@@ -3,75 +3,119 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MongoPilot – AI Copilot for MongoDB</title>
+  <title>MongoPilot – Coming Soon</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    body {
+    * {
+      box-sizing: border-box;
       margin: 0;
+      padding: 0;
+    }
+
+    body {
       font-family: 'Inter', sans-serif;
-      background: #0e0e0e;
+      background-color: #0e0e0e;
       color: #ffffff;
+      min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      text-align: center;
-    }
-    .container {
-      max-width: 600px;
       padding: 2rem;
     }
-    h1 {
+
+    .wrapper {
+      max-width: 700px;
+      text-align: center;
+    }
+
+    .logo {
       font-size: 2.5rem;
+      font-weight: 700;
+      color: #21f379;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 1.2rem;
+      color: #aaa;
+      margin-bottom: 2rem;
+    }
+
+    .teaser {
+      background: #1a1a1a;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .teaser h2 {
+      font-size: 1.5rem;
       margin-bottom: 1rem;
       color: #21f379;
     }
-    p {
-      font-size: 1.1rem;
-      margin-bottom: 2rem;
-      color: #cfcfcf;
+
+    .teaser ul {
+      list-style: none;
+      line-height: 1.8;
+      color: #ddd;
     }
-    .email-box {
-      display: flex;
-      justify-content: center;
+
+    .about {
+      font-size: 0.95rem;
+      color: #999;
       margin-top: 2rem;
     }
-    input[type="email"] {
-      padding: 0.8rem 1rem;
-      border: none;
-      border-radius: 4px 0 0 4px;
-      width: 60%;
-      font-size: 1rem;
+
+    .footer {
+      font-size: 0.9rem;
+      color: #666;
+      margin-top: 3rem;
     }
-    button {
-      padding: 0.8rem 1.2rem;
-      border: none;
-      background: #21f379;
-      color: #0e0e0e;
-      font-weight: bold;
-      cursor: pointer;
-      border-radius: 0 4px 4px 0;
-      transition: background 0.3s ease;
+
+    .highlight {
+      color: #21f379;
     }
-    button:hover {
-      background: #18c567;
-    }
-    .tagline {
-      font-size: 1rem;
-      color: #999;
+
+    @media (max-width: 600px) {
+      .logo { font-size: 2rem; }
+      .teaser h2 { font-size: 1.25rem; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>MongoPilot</h1>
-    <p>The AI Copilot that speaks MongoDB like a human.</p>
-    <div class="email-box">
-      <input type="email" placeholder="you@example.com" disabled />
-      <button disabled>Coming Soon</button>
+  <div class="wrapper">
+    <div class="logo">MongoPilot</div>
+    <div class="subtitle">An AI Copilot for MongoDB. Built for developers. Coming very soon.</div>
+
+    <div class="teaser">
+      <h2>🚀 What’s Coming</h2>
+      <ul>
+        <li>🧠 Natural language → MongoDB query conversion</li>
+        <li>🔍 Schema-aware auto-completion</li>
+        <li>🧾 Safe previews + undo for data mutations</li>
+        <li>🔐 Secure connection via static proxy IP</li>
+        <li>📊 Visual insights from your live data</li>
+      </ul>
     </div>
-    <p class="tagline">Launching soon. Stay tuned.</p>
+
+    <div class="teaser">
+      <h2>👨‍💻 Built By</h2>
+      <ul>
+        <li><strong>Gundam Himavarshith Reddy</strong> aka <strong>Siddu</strong></li>
+        <li>MongoDB Certified Developer</li>
+        <li>Founder of <em>What2Eat</em> App</li>
+        <li>Dreamer. Builder. Doer.</li>
+      </ul>
+    </div>
+
+    <div class="about">
+      This tool will change the way developers interact with MongoDB. No more syntax hunting — just say what you need and let the AI handle the rest.
+    </div>
+
+    <div class="footer">
+      <em>Stay tuned – launching in public beta soon.</em>
+    </div>
   </div>
 </body>
 </html>
