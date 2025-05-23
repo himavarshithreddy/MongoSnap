@@ -3,16 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MongoPilot – Coming Soon</title>
+  <title>MongoPilot – AI-Powered MongoDB Assistant</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --primary: #21f379;
-      --bg-dark: #0e0e0e;
-      --bg-card: #1a1a1a;
+      --primary-dark: #1acc65;
+      --bg-dark: #0a0a0a;
+      --bg-card: #141414;
       --text: #ffffff;
       --text-muted: #999;
+      --gradient: linear-gradient(135deg, var(--primary) 0%, #21b3f3 100%);
     }
 
     * {
@@ -21,148 +23,213 @@
       padding: 0;
     }
 
-    @keyframes fadeUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-      100% { transform: scale(1); }
+    html {
+      scroll-behavior: smooth;
     }
 
     body {
       font-family: 'Inter', sans-serif;
       background-color: var(--bg-dark);
       color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 2rem;
-      position: relative;
+      line-height: 1.6;
       overflow-x: hidden;
     }
 
-    body::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, var(--primary), transparent);
-      animation: pulse 3s infinite;
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
     }
 
-    .wrapper {
-      max-width: 800px;
-      text-align: center;
-      animation: fadeUp 0.8s ease-out;
+    /* Header Section */
+    .header {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      width: 150%;
+      height: 100%;
+      background: radial-gradient(circle at center, rgba(33, 243, 121, 0.1) 0%, transparent 70%);
+      z-index: 0;
+    }
+
+    .header-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo-container {
+      display: inline-block;
+      margin-bottom: 2rem;
+      position: relative;
     }
 
     .logo {
       font-family: 'Fira Code', monospace;
-      font-size: 3rem;
+      font-size: 4rem;
       font-weight: 700;
-      color: var(--primary);
-      margin-bottom: 0.5rem;
-      text-shadow: 0 0 20px rgba(33, 243, 121, 0.3);
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: fadeIn 1s ease-out;
     }
 
-    .subtitle {
-      font-size: 1.3rem;
-      color: #aaa;
-      margin-bottom: 3rem;
-      line-height: 1.5;
+    .terminal-cursor {
+      display: inline-block;
+      width: 4px;
+      height: 40px;
+      background: var(--primary);
+      animation: blink 1s infinite;
+      margin-left: 8px;
+      vertical-align: middle;
     }
 
-    .teaser {
-      background: var(--bg-card);
-      padding: 2.5rem;
-      border-radius: 16px;
-      margin-bottom: 2rem;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-      backdrop-filter: blur(5px);
-      transition: transform 0.3s ease;
-    }
-
-    .teaser:hover {
-      transform: translateY(-5px);
-    }
-
-    .teaser h2 {
-      font-family: 'Fira Code', monospace;
-      font-size: 1.6rem;
-      margin-bottom: 1.5rem;
-      color: var(--primary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-
-    .teaser ul {
-      list-style: none;
-      line-height: 2;
-      color: #ddd;
-    }
-
-    .teaser li {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      opacity: 0.9;
-      transition: opacity 0.2s ease;
-    }
-
-    .teaser li:hover {
-      opacity: 1;
-    }
-
-    .about {
-      font-size: 1.1rem;
+    .header-subtitle {
+      font-size: 1.5rem;
       color: var(--text-muted);
-      margin-top: 2rem;
-      line-height: 1.6;
-      padding: 2rem;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.05);
+      margin-bottom: 3rem;
+      max-width: 600px;
     }
 
-    .footer {
-      font-size: 0.9rem;
-      color: #666;
+    /* Features Grid */
+    .features {
+      padding: 6rem 0;
+      background: var(--bg-card);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
       margin-top: 3rem;
-      font-family: 'Fira Code', monospace;
     }
 
-    .highlight {
+    .feature-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 2rem;
+      border-radius: 16px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(33, 243, 121, 0.1);
+    }
+
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .feature-title {
+      font-family: 'Fira Code', monospace;
       color: var(--primary);
+      margin-bottom: 1rem;
+    }
+
+    /* Code Preview Section */
+    .code-preview {
+      padding: 6rem 0;
       position: relative;
     }
 
-    .code-block {
+    .code-window {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-top: 2rem;
       font-family: 'Fira Code', monospace;
-      background: rgba(33, 243, 121, 0.1);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+      gap: 0.5rem;
+    }
+
+    .window-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff5f56;
+    }
+
+    .window-dot:nth-child(2) { background: #ffbd2e; }
+    .window-dot:nth-child(3) { background: #27c93f; }
+
+    .code-content {
+      color: var(--text-muted);
+    }
+
+    .code-highlight {
       color: var(--primary);
     }
 
-    /* Terminal-like animation for the subtitle */
-    .typing::after {
-      content: '|';
-      animation: blink 1s infinite;
+    /* About Section */
+    .about {
+      padding: 6rem 0;
+      background: var(--bg-card);
+    }
+
+    .profile {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      margin-top: 3rem;
+      padding: 2rem;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+    }
+
+    .profile-info {
+      flex: 1;
+    }
+
+    .profile-title {
+      font-family: 'Fira Code', monospace;
+      color: var(--primary);
+      margin-bottom: 1rem;
+    }
+
+    .profile-details {
+      list-style: none;
+    }
+
+    .profile-details li {
+      margin-bottom: 0.5rem;
+      color: var(--text-muted);
+    }
+
+    /* Footer */
+    .footer {
+      padding: 4rem 0;
+      text-align: center;
+      background: var(--bg-dark);
+    }
+
+    .npm-install {
+      display: inline-block;
+      font-family: 'Fira Code', monospace;
+      background: var(--bg-card);
+      padding: 1rem 2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes blink {
@@ -170,46 +237,102 @@
       50% { opacity: 0; }
     }
 
-    @media (max-width: 600px) {
-      .logo { font-size: 2.2rem; }
-      .teaser h2 { font-size: 1.3rem; }
-      .teaser { padding: 1.5rem; }
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .logo { font-size: 3rem; }
+      .header-subtitle { font-size: 1.2rem; }
+      .features-grid { grid-template-columns: 1fr; }
+      .profile { flex-direction: column; text-align: center; }
     }
   </style>
 </head>
 <body>
-  <div class="wrapper">
-    <div class="logo">> MongoPilot_</div>
-    <div class="subtitle typing">An AI Copilot for MongoDB. Built for developers. Coming very soon.</div>
-
-    <div class="teaser">
-      <h2>🚀 What's Coming</h2>
-      <ul>
-        <li><span class="code-block">db.find(</span> Natural language → MongoDB query conversion</li>
-        <li><span class="code-block">.autocomplete(</span> Schema-aware auto-completion</li>
-        <li><span class="code-block">.preview(</span> Safe previews + undo for data mutations</li>
-        <li><span class="code-block">.connect(</span> Secure connection via static proxy IP</li>
-        <li><span class="code-block">.analyze(</span> Visual insights from your live data</li>
-      </ul>
+  <header class="header">
+    <div class="container header-content">
+      <div class="logo-container">
+        <div class="logo">> MongoPilot_</div>
+        <span class="terminal-cursor"></span>
+      </div>
+      <p class="header-subtitle">
+        Your AI-powered MongoDB assistant that turns natural language into powerful queries. 
+        Built by developers, for developers.
+      </p>
     </div>
+  </header>
 
-    <div class="teaser">
-      <h2>👨‍💻 Built By</h2>
-      <ul>
-        <li>const developer = <span class="highlight">"Gundam Himavarshith Reddy"</span> // aka Siddu</li>
-        <li>certification: <span class="code-block">MongoDB.Certified.Developer</span></li>
-        <li>projects: [<span class="highlight">"What2Eat"</span>, ...]</li>
-        <li>traits: ["Dreamer", "Builder", "Doer"]</li>
-      </ul>
+  <section class="features">
+    <div class="container">
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <h3 class="feature-title">Natural Language Queries</h3>
+          <p>Transform plain English into optimized MongoDB queries instantly. No more syntax hunting.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3 class="feature-title">Smart Completion</h3>
+          <p>Context-aware suggestions based on your schema and query patterns.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-title">Safe Operations</div>
+          <p>Preview mutations, automatic backups, and one-click undo for peace of mind.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔐</div>
+          <h3 class="feature-title">Secure by Design</h3>
+          <p>Static IP proxy, encrypted connections, and zero data storage.</p>
+        </div>
+      </div>
     </div>
+  </section>
 
-    <div class="about">
-      This tool will change the way developers interact with MongoDB. No more syntax hunting — just say what you need and let the AI handle the rest.
+  <section class="code-preview">
+    <div class="container">
+      <div class="code-window">
+        <div class="code-header">
+          <span class="window-dot"></span>
+          <span class="window-dot"></span>
+          <span class="window-dot"></span>
+        </div>
+        <div class="code-content">
+          <span class="code-highlight">> </span>Show me all users who signed up last week and made a purchase<br>
+          <span class="code-highlight">Generating query...</span><br><br>
+          db.users.aggregate([<br>
+          &nbsp;&nbsp;{<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;$match: {<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;createdAt: { $gte: new Date("2024-03-10"), $lt: new Date("2024-03-17") },<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'purchases.0': { $exists: true }<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+          &nbsp;&nbsp;}<br>
+          ])
+        </div>
+      </div>
     </div>
+  </section>
 
-    <div class="footer">
-      <em>$ npm install mongopilot --coming-soon</em>
+  <section class="about">
+    <div class="container">
+      <div class="profile">
+        <div class="profile-info">
+          <h2 class="profile-title">const developer = {</h2>
+          <ul class="profile-details">
+            <li>name: "Himavarshith Reddy",</li>
+            <li>certification: "MongoDB.Certified.Developer",</li>
+            <li>projects: ["What2Eat", "MongoPilot"],</li>
+            <li>passion: "Building developer tools that matter"</li>
+          </ul>
+          <h2 class="profile-title">}</h2>
+        </div>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="npm-install">$ npm install mongopilot@beta --save-dev</div>
+      <p>Coming soon in public beta. Stay tuned for updates.</p>
+    </div>
+  </footer>
 </body>
 </html>
