@@ -5,107 +5,201 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MongoPilot – Coming Soon</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --primary: #21f379;
+      --bg-dark: #0e0e0e;
+      --bg-card: #1a1a1a;
+      --text: #ffffff;
+      --text-muted: #999;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
 
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #0e0e0e;
-      color: #ffffff;
+      background-color: var(--bg-dark);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
       padding: 2rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary), transparent);
+      animation: pulse 3s infinite;
     }
 
     .wrapper {
-      max-width: 700px;
+      max-width: 800px;
       text-align: center;
+      animation: fadeUp 0.8s ease-out;
     }
 
     .logo {
-      font-size: 2.5rem;
+      font-family: 'Fira Code', monospace;
+      font-size: 3rem;
       font-weight: 700;
-      color: #21f379;
+      color: var(--primary);
       margin-bottom: 0.5rem;
+      text-shadow: 0 0 20px rgba(33, 243, 121, 0.3);
     }
 
     .subtitle {
-      font-size: 1.2rem;
+      font-size: 1.3rem;
       color: #aaa;
-      margin-bottom: 2rem;
+      margin-bottom: 3rem;
+      line-height: 1.5;
     }
 
     .teaser {
-      background: #1a1a1a;
-      padding: 2rem;
-      border-radius: 12px;
+      background: var(--bg-card);
+      padding: 2.5rem;
+      border-radius: 16px;
       margin-bottom: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(5px);
+      transition: transform 0.3s ease;
+    }
+
+    .teaser:hover {
+      transform: translateY(-5px);
     }
 
     .teaser h2 {
-      font-size: 1.5rem;
-      margin-bottom: 1rem;
-      color: #21f379;
+      font-family: 'Fira Code', monospace;
+      font-size: 1.6rem;
+      margin-bottom: 1.5rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
     }
 
     .teaser ul {
       list-style: none;
-      line-height: 1.8;
+      line-height: 2;
       color: #ddd;
     }
 
+    .teaser li {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      opacity: 0.9;
+      transition: opacity 0.2s ease;
+    }
+
+    .teaser li:hover {
+      opacity: 1;
+    }
+
     .about {
-      font-size: 0.95rem;
-      color: #999;
+      font-size: 1.1rem;
+      color: var(--text-muted);
       margin-top: 2rem;
+      line-height: 1.6;
+      padding: 2rem;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
     }
 
     .footer {
       font-size: 0.9rem;
       color: #666;
       margin-top: 3rem;
+      font-family: 'Fira Code', monospace;
     }
 
     .highlight {
-      color: #21f379;
+      color: var(--primary);
+      position: relative;
+    }
+
+    .code-block {
+      font-family: 'Fira Code', monospace;
+      background: rgba(33, 243, 121, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      color: var(--primary);
+    }
+
+    /* Terminal-like animation for the subtitle */
+    .typing::after {
+      content: '|';
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
     }
 
     @media (max-width: 600px) {
-      .logo { font-size: 2rem; }
-      .teaser h2 { font-size: 1.25rem; }
+      .logo { font-size: 2.2rem; }
+      .teaser h2 { font-size: 1.3rem; }
+      .teaser { padding: 1.5rem; }
     }
   </style>
 </head>
 <body>
   <div class="wrapper">
-    <div class="logo">MongoPilot</div>
-    <div class="subtitle">An AI Copilot for MongoDB. Built for developers. Coming very soon.</div>
+    <div class="logo">> MongoPilot_</div>
+    <div class="subtitle typing">An AI Copilot for MongoDB. Built for developers. Coming very soon.</div>
 
     <div class="teaser">
-      <h2>🚀 What’s Coming</h2>
+      <h2>🚀 What's Coming</h2>
       <ul>
-        <li>🧠 Natural language → MongoDB query conversion</li>
-        <li>🔍 Schema-aware auto-completion</li>
-        <li>🧾 Safe previews + undo for data mutations</li>
-        <li>🔐 Secure connection via static proxy IP</li>
-        <li>📊 Visual insights from your live data</li>
+        <li><span class="code-block">db.find(</span> Natural language → MongoDB query conversion</li>
+        <li><span class="code-block">.autocomplete(</span> Schema-aware auto-completion</li>
+        <li><span class="code-block">.preview(</span> Safe previews + undo for data mutations</li>
+        <li><span class="code-block">.connect(</span> Secure connection via static proxy IP</li>
+        <li><span class="code-block">.analyze(</span> Visual insights from your live data</li>
       </ul>
     </div>
 
     <div class="teaser">
       <h2>👨‍💻 Built By</h2>
       <ul>
-        <li><strong>Gundam Himavarshith Reddy</strong> aka <strong>Siddu</strong></li>
-        <li>MongoDB Certified Developer</li>
-        <li>Founder of <em>What2Eat</em> App</li>
-        <li>Dreamer. Builder. Doer.</li>
+        <li>const developer = <span class="highlight">"Gundam Himavarshith Reddy"</span> // aka Siddu</li>
+        <li>certification: <span class="code-block">MongoDB.Certified.Developer</span></li>
+        <li>projects: [<span class="highlight">"What2Eat"</span>, ...]</li>
+        <li>traits: ["Dreamer", "Builder", "Doer"]</li>
       </ul>
     </div>
 
@@ -114,7 +208,7 @@
     </div>
 
     <div class="footer">
-      <em>Stay tuned – launching in public beta soon.</em>
+      <em>$ npm install mongopilot --coming-soon</em>
     </div>
   </div>
 </body>
