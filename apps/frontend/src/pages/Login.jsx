@@ -28,7 +28,7 @@ function Login() {
             {/* <div id='divider-desktop' className='w-[2px] h-150 bg-[#23533784] hidden md:block rounded-full m-auto'></div>
             <div id='divider-mobile' className='w-[90%] h-[2px] bg-[#23533784] md:hidden rounded-full m-auto'></div> */}
             <div id='right' className='md:w-[48%] w-full h-auto flex justify-center items-center md:px-10 md:py-5 px-0 py-3'>
-                <div className='md:w-[95%] w-full h-130  bg-[#17211b] bg-[#121c16] rounded-3xl  hover:bg-[#17241c] md:hover:scale-102 transition-all duration-300' ></div>
+                <div className='md:w-[95%] w-full h-130  bg-[#17211b] rounded-3xl  hover:bg-[#17241c] md:hover:scale-102 transition-all duration-300' ></div>
             </div>
             </div>
          </div>
