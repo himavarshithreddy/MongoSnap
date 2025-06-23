@@ -19,5 +19,6 @@ const userSchema = new mongoose.Schema({
     },
     isVerified: { type: Boolean, default: false },
     verificationToken: { type: String, default: null },
+    resetPasswordToken: { type: String, default: null },
 });
 module.exports = mongoose.model('User', userSchema);

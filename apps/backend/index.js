@@ -6,6 +6,8 @@ const cookieParser = require('cookie-parser');
 
 const authRoutes = require('./routes/auth');
 const testRoutes = require('./routes/test');
+const forgotPasswordRoutes = require('./routes/forgotpassword');
+const verifyRoutes = require('./routes/verify');
 
 dotenv.config();
 
@@ -19,7 +21,8 @@ app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
 app.use('/', testRoutes);
-app.use('/', require('./routes/verify'));
+app.use('/', verifyRoutes);
+app.use('/', forgotPasswordRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {

@@ -22,5 +22,12 @@ const sendVerificationEmail = async (email, token) => {
     html: `<p>Click the link to verify your email: <a href="${link}">${link}</a></p>`
   });
 };
-
-module.exports = { sendVerificationEmail };
+const sendResetPasswordEmail = async (email, link) => {
+    await transporter.sendMail({
+        from: `"MongoPilot" <noreply@himavarshithreddy.in>`,
+        to: email,
+        subject: "Reset your MongoPilot password",
+        html: `<p>Click the link to reset your password: <a href="${link}">${link}</a></p>`
+    });
+};
+module.exports = { sendVerificationEmail, sendResetPasswordEmail };

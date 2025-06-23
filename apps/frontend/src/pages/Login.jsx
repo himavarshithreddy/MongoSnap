@@ -23,6 +23,10 @@ function Login() {
     const [error, setError] = useState('');
     const [showPasswordStrength, setShowPasswordStrength] = useState(false);
     const [success, setSuccess] = useState('');
+    const [forgotEmail, setForgotEmail] = useState('');
+    const [forgotLoading, setForgotLoading] = useState(false);
+    const [forgotError, setForgotError] = useState('');
+    const [forgotSuccess, setForgotSuccess] = useState('');
 
     const handleInput = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -55,7 +59,38 @@ function Login() {
             setLoading(false);
         }
     };
-
+    const handleForgotPassword = async (e) => {
+        e.preventDefault();
+        setForgotLoading(true);
+        setForgotError('');
+        setForgotSuccess('');
+        
+        try {
+            const res = await fetch('http://192.168.1.10:4000/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: forgotEmail }),
+            });
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to send reset link');
+            }
+            
+            setForgotSuccess('Password reset link has been sent to your email address. Please check your inbox and follow the instructions to reset your password.');
+        } catch (err) {
+            setForgotError(err.message);
+        } finally {
+            setForgotLoading(false);
+        }
+    };
+    const resetForgotModal = () => {
+        setShowForgot(false);
+        setForgotEmail('');
+        setForgotError('');
+        setForgotSuccess('');
+        setForgotLoading(false);
+    };
     const allPasswordChecksPassed = passwordChecks.every(check => check.test(form.password));
 
     return (
@@ -64,13 +99,68 @@ function Login() {
             {showForgot && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
                     <div className="bg-[#17211b] rounded-xl p-8 md:w-[90vw] w-[95vw] max-w-md shadow-lg relative flex flex-col items-center">
-                        <button className="absolute top-3 right-3 text-gray-400 hover:text-white text-xl cursor-pointer" onClick={() => setShowForgot(false)}>&times;</button>
+                        <button 
+                            className="absolute top-3 right-3 text-gray-400 hover:text-white text-xl cursor-pointer" 
+                            onClick={resetForgotModal}
+                        >
+                            &times;
+                        </button>
                         <h2 className="text-2xl font-bold text-white mb-4">Forgot Password</h2>
                         <p className="text-gray-400 text-sm mb-4 text-center">Enter your email address and we'll send you a link to reset your password.</p>
-                        <form className="w-full flex flex-col gap-4">
-                            <input type="email" placeholder="Email Address" className="w-full h-12 rounded-md border-1 border-[#35c56a69] p-2 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white bg-transparent placeholder-gray-500" />
-                            <button type="submit" className="w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer">Send Reset Link</button>
-                        </form>
+                        
+                        {forgotSuccess ? (
+                            <div className="w-full text-center">
+                                <div className="flex items-center justify-center mb-4">
+                                    <svg className="w-12 h-12 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </div>
+                                <p className="text-green-400 mb-4">{forgotSuccess}</p>
+                                <button 
+                                    onClick={resetForgotModal}
+                                    className="w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        ) : (
+                            <form className="w-full flex flex-col gap-4" onSubmit={handleForgotPassword}>
+                                <input 
+                                    type="email" 
+                                    placeholder="Email Address" 
+                                    value={forgotEmail}
+                                    onChange={(e) => setForgotEmail(e.target.value)}
+                                    className="w-full h-12 rounded-md border-1 border-[#35c56a69] p-2 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white bg-transparent placeholder-gray-500" 
+                                />
+                                
+                                {forgotError && (
+                                    <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span>{forgotError}</span>
+                                    </div>
+                                )}
+                                
+                                {forgotLoading && (
+                                    <div className="flex items-center gap-2 text-green-300" role="status">
+                                        <svg className="animate-spin h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                        </svg>
+                                        <span>Sending reset link...</span>
+                                    </div>
+                                )}
+                                
+                                <button 
+                                    type="submit" 
+                                    disabled={forgotLoading || !forgotEmail}
+                                    className={`w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${forgotLoading || !forgotEmail ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                >
+                                    {forgotLoading ? 'Sending...' : 'Send Reset Link'}
+                                </button>
+                            </form>
+                        )}
                     </div>
                 </div>
             )}
