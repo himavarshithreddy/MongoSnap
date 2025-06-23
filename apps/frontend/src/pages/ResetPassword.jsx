@@ -74,13 +74,9 @@ function ResetPassword() {
         <div className="w-full min-h-screen bg-[#101813] flex justify-center items-center">
             <div className="bg-[#17211b] rounded-xl p-8 md:w-[90vw] w-[95vw] max-w-md shadow-lg">
                 <div className="text-center mb-8">
-                    <div className="w-60 h-10 text-[#0da850] rounded-full bg-[#101813] border-1 border-[#35c56a69] flex justify-center items-center mx-auto mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sparkles w-4 h-4 text-primary">
-                            <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
-                        </svg>
-                        <h1 className="text-sm ml-2">AI Powered Database Assistant</h1>
-                    </div>
-                    <h1 className="text-4xl font-bold text-white mb-2">Reset Password</h1>
+                    {/* MongoPilot Logo (copied from Login.jsx) */}
+                    <h1 className="text-5xl font-bold text-white tracking-wide mb-2">Mongo<span className="text-[#3CBC6B]">Pilot</span></h1>
+                    <h1 className="text-4xl font-bold text-white mb-2 mt-4">Reset Password</h1>
                     <p className="text-gray-400">Enter your new password below</p>
                 </div>
 

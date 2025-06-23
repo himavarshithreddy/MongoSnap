@@ -6,17 +6,12 @@ const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const { sendVerificationEmail } = require('../utils/mailer');
 dotenv.config();
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET ;
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET ;
 
 // Helper to generate tokens
 function generateAccessToken(user) {
   return jwt.sign({ id: user._id }, ACCESS_TOKEN_SECRET, { expiresIn: '1m' });
 }
-function generateRefreshToken(user) {
-  return jwt.sign({ id: user._id }, REFRESH_TOKEN_SECRET, { expiresIn: '1d' });
-}
-
 
 // POST /signup
 router.post('/signup', async (req, res) => {
@@ -36,13 +31,6 @@ router.post('/signup', async (req, res) => {
     await newUser.save();
 
     const accessToken = generateAccessToken(newUser);
-    const refreshToken = generateRefreshToken(newUser);
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-      maxAge: 1 * 24 * 60 * 60 * 1000 // 1 days
-    });
     await sendVerificationEmail(newUser.email, verificationToken);
 
     res.status(201).json({ message: 'Signup successful, please check your email for verification', token: accessToken, user: {id: newUser._id, name: newUser.name, email: newUser.email } });
@@ -67,47 +55,11 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: 'Invalid email or password' });
    
     const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
-    
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-      maxAge: 1 * 24 * 60 * 60 * 1000 // 1 days
-    });
-    
     res.status(200).json({ message: 'Login successful', token: accessToken, user: {id: user._id, name: user.name, email: user.email } });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ message: 'Server error during login' });
   }
-});
-
-// POST /refresh
-router.post('/refresh', (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
-  if (!refreshToken) {
-    return res.status(401).json({ message: 'No refresh token' });
-  }
-  
-  jwt.verify(refreshToken, REFRESH_TOKEN_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ message: 'Invalid refresh token' });
-    }
-    
-    const accessToken = generateAccessToken({ _id: decoded.id });
-    res.json({ token: accessToken });
-  });
-});
-
-// POST /logout
-router.post('/logout', (req, res) => {
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-  });
-  res.json({ message: 'Logged out' });
 });
 
 module.exports = router;

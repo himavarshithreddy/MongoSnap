@@ -22,43 +22,14 @@ function Home() {
                 ...(options.headers || {}),
                 'Authorization': `Bearer ${token}`
             },
-            credentials: 'include', // send cookies for refresh
+            credentials: 'include', // send cookies for future use if needed
         });
         
         if (res.status === 401) {
-            // Try to refresh token
-            try {
-                const refreshRes = await fetch('http://192.168.1.10:4000/api/auth/refresh', {
-                    method: 'POST',
-                    credentials: 'include',
-                });
-                
-                if (refreshRes.ok) {
-                    const refreshData = await refreshRes.json();
-                    localStorage.setItem('token', refreshData.token);
-                    
-                    // Retry original request with new token
-                    token = refreshData.token;
-                    res = await fetch(url, {
-                        ...options,
-                        headers: {
-                            ...(options.headers || {}),
-                            'Authorization': `Bearer ${token}`
-                        },
-                        credentials: 'include',
-                    });
-                } else {
-                    // Refresh failed, force logout
-                    localStorage.removeItem('token');
-                    navigate('/login');
-                    return null;
-                }
-            } catch {
-                // Refresh failed, force logout
-                localStorage.removeItem('token');
-                navigate('/login');
-                return null;
-            }
+            // Just logout on 401, do not try to refresh
+            localStorage.removeItem('token');
+            navigate('/login');
+            return null;
         }
         return res;
     };

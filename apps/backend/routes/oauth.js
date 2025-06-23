@@ -13,15 +13,10 @@ const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
 // Helper to generate tokens
 function generateAccessToken(user) {
     return jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1m' });
-}
-
-function generateRefreshToken(user) {
-    return jwt.sign({ id: user._id }, REFRESH_TOKEN_SECRET, { expiresIn: '1d' });
 }
 
 // Step 1: Redirect to Google OAuth
@@ -140,15 +135,6 @@ router.get('/google/callback', async (req, res) => {
         // Generate JWT
         const token = generateAccessToken(user);
 
-        // Generate refresh token and set as cookie
-        const refreshToken = generateRefreshToken(user);
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 1 * 24 * 60 * 60 * 1000 // 1 day
-        });
-
         console.log('Redirecting to frontend...');
 
         // Redirect to frontend popup with token
@@ -266,15 +252,6 @@ router.get('/github/callback', async (req, res) => {
 
         // Generate JWT
         const token = generateAccessToken(user);
-
-        // Generate refresh token and set as cookie
-        const refreshToken = generateRefreshToken(user);
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 1 * 24 * 60 * 60 * 1000 // 1 day
-        });
 
         console.log('Redirecting to frontend...');
 
