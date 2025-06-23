@@ -11,7 +11,7 @@ const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET ;
 
 // Helper to generate tokens
 function generateAccessToken(user) {
-  return jwt.sign({ id: user._id }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
+  return jwt.sign({ id: user._id }, ACCESS_TOKEN_SECRET, { expiresIn: '1m' });
 }
 function generateRefreshToken(user) {
   return jwt.sign({ id: user._id }, REFRESH_TOKEN_SECRET, { expiresIn: '1d' });
@@ -40,8 +40,8 @@ router.post('/signup', async (req, res) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      sameSite: 'none',
+      maxAge: 1 * 24 * 60 * 60 * 1000 // 1 days
     });
     await sendVerificationEmail(newUser.email, verificationToken);
 
@@ -57,8 +57,6 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   const jwt = require('jsonwebtoken');
 
- 
-  
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: 'Invalid email or password' });
@@ -70,15 +68,17 @@ router.post('/login', async (req, res) => {
    
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+    
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'none',
       maxAge: 1 * 24 * 60 * 60 * 1000 // 1 days
     });
+    
     res.status(200).json({ message: 'Login successful', token: accessToken, user: {id: user._id, name: user.name, email: user.email } });
   } catch (err) {
-    console.error(err);
+    console.error('Login error:', err);
     res.status(500).json({ message: 'Server error during login' });
   }
 });
@@ -86,9 +86,15 @@ router.post('/login', async (req, res) => {
 // POST /refresh
 router.post('/refresh', (req, res) => {
   const refreshToken = req.cookies.refreshToken;
-  if (!refreshToken) return res.status(401).json({ message: 'No refresh token' });
+  if (!refreshToken) {
+    return res.status(401).json({ message: 'No refresh token' });
+  }
+  
   jwt.verify(refreshToken, REFRESH_TOKEN_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ message: 'Invalid refresh token' });
+    if (err) {
+      return res.status(403).json({ message: 'Invalid refresh token' });
+    }
+    
     const accessToken = generateAccessToken({ _id: decoded.id });
     res.json({ token: accessToken });
   });
@@ -99,7 +105,7 @@ router.post('/logout', (req, res) => {
   res.clearCookie('refreshToken', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
   });
   res.json({ message: 'Logged out' });
 });

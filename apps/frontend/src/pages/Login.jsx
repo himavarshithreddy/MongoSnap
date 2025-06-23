@@ -27,6 +27,62 @@ function Login() {
     const [forgotLoading, setForgotLoading] = useState(false);
     const [forgotError, setForgotError] = useState('');
     const [forgotSuccess, setForgotSuccess] = useState('');
+    const [oauthLoading, setOauthLoading] = useState(false);
+    const [redirecting, setRedirecting] = useState(false);
+
+    // Popup window reference
+    const [popupWindow, setPopupWindow] = useState(null);
+
+    // Listen for messages from popup
+    useEffect(() => {
+        const handleMessage = (event) => {
+            // Only accept messages from our own domain
+            if (event.origin !== window.location.origin) return;
+            
+            if (event.data.type === 'OAUTH_SUCCESS') {
+                const { token } = event.data;
+                localStorage.setItem('token', token);
+                setOauthLoading(false);
+                setPopupWindow(null);
+                window.location.href = '/'; // Redirect to home
+            } else if (event.data.type === 'OAUTH_ERROR') {
+                setError(event.data.error || 'OAuth authentication failed');
+                setOauthLoading(false);
+                setPopupWindow(null);
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, []);
+
+    // Check if popup is closed and handle timeout
+    useEffect(() => {
+        if (!popupWindow) return;
+
+        const checkClosed = setInterval(() => {
+            if (popupWindow.closed) {
+                setPopupWindow(null);
+                setOauthLoading(false);
+                clearInterval(checkClosed);
+            }
+        }, 1000);
+
+        // Timeout after 5 minutes
+        const timeout = setTimeout(() => {
+            if (popupWindow && !popupWindow.closed) {
+                popupWindow.close();
+                setError('Authentication timed out. Please try again.');
+                setOauthLoading(false);
+                setPopupWindow(null);
+            }
+        }, 5 * 60 * 1000);
+
+        return () => {
+            clearInterval(checkClosed);
+            clearTimeout(timeout);
+        };
+    }, [popupWindow]);
 
     const handleInput = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -50,9 +106,23 @@ function Login() {
                 });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Something went wrong');
-            setSuccess(data.message);
+            
+            // Store token and user info
             localStorage.setItem('token', data.token);
-            // Optionally: save user info, redirect, etc.
+            
+            if (mode === 'login') {
+                // For login, redirect to home immediately
+                setSuccess('Login successful! Redirecting to home page...');
+                setRedirecting(true);
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 500); 
+            } else {
+               
+                setSuccess(data.message);
+               
+                setForm({ name: '', email: '', password: '' });
+            }
         } catch (err) {
             setError(err.message);
         } finally {
@@ -92,7 +162,27 @@ function Login() {
         setForgotLoading(false);
     };
     const allPasswordChecksPassed = passwordChecks.every(check => check.test(form.password));
-
+    const handleGoogleLogin = () => {
+        setOauthLoading(true);
+        setError(''); // Clear any previous errors
+        
+        const popup = window.open(
+            'http://192.168.1.10:4000/api/auth/google', 
+            'googleOAuth', 
+            'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+        );
+        
+        if (!popup) {
+            setError('Popup blocked! Please allow popups for this site and try again.');
+            setOauthLoading(false);
+            return;
+        }
+        
+        setPopupWindow(popup);
+        
+        // Focus the popup
+        popup.focus();
+    };
     return (
         <div id='main' className='w-full min-h-screen bg-[#101813] flex justify-center items-center'>
             {/* Forgot Password Modal */}
@@ -165,6 +255,32 @@ function Login() {
                 </div>
             )}
             <div id='container' className='md:w-[85%] w-[95%] mx-auto min-h-full bg-[#121c16] rounded-lg flex md:justify-between md:flex-row flex-col md:gap-0 gap-10 py-10 md:py-5'>
+                {/* OAuth Popup Overlay */}
+                {oauthLoading && popupWindow && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                        <div className="bg-[#17211b] rounded-xl p-8 max-w-md w-[90%] shadow-lg text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+                            <h2 className="text-xl font-bold text-white mb-4">Google Sign-In</h2>
+                            <p className="text-gray-400 mb-4">
+                                A popup window has opened for Google authentication. 
+                                Please complete the sign-in process in the popup window.
+                            </p>
+                            <p className="text-sm text-gray-500 mb-4">
+                                If you don't see the popup, check your browser's popup blocker settings.
+                            </p>
+                            <button 
+                                onClick={() => {
+                                    popupWindow.close();
+                                    setOauthLoading(false);
+                                    setPopupWindow(null);
+                                }}
+                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <div id='left' className='md:w-[60%] w-full min-h-full flex flex-col md:pl-10 md:py-5 md:pr-50 px-4 py-3 mb-5 md:mb-0 items-center md:items-start'>
                     <div  className='w-60 h-10 text-[#0da850] rounded-full bg-[#101813] border-1 border-[#35c56a69] flex justify-center items-center '>
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sparkles w-4 h-4 text-primary cz-color-4825622 cz-color-3813676"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
@@ -273,27 +389,51 @@ function Login() {
                                     <div className="flex items-center gap-2 bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded mb-2" role="status">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-400"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                         <span>{success}</span>
+                                        {redirecting && (
+                                            <button 
+                                                onClick={() => window.location.href = '/'}
+                                                className="ml-2 text-xs bg-green-600 px-2 py-1 rounded hover:bg-green-700"
+                                            >
+                                                Go Now
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                                 {loading && (
                                     <div className="flex items-center gap-2 text-green-300 mb-2" role="status">
                                         <svg className="animate-spin h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
-                                        <span>Loading...</span>
+                                        <span>{redirecting ? 'Redirecting...' : 'Loading...'}</span>
                                     </div>
                                 )}
                                 <button
-                                    disabled={loading || (mode === 'signup' && !allPasswordChecksPassed)}
-                                    className={`w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${loading || (mode === 'signup' && !allPasswordChecksPassed) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    disabled={loading || redirecting || (mode === 'signup' && !allPasswordChecksPassed)}
+                                    className={`w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${loading || redirecting || (mode === 'signup' && !allPasswordChecksPassed) ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 >
-                                    {mode === 'login' ? 'Sign in' : 'Sign up'}
+                                    {redirecting ? 'Redirecting...' : (mode === 'login' ? 'Sign in' : 'Sign up')}
                                 </button>
                             </div>
                         </form>
                         <p className='uppercase text-gray-400 text-[12px] md:text-sm mt-5'>or</p>
                         <div className='md:w-[85%] w-[90%] h-auto flex gap-5 mt-5 flex-col'>
-                            <button className='w-full h-12 rounded-md border-1 border-[#35c56a69] text-white text-md font-semibold  hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer flex items-center justify-center gap-3'>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 48 48"><path fill="white" d="M43.611 20.083H42V20H24v8h11.303c-1.627 4.657-6.084 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.438 0 4.7.749 6.573 2.027l6.571-6.571C34.047 5.053 29.268 3 24 3C12.954 3 4 11.954 4 23s8.954 20 20 20c11.045 0 19.799-7.969 19.799-19.014c0-1.276-.138-2.254-.314-3.217z"/></svg>
-                               Continue with Google
+                            <button 
+                                onClick={handleGoogleLogin} 
+                                disabled={oauthLoading}
+                                className={`w-full h-12 rounded-md border-1 border-[#35c56a69] text-white text-md font-semibold hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer flex items-center justify-center gap-3 ${oauthLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                                {oauthLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                        </svg>
+                                        Connecting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 48 48"><path fill="white" d="M43.611 20.083H42V20H24v8h11.303c-1.627 4.657-6.084 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.438 0 4.7.749 6.573 2.027l6.571-6.571C34.047 5.053 29.268 3 24 3C12.954 3 4 11.954 4 23s8.954 20 20 20c11.045 0 19.799-7.969 19.799-19.014c0-1.276-.138-2.254-.314-3.217z"/></svg>
+                                        Continue with Google
+                                    </>
+                                )}
                             </button>
                             <button className='w-full h-12 rounded-md border-1 border-[#35c56a69] text-white text-md font-semibold hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer flex items-center justify-center gap-3'>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489c.5.092.682-.217.682-.483c0-.237-.009-.868-.014-1.703c-2.782.604-3.369-1.342-3.369-1.342c-.454-1.154-1.11-1.461-1.11-1.461c-.908-.62.069-.608.069-.608c1.004.07 1.532 1.032 1.532 1.032c.892 1.528 2.341 1.087 2.91.832c.092-.647.35-1.087.636-1.338c-2.221-.253-4.555-1.112-4.555-4.951c0-1.093.39-1.988 1.029-2.688c-.103-.253-.446-1.272.098-2.65c0 0 .84-.27 2.75 1.025A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337c1.909-1.295 2.748-1.025 2.748-1.025c.546 1.378.202 2.397.1 2.65c.64.7 1.028 1.595 1.028 2.688c0 3.848-2.337 4.695-4.566 4.944c.359.309.678.919.678 1.852c0 1.336-.012 2.417-.012 2.747c0 .268.18.579.688.481A10.013 10.013 0 0 0 22 12c0-5.523-4.477-10-10-10"/></svg>

@@ -11,7 +11,9 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: true,
+        required: function() {
+            return !this.oauthProvider; // Password only required for non-OAuth users
+        },
     },
     createdAt: {
         type: Date,
@@ -20,5 +22,7 @@ const userSchema = new mongoose.Schema({
     isVerified: { type: Boolean, default: false },
     verificationToken: { type: String, default: null },
     resetPasswordToken: { type: String, default: null },
+    oauthProvider: { type: String, default: null }, // 'google', 'github', etc.
+    oauthId: { type: String, default: null }, // OAuth provider's user ID
 });
 module.exports = mongoose.model('User', userSchema);
