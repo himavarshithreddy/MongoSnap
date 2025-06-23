@@ -47,6 +47,7 @@ function Login() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Something went wrong');
             setSuccess(data.message);
+            localStorage.setItem('token', data.token);
             // Optionally: save user info, redirect, etc.
         } catch (err) {
             setError(err.message);
