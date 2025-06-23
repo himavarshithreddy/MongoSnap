@@ -27,7 +27,8 @@ function Login() {
     const [forgotLoading, setForgotLoading] = useState(false);
     const [forgotError, setForgotError] = useState('');
     const [forgotSuccess, setForgotSuccess] = useState('');
-    const [oauthLoading, setOauthLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const [githubLoading, setGithubLoading] = useState(false);
     const [redirecting, setRedirecting] = useState(false);
 
     // Popup window reference
@@ -42,12 +43,14 @@ function Login() {
             if (event.data.type === 'OAUTH_SUCCESS') {
                 const { token } = event.data;
                 localStorage.setItem('token', token);
-                setOauthLoading(false);
+                setGoogleLoading(false);
+                setGithubLoading(false);
                 setPopupWindow(null);
                 window.location.href = '/'; // Redirect to home
             } else if (event.data.type === 'OAUTH_ERROR') {
                 setError(event.data.error || 'OAuth authentication failed');
-                setOauthLoading(false);
+                setGoogleLoading(false);
+                setGithubLoading(false);
                 setPopupWindow(null);
             }
         };
@@ -63,7 +66,8 @@ function Login() {
         const checkClosed = setInterval(() => {
             if (popupWindow.closed) {
                 setPopupWindow(null);
-                setOauthLoading(false);
+                setGoogleLoading(false);
+                setGithubLoading(false);
                 clearInterval(checkClosed);
             }
         }, 1000);
@@ -73,7 +77,8 @@ function Login() {
             if (popupWindow && !popupWindow.closed) {
                 popupWindow.close();
                 setError('Authentication timed out. Please try again.');
-                setOauthLoading(false);
+                setGoogleLoading(false);
+                setGithubLoading(false);
                 setPopupWindow(null);
             }
         }, 5 * 60 * 1000);
@@ -163,7 +168,7 @@ function Login() {
     };
     const allPasswordChecksPassed = passwordChecks.every(check => check.test(form.password));
     const handleGoogleLogin = () => {
-        setOauthLoading(true);
+        setGoogleLoading(true);
         setError(''); // Clear any previous errors
         
         const popup = window.open(
@@ -174,7 +179,7 @@ function Login() {
         
         if (!popup) {
             setError('Popup blocked! Please allow popups for this site and try again.');
-            setOauthLoading(false);
+            setGoogleLoading(false);
             return;
         }
         
@@ -183,6 +188,29 @@ function Login() {
         // Focus the popup
         popup.focus();
     };
+
+    const handleGitHubLogin = () => {
+        setGithubLoading(true);
+        setError(''); // Clear any previous errors
+        
+        const popup = window.open(
+            'http://192.168.1.10:4000/api/auth/github', 
+            'githubOAuth', 
+            'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+        );
+        
+        if (!popup) {
+            setError('Popup blocked! Please allow popups for this site and try again.');
+            setGithubLoading(false);
+            return;
+        }
+        
+        setPopupWindow(popup);
+        
+        // Focus the popup
+        popup.focus();
+    };
+
     return (
         <div id='main' className='w-full min-h-screen bg-[#101813] flex justify-center items-center'>
             {/* Forgot Password Modal */}
@@ -256,13 +284,13 @@ function Login() {
             )}
             <div id='container' className='md:w-[85%] w-[95%] mx-auto min-h-full bg-[#121c16] rounded-lg flex md:justify-between md:flex-row flex-col md:gap-0 gap-10 py-10 md:py-5'>
                 {/* OAuth Popup Overlay */}
-                {oauthLoading && popupWindow && (
+                {(googleLoading || githubLoading) && popupWindow && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
                         <div className="bg-[#17211b] rounded-xl p-8 max-w-md w-[90%] shadow-lg text-center">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-                            <h2 className="text-xl font-bold text-white mb-4">Google Sign-In</h2>
+                            <h2 className="text-xl font-bold text-white mb-4">OAuth Authentication</h2>
                             <p className="text-gray-400 mb-4">
-                                A popup window has opened for Google authentication. 
+                                A popup window has opened for authentication. 
                                 Please complete the sign-in process in the popup window.
                             </p>
                             <p className="text-sm text-gray-500 mb-4">
@@ -271,7 +299,8 @@ function Login() {
                             <button 
                                 onClick={() => {
                                     popupWindow.close();
-                                    setOauthLoading(false);
+                                    setGoogleLoading(false);
+                                    setGithubLoading(false);
                                     setPopupWindow(null);
                                 }}
                                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
@@ -417,10 +446,10 @@ function Login() {
                         <div className='md:w-[85%] w-[90%] h-auto flex gap-5 mt-5 flex-col'>
                             <button 
                                 onClick={handleGoogleLogin} 
-                                disabled={oauthLoading}
-                                className={`w-full h-12 rounded-md border-1 border-[#35c56a69] text-white text-md font-semibold hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer flex items-center justify-center gap-3 ${oauthLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                disabled={googleLoading}
+                                className={`w-full h-12 rounded-md border-1 border-[#35c56a69] text-white text-md font-semibold hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer flex items-center justify-center gap-3 ${googleLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
                             >
-                                {oauthLoading ? (
+                                {googleLoading ? (
                                     <>
                                         <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -435,9 +464,25 @@ function Login() {
                                     </>
                                 )}
                             </button>
-                            <button className='w-full h-12 rounded-md border-1 border-[#35c56a69] text-white text-md font-semibold hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer flex items-center justify-center gap-3'>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489c.5.092.682-.217.682-.483c0-.237-.009-.868-.014-1.703c-2.782.604-3.369-1.342-3.369-1.342c-.454-1.154-1.11-1.461-1.11-1.461c-.908-.62.069-.608.069-.608c1.004.07 1.532 1.032 1.532 1.032c.892 1.528 2.341 1.087 2.91.832c.092-.647.35-1.087.636-1.338c-2.221-.253-4.555-1.112-4.555-4.951c0-1.093.39-1.988 1.029-2.688c-.103-.253-.446-1.272.098-2.65c0 0 .84-.27 2.75 1.025A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337c1.909-1.295 2.748-1.025 2.748-1.025c.546 1.378.202 2.397.1 2.65c.64.7 1.028 1.595 1.028 2.688c0 3.848-2.337 4.695-4.566 4.944c.359.309.678.919.678 1.852c0 1.336-.012 2.417-.012 2.747c0 .268.18.579.688.481A10.013 10.013 0 0 0 22 12c0-5.523-4.477-10-10-10"/></svg>
-                                Continue with Github
+                            <button 
+                                onClick={handleGitHubLogin} 
+                                disabled={githubLoading}
+                                className={`w-full h-12 rounded-md border-1 border-[#35c56a69] text-white text-md font-semibold hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer flex items-center justify-center gap-3 ${githubLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                                {githubLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                        </svg>
+                                        Connecting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489c.5.092.682-.217.682-.483c0-.237-.009-.868-.014-1.703c-2.782.604-3.369-1.342-3.369-1.342c-.454-1.154-1.11-1.461-1.11-1.461c-.908-.62.069-.608.069-.608c1.004.07 1.532 1.032 1.532 1.032c.892 1.528 2.341 1.087 2.91.832c.092-.647.35-1.087.636-1.338c-2.221-.253-4.555-1.112-4.555-4.951c0-1.093.39-1.988 1.029-2.688c-.103-.253-.446-1.272.098-2.65c0 0 .84-.27 2.75 1.025A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337c1.909-1.295 2.748-1.025 2.748-1.025c.546 1.378.202 2.397.1 2.65c.64.7 1.028 1.595 1.028 2.688c0 3.848-2.337 4.695-4.566 4.944c.359.309.678.919.678 1.852c0 1.336-.012 2.417-.012 2.747c0 .268.18.579.688.481A10.013 10.013 0 0 0 22 12c0-5.523-4.477-10-10-10"/></svg>
+                                        Continue with GitHub
+                                    </>
+                                )}
                             </button>
                         </div>
                         <a onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} className='text-[#11a15e] text-md mt-5 cursor-pointer focus:outline-none md:hover:underline'>{mode === 'login' ? "Don't have an account?" : 'Already have an account?'} <span className='underline'>{mode === 'login' ? 'Sign up' : 'Sign in'}</span></a>
