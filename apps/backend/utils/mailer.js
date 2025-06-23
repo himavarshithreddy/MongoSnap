@@ -1,0 +1,26 @@
+// utils/mailer.js
+const nodemailer = require('nodemailer');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const transporter = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_EMAIL,
+    pass: process.env.BREVO_API_KEY
+  }
+});
+
+const sendVerificationEmail = async (email, token) => {
+  const link = `http://192.168.1.10:4000/verify-email/${token}`;
+  await transporter.sendMail({
+    from: `"MongoPilot" <noreply@himavarshithreddy.in>`,
+    to: email,
+    subject: "Verify your MongoPilot account",
+    html: `<p>Click the link to verify your email: <a href="${link}">${link}</a></p>`
+  });
+};
+
+module.exports = { sendVerificationEmail };

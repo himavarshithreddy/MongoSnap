@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 
 const authRoutes = require('./routes/auth');
 const testRoutes = require('./routes/test');
@@ -9,11 +10,16 @@ const testRoutes = require('./routes/test');
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: 'http://192.168.1.10:5173',
+  credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
 app.use('/', testRoutes);
+app.use('/', require('./routes/verify'));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
