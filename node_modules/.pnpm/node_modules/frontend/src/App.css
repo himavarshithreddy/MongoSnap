@@ -1,6 +1,1 @@
 @import "tailwindcss";
-
-.max-w-custom {
-  max-width: 85%;
-  min-width: 85%;
-}

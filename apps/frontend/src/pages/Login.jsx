@@ -1,14 +1,62 @@
-import React, { useEffect,useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import '../App.css'
 import { Eye, EyeOff } from 'lucide-react';     
+
+/** Password strength check utility */
+const passwordChecks = [
+  { label: 'At least 8 characters', test: (pw) => pw.length >= 8 },
+  { label: 'One uppercase letter', test: (pw) => /[A-Z]/.test(pw) },
+  { label: 'One lowercase letter', test: (pw) => /[a-z]/.test(pw) },
+  { label: 'One number', test: (pw) => /[0-9]/.test(pw) },
+  { label: 'One special character', test: (pw) => /[^A-Za-z0-9]/.test(pw) },
+];
 
 function Login() {
     useEffect(() => {
         document.title = "MongoPilot - Login";
-      }, []);
+    }, []);
     const [showpassword, setShowpassword] = useState(false);
     const [mode, setMode] = useState('login');
     const [showForgot, setShowForgot] = useState(false);
+    const [form, setForm] = useState({ name: '', email: '', password: '' });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [showPasswordStrength, setShowPasswordStrength] = useState(false);
+    const [success, setSuccess] = useState('');
+
+    const handleInput = (e) => {
+        setForm({ ...form, [e.target.name]: e.target.value });
+    };
+
+    const handleAuth = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
+        const payload = mode === 'login'
+            ? { email: form.email, password: form.password }
+            : { name: form.name, email: form.email, password: form.password };
+        try {
+            const res = await fetch(`http://192.168.1.10:4000${endpoint}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Something went wrong');
+            setSuccess(data.message);
+            // Optionally: save user info, redirect, etc.
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const allPasswordChecksPassed = passwordChecks.every(check => check.test(form.password));
+
     return (
         <div id='main' className='w-full min-h-screen bg-[#101813] flex justify-center items-center'>
             {/* Forgot Password Modal */}
@@ -25,10 +73,10 @@ function Login() {
                     </div>
                 </div>
             )}
-            <div id='container' className='w-full md:max-w-custom mx-auto min-h-full bg-[#121c16] rounded-lg flex md:justify-between md:flex-row flex-col md:gap-0 gap-10 py-10 md:py-5'>
+            <div id='container' className='md:w-[85%] w-[95%] mx-auto min-h-full bg-[#121c16] rounded-lg flex md:justify-between md:flex-row flex-col md:gap-0 gap-10 py-10 md:py-5'>
                 <div id='left' className='md:w-[60%] w-full min-h-full flex flex-col md:pl-10 md:py-5 md:pr-50 px-4 py-3 mb-5 md:mb-0 items-center md:items-start'>
                     <div  className='w-60 h-10 text-[#0da850] rounded-full bg-[#101813] border-1 border-[#35c56a69] flex justify-center items-center '>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles w-4 h-4 text-primary cz-color-4825622 cz-color-3813676"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" class="cz-color-4825622 cz-color-3813676"></path><path d="M20 3v4" class="cz-color-4825622 cz-color-3813676"></path><path d="M22 5h-4" class="cz-color-4825622 cz-color-3813676"></path><path d="M4 17v2" class="cz-color-4825622 cz-color-3813676"></path><path d="M5 18H3" class="cz-color-4825622 cz-color-3813676"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sparkles w-4 h-4 text-primary cz-color-4825622 cz-color-3813676"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
                         <h1 className=' text-sm ml-2'>AI Powered Database Assistant</h1>
                     </div>
                    
@@ -62,44 +110,92 @@ function Login() {
                 {/* <div id='divider-desktop' className='w-[2px] h-150 bg-[#23533784] hidden md:block rounded-full m-auto'></div>
                 <div id='divider-mobile' className='w-[90%] h-[2px] bg-[#23533784] md:hidden rounded-full m-auto'></div> */}
                 <div id='right' className='md:w-[40%] w-full h-auto flex justify-center items-center md:px-10 md:py-5 px-0 py-3'>
-                    <div className='md:w-[95%] w-full h-auto  bg-[#17211b] rounded-3xl  hover:bg-[#17241c] md:hover:scale-102 transition-all duration-300 flex flex-col items-center py-10' >
+                    <div className='md:w-[95%] w-full h-auto  bg-[#17211b] rounded-3xl  hover:bg-[#17241c]  transition-all duration-300 flex flex-col items-center py-10' >
                         <h1 className='text-4xl font-bold text-white'>{mode === 'login' ? 'Welcome Back' : 'Get Started'}</h1>
                         <p className='text-gray-400 text-lg mt-3'>{mode === 'login' ? 'Sign in to your MongoPilot account' : 'Create an account to get started'}</p>
-                        <form className='md:w-[85%] w-[90%] h-auto flex flex-col gap-5 mt-10'>
+                        <form className='md:w-[85%] w-[90%] h-auto flex flex-col gap-5 mt-10' onSubmit={handleAuth}>
                             <div className='w-full h-auto flex flex-col gap-5'>
                                 {mode === 'signup' && (
                                 <div className='w-full h-auto flex flex-col gap-2'>
                                 <label htmlFor='name' className='text-white text-sm font-bold'>Name</label>
-                                <input type='text' placeholder='Name' className='w-full placeholder-gray-500 h-12 rounded-md border-1 border-[#35c56a69] p-2 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white font-semibold' id='name' />
+                                <input type='text' name='name' placeholder='Name' className='w-full placeholder-gray-500 h-12 rounded-md border-1 border-[#35c56a69] p-2 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white font-semibold' id='name' value={form.name} onChange={handleInput} />
                                 </div>
                                 )}
                                 <div className='w-full h-auto flex flex-col gap-2'>
                                 <label htmlFor='email' className='text-white text-sm font-bold'>Email Address</label>
-                                <input type='email' placeholder='Email Address' className='w-full placeholder-gray-500 h-12 rounded-md border-1 border-[#35c56a69] p-2 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white font-semibold' id='email' />
+                                <input type='email' name='email' placeholder='Email Address' className='w-full placeholder-gray-500 h-12 rounded-md border-1 border-[#35c56a69] p-2 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white font-semibold' id='email' value={form.email} onChange={handleInput} />
                                 </div>
                                 <div className='w-full h-auto flex flex-col gap-2'>
                                 <label htmlFor='password' className='text-white text-sm font-bold'>Password</label>
                                 <div className='relative h-12 w-full'>
                                     <input 
                                         type={showpassword ? 'text' : 'password'}
+                                        name='password'
                                         placeholder='Password'
-                                        className='w-full h-12 placeholder-gray-500 rounded-md border-1 border-[#35c56a69] p-2 pr-10 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white font-semibold' 
+                                        className='w-full h-12 placeholder-gray-500 rounded-md border-1 border-[#35c56a69] p-2 pr-10 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white font-semibold}' 
                                         id='password' 
+                                        value={form.password}
+                                        onChange={handleInput}
+                                        onFocus={() => setShowPasswordStrength(true)}
+                                         onBlur={() => setShowPasswordStrength(false)}
                                     />
                                     <button
                                         type='button'
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-200 focus:outline-none"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-200 focus:outline-none cursor-pointer"
                                         onClick={() => setShowpassword((prev) => !prev)}
                                         tabIndex={-1}
                                     >
                                         {showpassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                     </button>
                                 </div>
+                                {/* Password strength indicators */}
+                                {mode === 'signup' && showPasswordStrength && (
+                                    <ul className="mt-2 space-y-1 text-xs">
+                                        {passwordChecks.map((check, idx) => {
+                                            const passed = check.test(form.password);
+                                            return (
+                                                <li key={idx} className={passed ? 'text-green-400 flex items-center gap-1' : 'text-red-400 flex items-center gap-1'}>
+                                                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="inline-block">
+                                                        {passed ? (
+                                                            <path d="M5 10l4 4 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                        ) : (
+                                                            <circle cx="10" cy="10" r="6" stroke="currentColor" strokeWidth="2" fill="none" />
+                                                        )}
+                                                    </svg>
+                                                    {check.label}
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                )}
                                 </div>
                                 {mode === 'login' && (
                                 <button type="button" onClick={() => setShowForgot(true)} className='w-auto h-5 text-[#11a15e] text-sm cursor-pointer self-end hover:underline'>Forgot Password?</button>
                                 )}
-                                <button className='w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer'>{mode === 'login' ? 'Sign in' : 'Sign up'}</button>
+                                {error && (
+                                    <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded mb-2 animate-shake" role="alert">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        <span>{error}</span>
+                                    </div>
+                                )}
+                                {success && (
+                                    <div className="flex items-center gap-2 bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded mb-2" role="status">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-400"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                        <span>{success}</span>
+                                    </div>
+                                )}
+                                {loading && (
+                                    <div className="flex items-center gap-2 text-green-300 mb-2" role="status">
+                                        <svg className="animate-spin h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+                                        <span>Loading...</span>
+                                    </div>
+                                )}
+                                <button
+                                    disabled={loading || (mode === 'signup' && !allPasswordChecksPassed)}
+                                    className={`w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${loading || (mode === 'signup' && !allPasswordChecksPassed) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                >
+                                    {mode === 'login' ? 'Sign in' : 'Sign up'}
+                                </button>
                             </div>
                         </form>
                         <p className='uppercase text-gray-400 text-[12px] md:text-sm mt-5'>or</p>
