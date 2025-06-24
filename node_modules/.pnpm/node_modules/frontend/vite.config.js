@@ -11,6 +11,7 @@ export default defineConfig({
   ],
   server: {
     host: true,
+    allowedHosts: ['mongopilot.mp'],
     proxy: {
       '/api': {
         target: 'http://192.168.1.10:4000',

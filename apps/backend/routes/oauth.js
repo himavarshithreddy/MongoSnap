@@ -28,7 +28,8 @@ function generateRefreshToken(user) {
     res.cookie('refreshToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // strict is best for refresh
+      sameSite: 'lax',
+      path: '/', // strict is best for refresh
       maxAge: 1 * 24 * 60 * 60 * 1000, // 1 day
     });
   }
