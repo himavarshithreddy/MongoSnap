@@ -14,19 +14,19 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendVerificationEmail = async (email, token) => {
-  const link = `http://mongopilot.mp:5173/api/verify-email/${token}`;
+  const link = `http://mongosnap.mp:5173/api/verify-email/${token}`;
   await transporter.sendMail({
-    from: `"MongoPilot" <noreply@himavarshithreddy.in>`,
+    from: `"MongoSnap" <noreply@himavarshithreddy.in>`,
     to: email,
-    subject: "Verify your MongoPilot account",
+    subject: "Verify your MongoSnap account",
     html: `<p>Click the link to verify your email: <a href="${link}">${link}</a></p>`
   });
 };
 const sendResetPasswordEmail = async (email, link) => {
     await transporter.sendMail({
-        from: `"MongoPilot" <noreply@himavarshithreddy.in>`,
+        from: `"MongoSnap" <noreply@himavarshithreddy.in>`,
         to: email,
-        subject: "Reset your MongoPilot password",
+        subject: "Reset your MongoSnap password",
         html: `<p>Click the link to reset your password: <a href="${link}">${link}</a></p>`
     });
 };

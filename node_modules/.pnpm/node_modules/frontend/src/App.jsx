@@ -5,13 +5,14 @@ import ResetPassword from './pages/ResetPassword'
 import ProtectedRoute from './ProtectedRoutes.jsx'
 import OAuthSuccess from './pages/OAuthSuccess'
 import OAuthPopup from './pages/OAuthPopup'
+import Connect from './pages/connect.jsx'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} /> */}
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />

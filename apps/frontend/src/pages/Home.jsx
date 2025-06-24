@@ -7,7 +7,7 @@ function Home() {
     const [error, setError] = useState('');
     const navigate = useNavigate();
     useEffect(() => {
-        document.title = "MongoPilot - Home";
+        document.title = "MongoSnap - Home";
     }, []);
     // Helper to fetch with auto-refresh
    // A flag and a promise for the refresh-in-progress
@@ -69,7 +69,7 @@ function Home() {
   }, [navigate]);
 
   useEffect(() => {
-    document.title = 'MongoPilot – Home';
+    document.title = 'MongoSnap – Home';
 
     const fetchUser = async () => {
       setLoading(true);

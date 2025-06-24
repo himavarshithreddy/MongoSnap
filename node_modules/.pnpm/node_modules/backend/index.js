@@ -13,7 +13,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: ['http://mongopilot.mp:5173'],
+  origin: ['http://mongosnap.mp:5173'],
   credentials: true,
   sameSite: 'lax'
 }));
@@ -35,5 +35,6 @@ mongoose.connect(process.env.MONGO_URI, {
 
 
 app.listen(4000,'0.0.0.0', () => {
-  console.log(`🚀 Server running on http://mongopilot.mp:4000`);
+  console.log(`🚀 Server running on http://mongosnap.mp:4000`);
+  console.log(`🚀 Frontend running on http://mongosnap.mp:5173`);
 });

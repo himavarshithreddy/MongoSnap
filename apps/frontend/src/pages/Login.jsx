@@ -13,7 +13,7 @@ const passwordChecks = [
 
 function Login() {
     useEffect(() => {
-        document.title = "MongoPilot - Login";
+        document.title = "MongoSnap - Login";
     }, []);
     const [showpassword, setShowpassword] = useState(false);
     const [mode, setMode] = useState('login');
@@ -317,7 +317,7 @@ function Login() {
                     </div>
                    
                    <div className='w-full h-auto pt-8'>
-                    <h1 className='md:text-8xl text-5xl font-bold text-white tracking-wide'>Mongo<span className='text-[#3CBC6B]'>Pilot</span></h1>
+                    <h1 className='md:text-8xl text-5xl font-bold text-white tracking-wide'>Mongo<span className='text-[#3CBC6B]'>Snap</span></h1>
                     <p className='text-gray-400 md:text-2xl text-sm md:mt-10 mt-5 leading-relaxed'>Transform your database interactions with intelligent natural language processing. Query, analyze, and manage your MongoDB databases like never before.</p>
                     <div id='left-containers' className='w-full h-auto flex gap-5 md:mt-12 mt-8 md:flex-row flex-col'>
                     <div className='w-full h-auto flex flex-col gap-5'>
@@ -348,7 +348,7 @@ function Login() {
                 <div id='right' className='md:w-[40%] w-full h-auto flex justify-center items-center md:px-10 md:py-5 px-0 py-3'>
                     <div className='md:w-[95%] w-full h-auto  bg-[#17211b] rounded-3xl  hover:bg-[#17241c]  transition-all duration-300 flex flex-col items-center py-10' >
                         <h1 className='text-4xl font-bold text-white'>{mode === 'login' ? 'Welcome Back' : 'Get Started'}</h1>
-                        <p className='text-gray-400 text-lg mt-3'>{mode === 'login' ? 'Sign in to your MongoPilot account' : 'Create an account to get started'}</p>
+                        <p className='text-gray-400 text-lg mt-3'>{mode === 'login' ? 'Sign in to your MongoSnap account' : 'Create an account to get started'}</p>
                         <form className='md:w-[85%] w-[90%] h-auto flex flex-col gap-5 mt-10' onSubmit={handleAuth}>
                             <div className='w-full h-auto flex flex-col gap-5'>
                                 {mode === 'signup' && (

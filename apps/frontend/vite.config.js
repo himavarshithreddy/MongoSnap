@@ -11,10 +11,10 @@ export default defineConfig({
   ],
   server: {
     host: true,
-    allowedHosts: ['mongopilot.mp'],
+    allowedHosts: ['mongosnap.mp'],
     proxy: {
       '/api': {
-        target: 'http://mongopilot.mp:4000',
+        target: 'http://mongosnap.mp:4000',
         changeOrigin: true,
         secure: false,
       }

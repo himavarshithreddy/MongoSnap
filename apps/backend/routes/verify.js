@@ -14,7 +14,7 @@ router.get('/verify-email/:token', async (req, res) => {
       <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Verification Failed - MongoPilot</title>
+          <title>Verification Failed - MongoSnap</title>
           <style>
               body {
                   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -52,10 +52,10 @@ router.get('/verify-email/:token', async (req, res) => {
       </head>
       <body>
           <div class="container">
-              <div class="logo">MongoPilot</div>
+              <div class="logo">MongoSnap</div>
               <h1>Verification Failed</h1>
               <p>The verification link is invalid or has expired.</p>
-              <a href="http://mongopilot.mp:5173/login" class="btn">Go to Login</a>
+              <a href="http://mongosnap.mp:5173/login" class="btn">Go to Login</a>
           </div>
       </body>
       </html>
@@ -72,7 +72,7 @@ router.get('/verify-email/:token', async (req, res) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Email Verified - MongoPilot</title>
+        <title>Email Verified - MongoSnap</title>
         <style>
             body {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -127,11 +127,11 @@ router.get('/verify-email/:token', async (req, res) => {
     </head>
     <body>
         <div class="container">
-            <div class="logo">Mongo<span class="pilot">Pilot</span></div>
+            <div class="logo">Mongo<span class="pilot">Snap</span></div>
             <div class="success">✓</div>
             <h1>Email Verified!</h1>
             <p>Your email has been successfully verified. You can now log in to your account.</p>
-            <a href="http://mongopilot.mp:5173/login" class="btn">Continue to Login</a>
+            <a href="http://mongosnap.mp:5173/login" class="btn">Continue to Login</a>
         </div>
     </body>
     </html>
