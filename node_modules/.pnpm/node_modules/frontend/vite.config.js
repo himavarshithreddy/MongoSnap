@@ -12,7 +12,11 @@ export default defineConfig({
   server: {
     host: true,
     proxy: {
-      '/api': 'http://192.168.1.10:4000', // 
+      '/api': {
+        target: 'http://192.168.1.10:4000',
+        changeOrigin: true,
+        secure: false,
+      }
     }
   }
 })

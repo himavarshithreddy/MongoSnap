@@ -13,17 +13,17 @@ dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: ['http://192.168.1.10:5173', 'http://192.168.1.10:5173'],
+  origin: ['http://192.168.1.10:5173'],
   credentials: true,
-  sameSite: 'none'
+  sameSite: 'lax'
 }));
 app.use(express.json());
 app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
-app.use('/', testRoutes);
-app.use('/', verifyRoutes);
-app.use('/', forgotPasswordRoutes);
+app.use('/api', testRoutes);
+app.use('/api', verifyRoutes);
+app.use('/api', forgotPasswordRoutes);
 app.use('/api/auth', oauthRoutes);
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {

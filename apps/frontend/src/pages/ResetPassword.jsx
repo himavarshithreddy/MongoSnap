@@ -42,7 +42,7 @@ function ResetPassword() {
         setSuccess('');
 
         try {
-            const res = await fetch('http://192.168.1.10:4000/reset-password', {
+            const res = await fetch('/api/reset-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 

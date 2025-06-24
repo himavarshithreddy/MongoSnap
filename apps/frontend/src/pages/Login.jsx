@@ -103,7 +103,7 @@ function Login() {
             ? { email: form.email, password: form.password }
             : { name: form.name, email: form.email, password: form.password };
         try {
-            const res = await fetch(`http://192.168.1.10:4000${endpoint}`,
+            const res = await fetch(`${endpoint}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -141,7 +141,7 @@ function Login() {
         setForgotSuccess('');
         
         try {
-            const res = await fetch('http://192.168.1.10:4000/forgot-password', {
+            const res = await fetch('/api/forgot-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: forgotEmail }),
@@ -172,7 +172,7 @@ function Login() {
         setError(''); // Clear any previous errors
         
         const popup = window.open(
-            'http://192.168.1.10:4000/api/auth/google', 
+            '/api/auth/google', 
             'googleOAuth', 
             'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
         );
@@ -194,7 +194,7 @@ function Login() {
         setError(''); // Clear any previous errors
         
         const popup = window.open(
-            'http://192.168.1.10:4000/api/auth/github', 
+            '/api/auth/github', 
             'githubOAuth', 
             'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
         );
@@ -423,7 +423,7 @@ function Login() {
                                                 onClick={() => window.location.href = '/'}
                                                 className="ml-2 text-xs bg-green-600 px-2 py-1 rounded hover:bg-green-700"
                                             >
-                                                Go Now
+                                                Go
                                             </button>
                                         )}
                                     </div>

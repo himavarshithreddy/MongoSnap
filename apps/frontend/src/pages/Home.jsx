@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 function Home() {
@@ -6,62 +6,102 @@ function Home() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const navigate = useNavigate();
-
-    // Helper to fetch with auto-refresh
-    const fetchWithAuth = async (url, options = {}) => {
-        let token = localStorage.getItem('token');
-        
-        if (!token) {
-            navigate('/login');
-            return null;
-        }
-
-        let res = await fetch(url, {
-            ...options,
-            headers: {
-                ...(options.headers || {}),
-                'Authorization': `Bearer ${token}`
-            },
-            credentials: 'include', // send cookies for future use if needed
-        });
-        
-        if (res.status === 401) {
-            // Just logout on 401, do not try to refresh
-            localStorage.removeItem('token');
-            navigate('/login');
-            return null;
-        }
-        return res;
-    };
-
     useEffect(() => {
-        const fetchUser = async () => {
-            setLoading(true);
-            setError('');
-            try {
-                const res = await fetchWithAuth('http://192.168.1.10:4000/me');
-                if (!res) return; // handled by refresh logic
-                
-                const data = await res.json();
-                if (!res.ok) {
-                    throw new Error(data.message || 'Failed to fetch user');
-                }
-                
-                setUser(data.user);
-            } catch (err) {
-                setError(err.message);
-                // Don't redirect on error, just show the error
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchUser();
-    }, [navigate]);
+        document.title = "MongoPilot - Home";
+    }, []);
+    // Helper to fetch with auto-refresh
+   // A flag and a promise for the refresh-in-progress
+  const isRefreshing = useRef(false);
+  const refreshPromise = useRef(null);
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        navigate('/login');
+  // Core fetchWithAuth with queue/mutex logic
+  const fetchWithAuth = useCallback(async (url, options = {}) => {
+    const getToken = () => localStorage.getItem('token');
+
+    const doFetch = async (token) => {
+      return fetch(url, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          Authorization: `Bearer ${token}`
+        },
+        credentials: 'include'
+      });
     };
+
+    let token = getToken();
+    let res = await doFetch(token);
+
+    if (res.status !== 401) {
+      return res;
+    }
+
+    // Got 401: need to refresh
+    if (!isRefreshing.current) {
+      // start the refresh only once
+      isRefreshing.current = true;
+      refreshPromise.current = (async () => {
+        const refreshRes = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include'
+        });
+        if (!refreshRes.ok) throw new Error('Refresh failed');
+        const { token: newToken } = await refreshRes.json();
+        localStorage.setItem('token', newToken);
+        isRefreshing.current = false;
+        return newToken;
+      })();
+    }
+
+    let newToken;
+    try {
+      newToken = await refreshPromise.current;
+    } catch (err) {
+        console.log(err);
+      // Refresh failed: clear and redirect
+      localStorage.removeItem('token');
+      navigate('/login');
+      return null;
+    }
+
+    // Retry original request with new token
+    return doFetch(newToken);
+  }, [navigate]);
+
+  useEffect(() => {
+    document.title = 'MongoPilot – Home';
+
+    const fetchUser = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await fetchWithAuth('/api/me');
+        if (!res) return;             // handled logout on refresh failure
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to fetch user');
+        setUser(data.user);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, [navigate, fetchWithAuth]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } finally {
+      localStorage.removeItem('token');
+      navigate('/login');
+    }
+  };
+    
 
     if (loading) {
         return (
