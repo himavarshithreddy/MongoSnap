@@ -14,7 +14,7 @@ export default defineConfig({
     allowedHosts: ['mongopilot.mp'],
     proxy: {
       '/api': {
-        target: 'http://192.168.1.10:4000',
+        target: 'http://mongopilot.mp:4000',
         changeOrigin: true,
         secure: false,
       }

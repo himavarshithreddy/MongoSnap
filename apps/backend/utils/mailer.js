@@ -14,7 +14,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendVerificationEmail = async (email, token) => {
-  const link = `http://192.168.1.10:4000/verify-email/${token}`;
+  const link = `http://mongopilot.mp:5173/api/verify-email/${token}`;
   await transporter.sendMail({
     from: `"MongoPilot" <noreply@himavarshithreddy.in>`,
     to: email,

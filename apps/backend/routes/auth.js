@@ -10,7 +10,7 @@ const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET ;
 
 // Helper to generate tokens
 function generateAccessToken(user) {
-  return jwt.sign({ id: user._id }, ACCESS_TOKEN_SECRET, { expiresIn: '10s' });
+  return jwt.sign({ id: user._id }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
 }
 function generateRefreshToken(user) {
   return jwt.sign({ id: user._id }, process.env.REFRESH_TOKEN_SECRET, {

@@ -16,7 +16,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 // Helper to generate tokens
 function generateAccessToken(user) {
-    return jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '10s' });
+    return jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '15m' });
 }
 function generateRefreshToken(user) {
     return jwt.sign({ id: user._id }, process.env.REFRESH_TOKEN_SECRET, {
@@ -156,7 +156,7 @@ router.get('/google/callback', async (req, res) => {
         console.log('Redirecting to frontend...');
 
         // Redirect to frontend popup with token
-        return res.redirect(`http://192.168.1.10:5173/oauth-popup?token=${token}`);
+        return res.redirect(`http://mongopilot.mp:5173/oauth-popup?token=${token}`);
 
     } catch (err) {
         console.error('OAuth error details:', err.response?.data || err.message);
@@ -276,7 +276,7 @@ router.get('/github/callback', async (req, res) => {
         console.log('Redirecting to frontend...');
 
         // Redirect to frontend popup with token
-        return res.redirect(`http://192.168.1.10:5173/oauth-popup?token=${token}`);
+        return res.redirect(`http://mongopilot.mp:5173/oauth-popup?token=${token}`);
 
     } catch (err) {
         console.error('GitHub OAuth error details:', err.response?.data || err.message);
