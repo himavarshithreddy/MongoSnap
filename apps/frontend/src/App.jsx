@@ -12,6 +12,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        {/* <Route path="/" element={<Home />} /> */}
         <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
