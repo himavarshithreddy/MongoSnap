@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
+import Logo from '../components/Logo';
 
 function OAuthSuccess() {
   const navigate = useNavigate();
@@ -75,6 +76,10 @@ function OAuthSuccess() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
+          <div className="flex items-center justify-center mb-4">
+            <Logo size="large" />
+            <h1 className="text-3xl font-bold text-gray-900">MongoSnap</h1>
+          </div>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-lg">Completing your login...</p>
         </div>
@@ -86,6 +91,10 @@ function OAuthSuccess() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Logo size="large" />
+            <h1 className="text-3xl font-bold text-gray-900">MongoSnap</h1>
+          </div>
           <div className="text-red-600 text-lg mb-4">Authentication Failed</div>
           <p className="text-gray-600 mb-4">{error}</p>
           <button 

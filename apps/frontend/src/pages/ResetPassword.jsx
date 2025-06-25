@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import Logo from '../components/Logo';
 
 /** Password strength check utility */
 const passwordChecks = [
@@ -74,8 +75,11 @@ function ResetPassword() {
         <div className="w-full min-h-screen bg-[#101813] flex justify-center items-center">
             <div className="bg-[#17211b] rounded-xl p-8 md:w-[90vw] w-[95vw] max-w-md shadow-lg">
                 <div className="text-center mb-8">
-                    {/* MongoSnap Logo (copied from Login.jsx) */}
-                    <h1 className="text-5xl font-bold text-white tracking-wide mb-2">Mongo<span className="text-[#3CBC6B]">Snap</span></h1>
+                    {/* MongoSnap Logo */}
+                    <div className="flex items-center justify-center mb-4">
+                        <Logo size="large" />
+                        <h1 className="text-5xl font-bold text-white tracking-wide">Mongo<span className="text-[#3CBC6B]">Snap</span></h1>
+                    </div>
                     <h1 className="text-4xl font-bold text-white mb-2 mt-4">Reset Password</h1>
                     <p className="text-gray-400">Enter your new password below</p>
                 </div>

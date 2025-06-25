@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
+import Logo from '../components/Logo';
 
 function OAuthPopup() {
     const [searchParams] = useSearchParams();
@@ -80,6 +81,11 @@ function OAuthPopup() {
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center">
             <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4 text-center">
+                <div className="flex items-center justify-center mb-6">
+                    <Logo size="default" />
+                    <h1 className="text-2xl font-bold text-gray-900">MongoSnap</h1>
+                </div>
+                
                 {status === 'processing' && (
                     <>
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>

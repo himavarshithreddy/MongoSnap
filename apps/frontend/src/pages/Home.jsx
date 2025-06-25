@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Logo from '../components/Logo';
 
 function Home() {
     const [user, setUser] = useState(null);
@@ -158,7 +159,10 @@ function Home() {
             <div className="max-w-4xl mx-auto px-4">
                 <div className="bg-white rounded-lg shadow-md p-6">
                     <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-3xl font-bold text-gray-900">Welcome, {user.name}!</h1>
+                        <div className="flex items-center">
+                            <Logo size="default" />
+                            <h1 className="text-3xl font-bold text-gray-900">Welcome, {user.name}!</h1>
+                        </div>
                         <button 
                             onClick={handleLogout}
                             className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"

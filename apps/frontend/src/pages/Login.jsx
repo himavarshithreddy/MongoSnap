@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import '../App.css'
 import { Eye, EyeOff } from 'lucide-react';     
+import Logo from '../components/Logo';
 
 /** Password strength check utility */
 const passwordChecks = [
@@ -317,7 +318,10 @@ function Login() {
                     </div>
                    
                    <div className='w-full h-auto pt-8'>
-                    <h1 className='md:text-8xl text-5xl font-bold text-white tracking-wide'>Mongo<span className='text-[#3CBC6B]'>Snap</span></h1>
+                    <div className='flex items-center mb-4'>
+                        <Logo size="xxlarge" />
+                        <h1 className='md:text-8xl text-5xl font-bold text-white tracking-wide'>Mongo<span className='text-[#3CBC6B]'>Snap</span></h1>
+                    </div>
                     <p className='text-gray-400 md:text-2xl text-sm md:mt-10 mt-5 leading-relaxed'>Transform your database interactions with intelligent natural language processing. Query, analyze, and manage your MongoDB databases like never before.</p>
                     <div id='left-containers' className='w-full h-auto flex gap-5 md:mt-12 mt-8 md:flex-row flex-col'>
                     <div className='w-full h-auto flex flex-col gap-5'>
