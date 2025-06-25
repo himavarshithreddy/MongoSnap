@@ -1,108 +1,14 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useUser } from '../contexts/UserContext';
 import Logo from '../components/Logo';
 
 function Home() {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const navigate = useNavigate();
     useEffect(() => {
         document.title = "MongoSnap - Home";
     }, []);
-    // Helper to fetch with auto-refresh
-   // A flag and a promise for the refresh-in-progress
-  const isRefreshing = useRef(false);
-  const refreshPromise = useRef(null);
 
-  // Core fetchWithAuth with queue/mutex logic
-  const fetchWithAuth = useCallback(async (url, options = {}) => {
-    const getToken = () => localStorage.getItem('token');
-
-    const doFetch = async (token) => {
-      return fetch(url, {
-        ...options,
-        headers: {
-          ...(options.headers || {}),
-          Authorization: `Bearer ${token}`
-        },
-        credentials: 'include'
-      });
-    };
-
-    let token = getToken();
-    let res = await doFetch(token);
-
-    if (res.status !== 401) {
-      return res;
-    }
-
-    // Got 401: need to refresh
-    if (!isRefreshing.current) {
-      // start the refresh only once
-      isRefreshing.current = true;
-      refreshPromise.current = (async () => {
-        const refreshRes = await fetch('/api/auth/refresh', {
-          method: 'POST',
-          credentials: 'include'
-        });
-        if (!refreshRes.ok) throw new Error('Refresh failed');
-        const { token: newToken } = await refreshRes.json();
-        localStorage.setItem('token', newToken);
-        isRefreshing.current = false;
-        return newToken;
-      })();
-    }
-
-    let newToken;
-    try {
-      newToken = await refreshPromise.current;
-    } catch (err) {
-        console.log(err);
-      // Refresh failed: clear and redirect
-      localStorage.removeItem('token');
-      navigate('/login');
-      return null;
-    }
-
-    // Retry original request with new token
-    return doFetch(newToken);
-  }, [navigate]);
-
-  useEffect(() => {
-    document.title = 'MongoSnap – Home';
-
-    const fetchUser = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const res = await fetchWithAuth('/api/me');
-        if (!res) return;             // handled logout on refresh failure
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Failed to fetch user');
-        setUser(data.user);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, [navigate, fetchWithAuth]);
-
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-    } finally {
-      localStorage.removeItem('token');
-      navigate('/login');
-    }
-  };
-    
+    // Use cached user data from context
+    const { user, loading, error, logout } = useUser();
 
     if (loading) {
         return (
@@ -122,7 +28,7 @@ function Home() {
                     <div className="text-red-600 text-lg mb-4">Error Loading User</div>
                     <p className="text-gray-600 mb-4">{error}</p>
                     <button 
-                        onClick={handleLogout}
+                        onClick={logout}
                         className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 mr-2"
                     >
                         Logout
@@ -144,7 +50,7 @@ function Home() {
                 <div className="text-center">
                     <div className="text-gray-600 text-lg mb-4">No user info found</div>
                     <button 
-                        onClick={handleLogout}
+                        onClick={logout}
                         className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
                     >
                         Back to Login
@@ -164,7 +70,7 @@ function Home() {
                             <h1 className="text-3xl font-bold text-gray-900">Welcome, {user.name}!</h1>
                         </div>
                         <button 
-                            onClick={handleLogout}
+                            onClick={logout}
                             className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
                         >
                             Logout

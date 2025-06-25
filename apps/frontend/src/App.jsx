@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { UserProvider } from './contexts/UserContext'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
@@ -10,6 +11,7 @@ import Connect from './pages/connect.jsx'
 function App() {
   return (
     <BrowserRouter>
+      <UserProvider>
       <Routes>
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         {/* <Route path="/" element={<Home />} /> */}
@@ -19,6 +21,7 @@ function App() {
         <Route path="/oauth-success" element={<OAuthSuccess />} />
         <Route path="/oauth-popup" element={<OAuthPopup />} />
       </Routes>
+      </UserProvider>
     </BrowserRouter>
   )
 }

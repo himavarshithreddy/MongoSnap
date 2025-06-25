@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
+import { useUser } from '../contexts/UserContext';
 import Logo from '../components/Logo';
 
 function OAuthSuccess() {
@@ -8,6 +9,7 @@ function OAuthSuccess() {
   const [searchParams] = useSearchParams();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const { login } = useUser();
 
   useEffect(() => {
     const handleOAuthSuccess = async () => {
@@ -45,32 +47,24 @@ function OAuthSuccess() {
           return;
         }
 
-        // Store the token
-        localStorage.setItem('token', token);
+        // Use UserContext login function
+        login(token);
         
-        // Small delay to ensure token is stored
+        // Small delay for user experience
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // Verify token is stored
-        const storedToken = localStorage.getItem('token');
-        if (storedToken !== token) {
-          setError('Failed to store authentication token');
-          setLoading(false);
-          return;
-        }
-
-        console.log('OAuth successful, navigating to home...');
-        navigate('/', { replace: true });
+        console.log('OAuth successful, navigating to connect...');
+        navigate('/connect', { replace: true });
         
       } catch (err) {
-        console.error('OAuth success error:', err);
+        console.error('OAuth success handling error:', err);
         setError('Failed to complete authentication');
         setLoading(false);
       }
     };
 
     handleOAuthSuccess();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, login]);
 
   if (loading) {
     return (

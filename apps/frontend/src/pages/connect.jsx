@@ -1,5 +1,6 @@
 import {React, useEffect, useState} from 'react'
-import { Eye, EyeOff, Plus, Trash2, Database, Clock } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2, Database, Clock, Info, LogOut } from 'lucide-react';
+import { useUser } from '../contexts/UserContext';
 import Logo from '../components/Logo';
 
 function Connect() {
@@ -12,6 +13,11 @@ function Connect() {
     const [uriError, setUriError] = useState('');
     const [nicknameError, setNicknameError] = useState('');
     const [showCredentials, setShowCredentials] = useState(false);
+    const [showInstructions, setShowInstructions] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    
+    // Use cached user data from context
+    const { user, loading: userLoading, error: userError, logout } = useUser();
     
     // Previous connections state
     const [previousConnections, setPreviousConnections] = useState([
@@ -67,6 +73,17 @@ function Connect() {
         if (diffInHours < 24) return `${diffInHours}h ago`;
         if (diffInHours < 48) return 'Yesterday';
         return date.toLocaleDateString();
+    };
+
+    // Get first letter of username
+    const getFirstLetter = (username) => {
+        return username ? username.charAt(0).toUpperCase() : 'U';
+    };
+
+    // Handle logout - using context logout function
+    const handleLogout = async () => {
+        setShowProfileModal(false);
+        await logout();
     };
 
     // Load connection into form
@@ -179,7 +196,74 @@ function Connect() {
             </div>
         </div>
         
-        <div className="w-[80%] min-h-screen flex justify-center items-center flex-col gap-10">
+        <div className="w-[80%] min-h-screen flex justify-center items-center flex-col gap-10 relative">
+            {/* Profile Icon - Top Right Corner */}
+            <div className="absolute top-6 right-6 z-10">
+                {userLoading ? (
+                    <div className="w-10 h-10 bg-brand-tertiary rounded-full flex items-center justify-center">
+                        <div className="w-4 h-4 border-2 border-brand-quaternary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                ) : userError ? (
+                    <button
+                        onClick={() => window.location.href = '/login'}
+                        className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white font-semibold hover:bg-red-600 transition-all duration-200"
+                        title="Login Required"
+                    >
+                        !
+                    </button>
+                ) : user ? (
+                    <>
+                        <button
+                            onClick={() => setShowProfileModal(!showProfileModal)}
+                            className="w-10 h-10 cursor-pointer bg-brand-tertiary rounded-full flex items-center justify-center text-white font-semibold hover:bg-opacity-80 transition-all duration-200"
+                            title="Profile"
+                        >
+                            {getFirstLetter(user.name)}
+                        </button>
+                        
+                        {/* Profile Modal */}
+                        {showProfileModal && (
+                            <>
+                                {/* Backdrop */}
+                                <div 
+                                    className="fixed inset-0 bg-black/50 z-20"
+                                    onClick={() => setShowProfileModal(false)}
+                                />
+                                
+                                {/* Modal */}
+                                <div className="absolute top-12 right-0 bg-brand-secondary rounded-lg p-4 border border-brand-tertiary shadow-lg z-30 min-w-64">
+                                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-brand-tertiary">
+                                        <div className="w-8 h-8 bg-brand-quaternary rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                                            {getFirstLetter(user.name)}
+                                        </div>
+                                        <div>
+                                            <p className="text-white font-medium text-sm">{user.name}</p>
+                                            <p className="text-gray-400 text-xs">{user.email}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <button
+                                        onClick={handleLogout}
+                                        className="w-full flex items-center gap-2 text-gray-300 hover:text-red-400 cursor-pointer transition-colors p-2 rounded-md hover:bg-brand-tertiary"
+                                    >
+                                        <LogOut size={16} />
+                                        <span className="text-sm">Logout</span>
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </>
+                ) : (
+                    <button
+                        onClick={() => window.location.href = '/login'}
+                        className="w-10 h-10 bg-brand-tertiary rounded-full flex items-center justify-center text-white font-semibold hover:bg-opacity-80 transition-all duration-200"
+                        title="Login"
+                    >
+                        ?
+                    </button>
+                )}
+            </div>
+          
             <h1 className='text-white text-4xl font-bold'>Connect to your <span className='text-brand-quaternary'>MongoDB Database</span></h1>
             <form className='w-[50%] bg-brand-secondary rounded-4xl flex flex-col gap-7 justify-center px-10 py-8' onSubmit={handleConnect} noValidate>
                 <div className='w-full flex flex-col gap-2'>
@@ -197,7 +281,33 @@ function Connect() {
                     {nicknameError && <span className="text-red-400 text-xs mt-1">{nicknameError}</span>}
                 </div>
                 <div className='w-full flex flex-col gap-2 mt-2'>
-                    <label htmlFor='connectionURI' className='text-gray-400 text-md font-semibold'>MongoDB Connection URL</label>
+                    <div className='flex items-center gap-2'>
+                        <label htmlFor='connectionURI' className='text-gray-400 text-md font-semibold'>MongoDB Connection URL</label>
+                        <button
+                            type="button"
+                            className={`p-1 rounded-full transition-all duration-200 cursor-pointer ${
+                                uriError ? 'text-red-400 bg-opacity-10 animate-pulse' : 'text-gray-400 hover:text-brand-quaternary'
+                            }`}
+                            onClick={() => setShowInstructions(!showInstructions)}
+                            title="Connection Instructions"
+                        >
+                            <Info size={16} />
+                        </button>
+                    </div>
+                    
+                    {showInstructions && (
+                        <div className='bg-brand-tertiary rounded-lg p-4 mb-2 border border-brand-quaternary'>
+                            <h4 className='text-white font-semibold mb-2'>Connection Instructions:</h4>
+                            <ul className='text-gray-300 text-sm space-y-1'>
+                                <li>• <strong>IP Whitelist:</strong> Add your current IP address to MongoDB Atlas Network Access</li>
+                                <li>• <strong>URI Format:</strong> mongodb+srv://username:password@cluster.mongodb.net/database</li>
+                                <li>• <strong>Authentication:</strong> Ensure username/password are correct</li>
+                                <li>• <strong>Database:</strong> Specify the database name at the end of the URI</li>
+                                <li>• <strong>SSL:</strong> MongoDB Atlas requires SSL connections</li>
+                            </ul>
+                        </div>
+                    )}
+                    
                     <div className='relative'>
                         <input 
                             type='text' 

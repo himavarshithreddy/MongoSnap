@@ -1,50 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
+import { useUser } from './contexts/UserContext';
 
 const ProtectedRoute = ({ children }) => {
-  const [authChecked, setAuthChecked] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user, loading } = useUser();
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      let token = localStorage.getItem('token');
-      if (!token) {
-        setIsAuthenticated(false);
-        setAuthChecked(true);
-        return;
-      }
-      try {
-        const { exp } = jwtDecode(token);
-        if (Date.now() >= exp * 1000) {
-          // Try to refresh
-          const res = await fetch('/api/auth/refresh', {
-            method: 'POST',
-            credentials: 'include'
-          });
-          if (res.ok) {
-            const data = await res.json();
-            localStorage.setItem('token', data.token);
-            setIsAuthenticated(true);
-          } else {
-            localStorage.removeItem('token');
-            setIsAuthenticated(false);
-          }
-        } else {
-          setIsAuthenticated(true);
-        }
-      } catch {
-        localStorage.removeItem('token');
-        setIsAuthenticated(false);
-      }
-      setAuthChecked(true);
-    };
-    checkAuth();
-  }, []);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-lg text-white">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-  if (!authChecked) return null; // or a loading spinner
-
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  return user ? children : <Navigate to="/login" replace />;
 };
 
 export default ProtectedRoute;

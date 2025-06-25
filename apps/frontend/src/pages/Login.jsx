@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import '../App.css'
 import { Eye, EyeOff } from 'lucide-react';     
+import { useUser } from '../contexts/UserContext';
 import Logo from '../components/Logo';
 
 /** Password strength check utility */
@@ -16,6 +17,9 @@ function Login() {
     useEffect(() => {
         document.title = "MongoSnap - Login";
     }, []);
+    
+    const { login } = useUser();
+    
     const [showpassword, setShowpassword] = useState(false);
     const [mode, setMode] = useState('login');
     const [showForgot, setShowForgot] = useState(false);
@@ -43,11 +47,11 @@ function Login() {
             
             if (event.data.type === 'OAUTH_SUCCESS') {
                 const { token } = event.data;
-                localStorage.setItem('token', token);
+                login(token); // Use UserContext login
                 setGoogleLoading(false);
                 setGithubLoading(false);
                 setPopupWindow(null);
-                window.location.href = '/'; // Redirect to home
+                window.location.href = '/connect'; // Redirect to connect
             } else if (event.data.type === 'OAUTH_ERROR') {
                 setError(event.data.error || 'OAuth authentication failed');
                 setGoogleLoading(false);
@@ -58,7 +62,7 @@ function Login() {
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, []);
+    }, [login]);
 
     // Check if popup is closed and handle timeout
     useEffect(() => {
@@ -113,20 +117,16 @@ function Login() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Something went wrong');
             
-            // Store token and user info
-            localStorage.setItem('token', data.token);
-            
             if (mode === 'login') {
-                // For login, redirect to home immediately
-                setSuccess('Login successful! Redirecting to home page...');
+                // Use UserContext login function
+                login(data.token, data.user);
+                setSuccess('Login successful! Redirecting to connect page...');
                 setRedirecting(true);
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.location.href = '/connect';
                 }, 500); 
             } else {
-               
                 setSuccess(data.message);
-               
                 setForm({ name: '', email: '', password: '' });
             }
         } catch (err) {
@@ -135,6 +135,7 @@ function Login() {
             setLoading(false);
         }
     };
+
     const handleForgotPassword = async (e) => {
         e.preventDefault();
         setForgotLoading(true);
@@ -160,6 +161,7 @@ function Login() {
             setForgotLoading(false);
         }
     };
+
     const resetForgotModal = () => {
         setShowForgot(false);
         setForgotEmail('');
@@ -167,7 +169,9 @@ function Login() {
         setForgotSuccess('');
         setForgotLoading(false);
     };
+
     const allPasswordChecksPassed = passwordChecks.every(check => check.test(form.password));
+
     const handleGoogleLogin = () => {
         setGoogleLoading(true);
         setError(''); // Clear any previous errors
