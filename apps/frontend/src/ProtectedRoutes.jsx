@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useUser } from './contexts/UserContext';
+import { useUser } from './hooks/useUser';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useUser();

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import '../App.css'
 import { Eye, EyeOff } from 'lucide-react';     
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 
 /** Password strength check utility */

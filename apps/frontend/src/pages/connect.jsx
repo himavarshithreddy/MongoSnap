@@ -1,6 +1,6 @@
 import {React, useEffect, useState} from 'react'
 import { Eye, EyeOff, Plus, Trash2, Database, Clock, Info, LogOut } from 'lucide-react';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 
 function Connect() {

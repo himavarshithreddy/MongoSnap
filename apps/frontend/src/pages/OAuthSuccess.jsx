@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 
 function OAuthSuccess() {

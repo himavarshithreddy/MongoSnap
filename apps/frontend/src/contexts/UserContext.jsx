@@ -1,15 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const UserContext = createContext();
-
-export const useUser = () => {
-    const context = useContext(UserContext);
-    if (!context) {
-        throw new Error('useUser must be used within a UserProvider');
-    }
-    return context;
-};
 
 export const UserProvider = ({ children }) => {
     const [user, setUser] = useState(null);
@@ -243,4 +235,6 @@ export const UserProvider = ({ children }) => {
             {children}
         </UserContext.Provider>
     );
-}; 
+};
+
+export { UserContext }; 
