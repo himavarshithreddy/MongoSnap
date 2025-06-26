@@ -9,6 +9,7 @@ const testRoutes = require('./routes/test');
 const forgotPasswordRoutes = require('./routes/forgotpassword');
 const verifyRoutes = require('./routes/verify');
 const oauthRoutes = require('./routes/oauth');
+const connectionRoutes = require('./routes/connection');
 dotenv.config();
 
 const app = express();
@@ -25,6 +26,7 @@ app.use('/api', testRoutes);
 app.use('/api', verifyRoutes);
 app.use('/api', forgotPasswordRoutes);
 app.use('/api/auth', oauthRoutes);
+app.use('/api/connection', connectionRoutes);
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,

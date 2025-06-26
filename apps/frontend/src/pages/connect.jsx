@@ -1,5 +1,6 @@
 import {React, useEffect, useState} from 'react'
 import { Eye, EyeOff, Plus, Trash2, Database, Clock, Info, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 
@@ -8,6 +9,7 @@ function Connect() {
         document.title = "MongoSnap - Connect";
     }, []);
 
+    const navigate = useNavigate();
     const [nickname, setNickname] = useState('');
     const [connectionURI, setConnectionURI] = useState('');
     const [uriError, setUriError] = useState('');
@@ -15,37 +17,85 @@ function Connect() {
     const [showCredentials, setShowCredentials] = useState(false);
     const [showInstructions, setShowInstructions] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [connectionsLoading, setConnectionsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [loadedConnection, setLoadedConnection] = useState(null);
+    const [testingConnection, setTestingConnection] = useState(false);
+    
+    // Auto-dismiss instructions timer
+    const [instructionsTimer, setInstructionsTimer] = useState(null);
+    const [serverIP, setServerIP] = useState('Loading...');
     
     // Use cached user data from context
-    const { user, loading: userLoading, error: userError, logout } = useUser();
+    const { user, loading: userLoading, error: userError, logout, fetchWithAuth } = useUser();
     
     // Previous connections state
-    const [previousConnections, setPreviousConnections] = useState([
-        {
-            id: 1,
-            nickname: 'Production Cluster',
-            uri: 'mongodb+srv://admin:password123@cluster0.mongodb.net/production',
-            lastUsed: '2024-01-15T10:30:00Z',
-            status: 'connected'
-        },
-        {
-            id: 2,
-            nickname: 'Development DB',
-            uri: 'mongodb+srv://dev:devpass@cluster1.mongodb.net/development',
-            lastUsed: '2024-01-14T15:45:00Z',
-            status: 'disconnected'
-        },
-        {
-            id: 3,
-            nickname: 'Staging Environment',
-            uri: 'mongodb+srv://staging:stagingpass@cluster2.mongodb.net/staging',
-            lastUsed: '2024-01-13T09:20:00Z',
-            status: 'disconnected'
-        }
-    ]);
+    const [previousConnections, setPreviousConnections] = useState([]);
 
-    // MongoDB URI validation regex (basic)
-    const mongoUriRegex = /^mongodb(?:\+srv)?:\/\/.+:.+@.+\/.+/;
+    // MongoDB URI validation regex (requires database name)
+    const mongoUriRegex = /^mongodb(?:\+srv)?:\/\/.+:.+@.+\/[^?]+(?:\?.*)?$/;
+
+    // Load connections on component mount
+    useEffect(() => {
+        const fetchConnections = async () => {
+            if (!user) return;
+            
+            setConnectionsLoading(true);
+            try {
+                console.log('Fetching connections for user:', user._id);
+                const response = await fetchWithAuth('/api/connection');
+                console.log('Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Connections data:', data);
+                    setPreviousConnections(data.connections || []);
+                } else {
+                    const errorData = await response.json();
+                    console.error('Error response:', errorData);
+                    setError(errorData.message || 'Failed to load connections');
+                }
+            } catch (error) {
+                console.error('Error fetching connections:', error);
+                setError('Failed to load connections');
+            } finally {
+                setConnectionsLoading(false);
+            }
+        };
+        
+        fetchConnections();
+    }, [user, fetchWithAuth]);
+
+    // Cleanup instructions timer on unmount
+    useEffect(() => {
+        return () => {
+            if (instructionsTimer) {
+                clearTimeout(instructionsTimer);
+            }
+        };
+    }, [instructionsTimer]);
+
+    // Fetch server IP on component mount
+    useEffect(() => {
+        const fetchServerIP = async () => {
+            try {
+                const response = await fetch('/api/connection/server-ip');
+                if (response.ok) {
+                    const data = await response.json();
+                    setServerIP(data.serverIP);
+                } else {
+                    setServerIP('Contact support for IP');
+                }
+            } catch (error) {
+                console.error('Error fetching server IP:', error);
+                setServerIP('Contact support for IP');
+            }
+        };
+
+        fetchServerIP();
+    }, []);
 
     // Helper to mask credentials in URI
     const getMaskedURI = (uri) => {
@@ -66,13 +116,7 @@ function Connect() {
     // Helper to format date
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        const now = new Date();
-        const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-        
-        if (diffInHours < 1) return 'Just now';
-        if (diffInHours < 24) return `${diffInHours}h ago`;
-        if (diffInHours < 48) return 'Yesterday';
-        return date.toLocaleDateString();
+        return date.toLocaleString();
     };
 
     // Get first letter of username
@@ -87,24 +131,68 @@ function Connect() {
     };
 
     // Load connection into form
-    const loadConnection = (connection) => {
-        setNickname(connection.nickname);
-        setConnectionURI(connection.uri);
-        setShowCredentials(false);
-        setUriError('');
-        setNicknameError('');
+    const loadConnection = async (connection) => {
+        try {
+            const response = await fetchWithAuth(`/api/connection/${connection._id}`);
+            if (response.ok) {
+                const data = await response.json();
+                setNickname(data.connection.nickname);
+                setConnectionURI(data.connection.uri);
+                setShowCredentials(false);
+                setUriError('');
+                setNicknameError('');
+                setError('');
+                // Store the loaded connection for testing
+                setLoadedConnection(data.connection);
+            } else {
+                const errorData = await response.json();
+                setError(errorData.message || 'Failed to load connection');
+            }
+        } catch (error) {
+            console.error('Error loading connection:', error);
+            setError('Failed to load connection');
+        }
     };
 
     // Remove connection
-    const removeConnection = (id) => {
-        setPreviousConnections(prev => prev.filter(conn => conn.id !== id));
+    const removeConnection = async (id) => {
+        try {
+            console.log('Removing connection with ID:', id);
+            const response = await fetchWithAuth(`/api/connection/${id}`, {
+                method: 'DELETE'
+            });
+            console.log('Remove response status:', response.status);
+            
+            if (response.ok) {
+                setPreviousConnections(prev => prev.filter(conn => conn._id !== id));
+                setSuccess('Connection removed successfully');
+                setTimeout(() => setSuccess(''), 3000);
+                // Clear loaded connection if it was the one removed
+                if (loadedConnection && loadedConnection._id === id) {
+                    setLoadedConnection(null);
+                    setNickname('');
+                    setConnectionURI('');
+                }
+            } else {
+                const errorData = await response.json();
+                console.error('Remove error response:', errorData);
+                setError(errorData.message || 'Failed to remove connection');
+            }
+        } catch (error) {
+            console.error('Error removing connection:', error);
+            setError('Failed to remove connection');
+        }
     };
 
-    const handleConnect = (e) => {
+    // Handle form submission
+    const handleConnect = async (e) => {
         e.preventDefault();
         let valid = true;
         setUriError('');
         setNicknameError('');
+        setError('');
+        setSuccess('');
+        
         if (!nickname.trim()) {
             setNicknameError('Nickname is required');
             valid = false;
@@ -112,30 +200,226 @@ function Connect() {
         if (!connectionURI.trim()) {
             setUriError('MongoDB URI is required');
             valid = false;
-        } else if (!mongoUriRegex.test(connectionURI.trim())) {
-            setUriError('Please enter a valid MongoDB connection URI');
+        } else {
+            // Check if URI has database name
+            const uri = connectionURI.trim();
+            const hasDatabaseName = /^mongodb(?:\+srv)?:\/\/.+:.+@.+\/[^?/]+(?:\?.*)?$/.test(uri);
+            
+            if (!hasDatabaseName) {
+                setUriError('Database name is required in the URI (e.g., /mydatabase)');
+                valid = false;
+            } else if (!mongoUriRegex.test(uri)) {
+                setUriError('Please enter a valid MongoDB connection URI');
+                valid = false;
+            }
+        }
+        if (!valid) {
+            // Auto-expand instructions on validation failure
+            setShowInstructions(true);
+            autoDismissInstructions();
+            return;
+        }
+        
+        setLoading(true);
+        
+        try {
+            console.log('Connecting to database:', { nickname: nickname.trim(), uri: connectionURI.trim() });
+            
+            // Use the new connect endpoint
+            const connectResponse = await fetchWithAuth('/api/connection/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nickname: nickname.trim(),
+                    uri: connectionURI.trim(),
+                    connectionId: loadedConnection ? loadedConnection._id : null
+                })
+            });
+            
+            console.log('Connect response status:', connectResponse.status);
+            
+            if (connectResponse.ok) {
+                const data = await connectResponse.json();
+                console.log('Connect response data:', data);
+                
+                // Add new connection to list if it's a new connection
+                if (data.connection.isNewConnection) {
+                    setPreviousConnections(prev => [data.connection, ...prev]);
+                }
+                
+                // Navigate to connection status page
+                navigate(`/connection-status?data=${encodeURIComponent(JSON.stringify(data.connection))}`);
+            } else {
+                const errorData = await connectResponse.json();
+                console.error('Connect error response:', errorData);
+                setError(errorData.message || 'Failed to connect to database');
+                // Auto-expand instructions on connection failure
+                setShowInstructions(true);
+                autoDismissInstructions();
+            }
+        } catch (error) {
+            console.error('Error connecting to database:', error);
+            setError('Failed to connect to database');
+            // Auto-expand instructions on connection failure
+            setShowInstructions(true);
+            autoDismissInstructions();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Test connection
+    const testConnection = async () => {
+        // Validate only URI before testing
+        let valid = true;
+        setUriError('');
+        setError('');
+        setSuccess('');
+        
+        if (!connectionURI.trim()) {
+            setUriError('MongoDB URI is required');
             valid = false;
-        }
-        if (!valid) return;
-        
-        // Add to previous connections if not already there
-        const existingConnection = previousConnections.find(conn => 
-            conn.nickname === nickname.trim() || conn.uri === connectionURI.trim()
-        );
-        
-        if (!existingConnection) {
-            const newConnection = {
-                id: Date.now(),
-                nickname: nickname.trim(),
-                uri: connectionURI.trim(),
-                lastUsed: new Date().toISOString(),
-                status: 'connected'
-            };
-            setPreviousConnections(prev => [newConnection, ...prev]);
+        } else {
+            // Check if URI has database name
+            const uri = connectionURI.trim();
+            const hasDatabaseName = /^mongodb(?:\+srv)?:\/\/.+:.+@.+\/[^?/]+(?:\?.*)?$/.test(uri);
+            
+            if (!hasDatabaseName) {
+                setUriError('Database name is required in the URI (e.g., /mydatabase)');
+                valid = false;
+            } else if (!mongoUriRegex.test(uri)) {
+                setUriError('Please enter a valid MongoDB connection URI');
+                valid = false;
+            }
         }
         
-        // Proceed with connection logic here
-        console.log('Connecting to:', { nickname: nickname.trim(), uri: connectionURI.trim() });
+        if (!valid) {
+            // Auto-expand instructions on validation failure
+            setShowInstructions(true);
+            autoDismissInstructions();
+            return;
+        }
+        
+        setTestingConnection(true);
+        
+        try {
+            console.log('Testing connection with URI:', connectionURI.trim());
+            
+            // Test the current URI in the form
+            const response = await fetch('/api/connection/test-uri', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    uri: connectionURI.trim()
+                })
+            });
+            
+            console.log('Test response status:', response.status);
+            
+            if (response.ok) {
+                setSuccess('Connection test successful! The URI is valid and accessible.');
+            } else {
+                const errorData = await response.json();
+                console.error('Test error response:', errorData);
+                setError(errorData.message || 'Connection test failed');
+                // Auto-expand instructions on test failure
+                setShowInstructions(true);
+                autoDismissInstructions();
+            }
+        } catch (error) {
+            console.error('Error testing connection:', error);
+            setError('Failed to test connection');
+            // Auto-expand instructions on test failure
+            setShowInstructions(true);
+            autoDismissInstructions();
+        } finally {
+            setTestingConnection(false);
+        }
+    };
+
+    // Auto-dismiss instructions after 5 seconds
+    const autoDismissInstructions = () => {
+        if (instructionsTimer) {
+            clearTimeout(instructionsTimer);
+        }
+        const timer = setTimeout(() => {
+            setShowInstructions(false);
+        }, 5000); // 5 seconds
+        setInstructionsTimer(timer);
+    };
+
+    // Clear auto-dismiss timer when instructions are manually toggled
+    const toggleInstructions = () => {
+        if (instructionsTimer) {
+            clearTimeout(instructionsTimer);
+            setInstructionsTimer(null);
+        }
+        setShowInstructions(!showInstructions);
+    };
+
+    // Auto-dismiss instructions when user starts typing
+    const handleInputChange = (e) => {
+        if (showInstructions) {
+            autoDismissInstructions();
+        }
+        // Call the original onChange handler
+        if (e.target.name === 'nickname') {
+            setNickname(e.target.value);
+        } else if (e.target.name === 'connectionURI') {
+            if (showCredentials || !e.target.value.includes('••••••')) {
+                setConnectionURI(e.target.value);
+            }
+        }
+    };
+
+    // Copy to clipboard function with fallback
+    const copyToClipboard = async (text, elementId) => {
+        try {
+            // Try modern clipboard API first
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                // Fallback for older browsers or non-secure contexts
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                textArea.remove();
+            }
+            
+            // Show success feedback
+            const element = document.getElementById(elementId) || event.target;
+            const originalText = element.textContent;
+            const originalClasses = element.className;
+            
+            element.textContent = 'Copied!';
+            element.className = originalClasses + ' text-green-400';
+            
+            setTimeout(() => {
+                element.textContent = originalText;
+                element.className = originalClasses;
+            }, 1000);
+            
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            // Show error feedback
+            const element = document.getElementById(elementId) || event.target;
+            const originalText = element.textContent;
+            const originalClasses = element.className;
+            
+            element.textContent = 'Copy failed';
+            element.className = originalClasses + ' text-red-400';
+            
+            setTimeout(() => {
+                element.textContent = originalText;
+                element.className = originalClasses;
+            }, 1000);
+        }
     };
 
     return (
@@ -152,7 +436,12 @@ function Connect() {
                 </div>
                 
                 <div className='flex-1 overflow-y-auto space-y-2 pr-2'>
-                    {previousConnections.length === 0 ? (
+                    {connectionsLoading ? (
+                        <div className='text-center py-8'>
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-quaternary mx-auto mb-2"></div>
+                            <p className='text-gray-400 text-sm'>Loading connections...</p>
+                        </div>
+                    ) : previousConnections.length === 0 ? (
                         <div className='text-center py-8'>
                             <Database size={32} className='text-gray-500 mx-auto mb-2' />
                             <p className='text-gray-400 text-sm'>No previous connections</p>
@@ -161,7 +450,7 @@ function Connect() {
                     ) : (
                         previousConnections.map((connection) => (
                             <div 
-                                key={connection.id}
+                                key={connection._id}
                                 className='bg-brand-tertiary rounded-lg p-3 cursor-pointer hover:bg-opacity-80 transition-all duration-200 border border-transparent hover:border-brand-quaternary'
                                 onClick={() => loadConnection(connection)}
                             >
@@ -169,25 +458,30 @@ function Connect() {
                                     <h3 className='text-white font-medium text-sm truncate flex-1'>
                                         {connection.nickname}
                                     </h3>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            removeConnection(connection.id);
-                                        }}
-                                        className='text-gray-500 hover:text-red-400 transition-colors p-1'
-                                        title="Remove connection"
-                                    >
-                                        <Trash2 size={12} />
-                                    </button>
+                                    <div className='flex items-center gap-1'>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeConnection(connection._id);
+                                            }}
+                                            className='text-gray-500 hover:text-red-400 transition-colors p-1'
+                                            title="Remove connection"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
                                 </div>
                                 
                                 <div className='text-gray-400 text-xs mb-2 truncate'>
-                                    {getMaskedURI(connection.uri)}
+                                    {connection.uri ? getMaskedURI(connection.uri) : '••••••••••••••••••••••••••••••••••••••••'}
                                 </div>
                                 
-                                <div className='flex items-center gap-1 text-gray-500'>
+                                <div className='flex items-center gap-1 text-gray-300'>
                                     <Clock size={10} />
                                     <span className='text-xs'>{formatDate(connection.lastUsed)}</span>
+                                    {connection.isActive && (
+                                        <span className='text-xs text-green-400'>• Active</span>
+                                    )}
                                 </div>
                             </div>
                         ))
@@ -205,7 +499,7 @@ function Connect() {
                     </div>
                 ) : userError ? (
                     <button
-                        onClick={() => window.location.href = '/login'}
+                        onClick={() => navigate('/login')}
                         className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white font-semibold hover:bg-red-600 transition-all duration-200"
                         title="Login Required"
                     >
@@ -255,7 +549,7 @@ function Connect() {
                     </>
                 ) : (
                     <button
-                        onClick={() => window.location.href = '/login'}
+                        onClick={() => navigate('/login')}
                         className="w-10 h-10 bg-brand-tertiary rounded-full flex items-center justify-center text-white font-semibold hover:bg-opacity-80 transition-all duration-200"
                         title="Login"
                     >
@@ -265,6 +559,20 @@ function Connect() {
             </div>
           
             <h1 className='text-white text-4xl font-bold'>Connect to your <span className='text-brand-quaternary'>MongoDB Database</span></h1>
+            
+            {/* Success/Error Messages */}
+            {success && (
+                <div className="w-[50%] bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded text-center">
+                    {success}
+                </div>
+            )}
+            
+            {error && (
+                <div className="w-[50%] bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded text-center">
+                    {error}
+                </div>
+            )}
+            
             <form className='w-[50%] bg-brand-secondary rounded-4xl flex flex-col gap-7 justify-center px-10 py-8' onSubmit={handleConnect} noValidate>
                 <div className='w-full flex flex-col gap-2'>
                     <label htmlFor='nickname' className='text-gray-400 text-md font-semibold'>Nickname</label>
@@ -275,7 +583,7 @@ function Connect() {
                         className={`placeholder-gray-500 h-12 rounded-md border-1 border-brand-tertiary p-2 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white ${nicknameError ? 'border-red-500' : ''}`}
                         id='nickname'
                         value={nickname}
-                        onChange={e => setNickname(e.target.value)}
+                        onChange={handleInputChange}
                         required
                     />
                     {nicknameError && <span className="text-red-400 text-xs mt-1">{nicknameError}</span>}
@@ -286,20 +594,38 @@ function Connect() {
                         <button
                             type="button"
                             className={`p-1 rounded-full transition-all duration-200 cursor-pointer ${
-                                uriError ? 'text-red-400 bg-opacity-10 animate-pulse' : 'text-gray-400 hover:text-brand-quaternary'
+                                uriError || error ? 'text-red-400 bg-opacity-10 animate-pulse' : 'text-gray-400 hover:text-brand-quaternary'
                             }`}
-                            onClick={() => setShowInstructions(!showInstructions)}
+                            onClick={toggleInstructions}
                             title="Connection Instructions"
                         >
                             <Info size={16} />
                         </button>
                     </div>
                     
+                    <p className='text-amber-300/80 text-sm font-medium -mb-1'>
+                        Note: You may need to whitelist our server's IP (
+                        <span 
+                            id="serverIP-inline"
+                            className='cursor-pointer hover:bg-amber-700/20 px-1 rounded transition-colors duration-200'
+                            onClick={() => copyToClipboard(serverIP, 'serverIP-inline')}
+                            title="Click to copy"
+                        >
+                            {serverIP}
+                        </span>
+                        ) in MongoDB Atlas Network Access
+                    </p>
+                    
                     {showInstructions && (
                         <div className='bg-brand-tertiary rounded-lg p-4 mb-2 border border-brand-quaternary'>
                             <h4 className='text-white font-semibold mb-2'>Connection Instructions:</h4>
                             <ul className='text-gray-300 text-sm space-y-1'>
-                                <li>• <strong>IP Whitelist:</strong> Add your current IP address to MongoDB Atlas Network Access</li>
+                                <li>• <strong>IP Whitelist:</strong> Add <code 
+                                    id="serverIP-instructions"
+                                    className='bg-gray-800 px-1 rounded text-amber-300 cursor-pointer hover:bg-gray-700 transition-colors duration-200'
+                                    onClick={() => copyToClipboard(serverIP, 'serverIP-instructions')}
+                                    title="Click to copy"
+                                >{serverIP}</code> to MongoDB Atlas Network Access</li>
                                 <li>• <strong>URI Format:</strong> mongodb+srv://username:password@cluster.mongodb.net/database</li>
                                 <li>• <strong>Authentication:</strong> Ensure username/password are correct</li>
                                 <li>• <strong>Database:</strong> Specify the database name at the end of the URI</li>
@@ -316,12 +642,7 @@ function Connect() {
                             className={`placeholder-gray-500 h-12 rounded-md border-1 border-brand-tertiary p-2 pr-12 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white w-full ${uriError ? 'border-red-500' : ''}`}
                             id='connectionURI'
                             value={showCredentials ? connectionURI : getMaskedURI(connectionURI)}
-                            onChange={(e) => {
-                                // Only update if we're in show mode or if the value doesn't contain masked bullets
-                                if (showCredentials || !e.target.value.includes('••••••')) {
-                                    setConnectionURI(e.target.value);
-                                }
-                            }}
+                            onChange={handleInputChange}
                             onFocus={() => {
                                 // Auto-show credentials when user tries to edit
                                 if (!showCredentials) {
@@ -347,7 +668,34 @@ function Connect() {
                     </div>
                     {uriError && <span className="text-red-400 text-xs mt-1">{uriError}</span>}
                 </div>
-                <button type='submit' className='w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer mt-2'>Connect</button>
+                
+                <div className='w-full flex gap-4'>
+                    <button 
+                        type='submit' 
+                        disabled={loading}
+                        className={`flex-1 h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                        {loading ? 'Connecting...' : 'Connect'}
+                    </button>
+                    
+                    <button
+                        type="button"
+                        onClick={testConnection}
+                        disabled={testingConnection}
+                        className={`flex uppercase font-bold items-center justify-center gap-2 px-6 py-3 bg-[#35c56a69] text-white rounded-md hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${testingConnection ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        title="Test Connection"
+                    >
+                        {testingConnection ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                <span>Testing...</span>
+                            </>
+                        ) : (
+                            <span>Test</span>
+                        )}
+                    </button>
+                </div>
+                
                 <p className='text-gray-400 text-sm text-center mt-2'>
                     Your connection details are secured and encrypted.
                 </p>

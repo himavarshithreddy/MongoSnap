@@ -5,6 +5,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const { sendVerificationEmail } = require('../utils/mailer');
+const databaseManager = require('../utils/databaseManager');
 dotenv.config();
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET ;
 
@@ -96,13 +97,40 @@ router.post('/refresh', async (req, res) => {
     return res.sendStatus(403);
   }
 });
-router.post('/logout', (req, res) => {
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-  });
-  res.status(200).json({ message: 'Logged out successfully' });
+router.post('/logout', async (req, res) => {
+  try {
+    // Get user ID from token if available
+    const token = req.cookies.refreshToken;
+    if (token) {
+      try {
+        const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+        const user = await User.findById(payload.id);
+        if (user) {
+          // Disconnect all database connections for this user
+          await databaseManager.disconnectAll(user._id.toString());
+          console.log(`Disconnected all database connections for user: ${user._id}`);
+        }
+      } catch (tokenError) {
+        console.log('Token verification failed during logout, continuing with logout');
+      }
+    }
+    
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+    res.status(200).json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Error during logout:', error);
+    // Still clear the cookie even if there's an error
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+    res.status(200).json({ message: 'Logged out successfully' });
+  }
 });
 
 module.exports = router;

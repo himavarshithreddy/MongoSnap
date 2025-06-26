@@ -120,7 +120,7 @@ function Login() {
             if (mode === 'login') {
                 // Use UserContext login function
                 login(data.token, data.user);
-                setSuccess('Login successful! Redirecting to connect page...');
+                setSuccess('Login successful! Redirecting...');
                 setRedirecting(true);
                 setTimeout(() => {
                     window.location.href = '/connect';
@@ -426,14 +426,7 @@ function Login() {
                                     <div className="flex items-center gap-2 bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded mb-2" role="status">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-400"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                         <span>{success}</span>
-                                        {redirecting && (
-                                            <button 
-                                                onClick={() => window.location.href = '/'}
-                                                className="ml-2 text-xs bg-green-600 px-2 py-1 rounded hover:bg-green-700"
-                                            >
-                                                Go
-                                            </button>
-                                        )}
+                                     
                                     </div>
                                 )}
                                 {loading && (
