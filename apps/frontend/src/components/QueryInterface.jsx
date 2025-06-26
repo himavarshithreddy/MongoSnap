@@ -17,7 +17,7 @@ function QueryInterface({
                 </div>
                 
                 <textarea 
-                    className="w-full px-3 py-2 rounded bg-gray-800 text-white border border-gray-700 font-mono text-sm h-32 resize-none cursor-text" 
+                    className="w-full px-3 py-2 rounded bg-[#2d4c38] text-white border border-brand-tertiary font-mono text-sm h-32 resize-none cursor-text" 
                     value={queryInput} 
                     onChange={e => setQueryInput(e.target.value)} 
                     placeholder="db.collection.find({})"
@@ -51,7 +51,7 @@ function QueryInterface({
 
             {/* Query Results */}
             {queryResult && (
-                <div className='w-full bg-gray-800 text-white p-4 rounded-lg overflow-x-auto'>
+                <div className='w-full bg-[#2d4c38] text-white p-4 rounded-lg overflow-x-auto'>
                     <div className="flex justify-between items-center mb-2">
                         <span className="text-gray-400 text-xs">Result:</span>
                         <span className="text-gray-400 text-xs">

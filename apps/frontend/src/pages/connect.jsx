@@ -463,7 +463,7 @@ function Connect() {
         <div className="w-[20%] min-h-screen flex flex-col bg-brand-secondary">
             <div className='flex items-center mb-6 p-4 border-b border-brand-tertiary'>
                 <Logo size="default" />
-                <h1 className='md:text-2xl text-3xl font-bold text-white tracking-wide ml-2'>Mongo<span className='text-brand-quaternary'>Snap</span></h1>
+                <h1 className='md:text-3xl text-3xl font-bold text-white tracking-wide'>Mongo<span className='text-brand-quaternary'>Snap</span></h1>
             </div>
             
             <div className='flex flex-col gap-4 px-4 flex-1 overflow-hidden'>

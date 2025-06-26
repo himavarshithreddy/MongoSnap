@@ -63,7 +63,7 @@ function QueryHistory({
             {historyData.length > 0 ? (
                 <div className='space-y-4'>
                     {historyData.map((item, index) => (
-                        <div key={item.id || index} className="border border-gray-700 rounded-lg bg-gray-800 p-4">
+                        <div key={item.id || index} className="border border-gray-700 rounded-lg bg-[#2d4c38] p-4">
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                     <span className="text-gray-400 text-sm">
@@ -100,7 +100,7 @@ function QueryHistory({
                                 </div>
                             </div>
                             
-                            <div className="bg-gray-900 p-3 rounded mb-3">
+                            <div className="bg-[#243c2d] p-3 rounded mb-3">
                                 <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap break-words">
                                     {item.query}
                                 </pre>
