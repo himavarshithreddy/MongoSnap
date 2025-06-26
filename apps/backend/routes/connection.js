@@ -631,7 +631,7 @@ router.post('/:id/query', verifyToken, async (req, res) => {
     }
 });
 
-// Get active connection details for query console
+// Get active connection details for playground
 router.get('/active', verifyToken, async (req, res) => {
     try {
         const userId = req.userId;
