@@ -424,6 +424,42 @@ function Connect() {
 
     return (
         <div className="min-h-screen w-full flex">
+        {/* Mobile View - Show message to use desktop */}
+        <div className="md:hidden min-h-screen w-full bg-brand-primary flex flex-col items-center justify-center px-6 text-center">
+            <div className='flex items-center mb-8'>
+                <Logo size="large" />
+                <h1 className='text-3xl font-bold text-white tracking-wide'>Mongo<span className='text-brand-quaternary'>Snap</span></h1>
+            </div>
+            
+            <div className='bg-brand-secondary rounded-2xl p-8 border border-brand-tertiary max-w-sm'>
+                <div className='mb-6'>
+                    
+                    <h2 className='text-white text-xl font-bold mb-2'>Desktop Required</h2>
+                    <p className='text-gray-300 text-sm leading-relaxed'>
+                        Database connections require a desktop or PC environment for optimal security and functionality.
+                    </p>
+                </div>
+                
+                <div className='bg-brand-tertiary rounded-lg p-4 mb-6'>
+                    <h3 className='text-white font-semibold mb-2 text-sm'>Please use:</h3>
+                    <ul className='text-gray-300 text-xs space-y-1 text-left'>
+                        <li>• Desktop computer</li>
+                        <li>• Laptop</li>
+                        <li>• Tablet in desktop mode</li>
+                    </ul>
+                </div>
+                
+                <button
+                    onClick={() => navigate('/login')}
+                    className='w-full bg-brand-tertiary text-white py-2 px-4 rounded-md font-medium hover:bg-opacity-90 transition-all duration-200'
+                >
+                    Back to Login
+                </button>
+            </div>
+        </div>
+
+        {/* Desktop View - Original content */}
+        <div className="hidden md:flex min-h-screen w-full">
         <div className="w-[20%] min-h-screen flex flex-col bg-brand-secondary">
             <div className='flex items-center mb-6 p-4 border-b border-brand-tertiary'>
                 <Logo size="default" />
@@ -700,6 +736,7 @@ function Connect() {
                     Your connection details are secured and encrypted.
                 </p>
             </form>
+        </div>
         </div>
         </div>
     )
