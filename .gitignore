@@ -52,3 +52,5 @@ coverage/
 **/tmp/
 node_modules
 node_modules
+mongosnap.mp-key.pem
+mongosnap.mp.pem
