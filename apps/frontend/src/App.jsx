@@ -7,7 +7,7 @@ import ProtectedRoute from './ProtectedRoutes.jsx'
 import OAuthSuccess from './pages/OAuthSuccess'
 import OAuthPopup from './pages/OAuthPopup'
 import Connect from './pages/connect.jsx'
-import ConnectionStatus from './pages/ConnectionStatus.jsx'
+import QueryConsole from './pages/QueryConsole.jsx'
 
 function App() {
   return (
@@ -17,7 +17,7 @@ function App() {
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         {/* <Route path="/" element={<Home />} /> */}
         <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
-        <Route path="/connection-status" element={<ProtectedRoute><ConnectionStatus /></ProtectedRoute>} />
+        <Route path="/query-console" element={<ProtectedRoute><QueryConsole /></ProtectedRoute>} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />

@@ -5,7 +5,7 @@ const Connection = require('../models/Connection');
 const databaseManager = require('../utils/databaseManager');
 const crypto = require('crypto');
 const dotenv = require('dotenv');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 dotenv.config();
 
 const ENCRYPTION_KEY = process.env.CONNECTION_ENCRYPTION_KEY;
@@ -472,10 +472,18 @@ router.get('/:id/status', verifyToken, async (req, res) => {
             isAlive = await databaseManager.testConnection(userId, connectionId);
         }
         
+        // Extract database info from URI
+        const decryptedUri = decrypt(connection.uri);
+        const uriMatch = decryptedUri.match(/mongodb(?:\+srv)?:\/\/[^@]+@([^\/]+)\/([^?]+)/);
+        const host = uriMatch ? uriMatch[1] : 'Unknown';
+        const databaseName = uriMatch ? uriMatch[2] : 'Unknown';
+        
         return res.status(200).json({
             connection: {
                 _id: connection._id,
                 nickname: connection.nickname,
+                host: host,
+                databaseName: databaseName,
                 isActive: connection.isActive,
                 isConnected: isConnected,
                 isAlive: isAlive,
@@ -556,6 +564,462 @@ router.post('/:id/reconnect', verifyToken, async (req, res) => {
     }
 });
 
+// Execute a query on the connected database
+router.post('/:id/query', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const connectionId = req.params.id;
+        const { collection, operation, query, options, update } = req.body;
+
+        if (!collection || !operation) {
+            return res.status(400).json({ message: 'Collection and operation are required.' });
+        }
+
+        // Prevent dangerous operations
+        const forbiddenOps = ['dropDatabase', 'drop', 'remove'];
+        if (forbiddenOps.includes(operation)) {
+            return res.status(403).json({ message: 'Operation not allowed.' });
+        }
+
+        // Get the connection info from DB
+        const dbConn = await Connection.findOne({ _id: connectionId, userId });
+        if (!dbConn) {
+            return res.status(404).json({ message: 'Connection not found.' });
+        }
+
+        // Get the database name from the connection info
+        const dbName = dbConn.databaseName || undefined;
+        const db = databaseManager.getDatabase(userId, connectionId, dbName);
+        if (!db) {
+            return res.status(400).json({ message: 'Not connected to the database.' });
+        }
+
+        const col = db.collection(collection);
+        let result;
+        switch (operation) {
+            case 'find':
+                result = await col.find(query || {}, options || {}).toArray();
+                break;
+            case 'findOne':
+                result = await col.findOne(query || {}, options || {});
+                break;
+            case 'insertOne':
+                result = await col.insertOne(query);
+                break;
+            case 'insertMany':
+                result = await col.insertMany(query);
+                break;
+            case 'updateOne':
+                result = await col.updateOne(query, update, options || {});
+                break;
+            case 'updateMany':
+                result = await col.updateMany(query, update, options || {});
+                break;
+            case 'deleteOne':
+                result = await col.deleteOne(query, options || {});
+                break;
+            case 'deleteMany':
+                result = await col.deleteMany(query, options || {});
+                break;
+            default:
+                return res.status(400).json({ message: 'Unsupported operation.' });
+        }
+        return res.status(200).json({ result });
+    } catch (error) {
+        console.error('Error executing query:', error);
+        return res.status(500).json({ message: 'Failed to execute query', details: error.message });
+    }
+});
+
+// Get active connection details for query console
+router.get('/active', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        
+        // Find the user's active connection
+        const activeConnection = await Connection.findOne({ 
+            userId, 
+            isActive: true 
+        }).sort({ lastUsed: -1 });
+        
+        if (!activeConnection) {
+            return res.status(404).json({ message: 'No active connection found' });
+        }
+        
+        // Check if connection is still active in database manager
+        const isConnected = databaseManager.isConnected(userId, activeConnection._id.toString());
+        const connectionInfo = databaseManager.getConnectionInfo(userId, activeConnection._id.toString());
+        
+        // Extract database info from URI
+        const decryptedUri = decrypt(activeConnection.uri);
+        const uriMatch = decryptedUri.match(/mongodb(?:\+srv)?:\/\/[^@]+@([^\/]+)\/([^?]+)/);
+        const host = uriMatch ? uriMatch[1] : 'Unknown';
+        const databaseName = uriMatch ? uriMatch[2] : 'Unknown';
+        
+        return res.status(200).json({
+            connection: {
+                _id: activeConnection._id,
+                nickname: activeConnection.nickname,
+                host: host,
+                databaseName: databaseName,
+                isActive: activeConnection.isActive,
+                isConnected: isConnected,
+                lastUsed: activeConnection.lastUsed,
+                createdAt: activeConnection.createdAt,
+                connectionInfo: connectionInfo
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error getting active connection:', error);
+        return res.status(500).json({ 
+            message: 'Failed to get active connection',
+            details: error.message 
+        });
+    }
+});
+
+// Helper function to convert MongoDB extended JSON to proper MongoDB types
+const convertExtendedJSON = (obj) => {
+    if (obj === null || obj === undefined) return obj;
+    
+    if (Array.isArray(obj)) {
+        return obj.map(convertExtendedJSON);
+    }
+    
+    if (typeof obj === 'object') {
+        // Handle custom ObjectId format from frontend
+        if (obj.__type === 'ObjectId') {
+            return new ObjectId(obj.value);
+        }
+        
+        // Handle ObjectId
+        if (obj.$oid) {
+            return new ObjectId(obj.$oid);
+        }
+        
+        // Handle Date
+        if (obj.$date) {
+            return new Date(obj.$date);
+        }
+        
+        // Recursively convert nested objects
+        const converted = {};
+        for (const [key, value] of Object.entries(obj)) {
+            converted[key] = convertExtendedJSON(value);
+        }
+        return converted;
+    }
+    
+    return obj;
+};
+
+// Execute a raw MongoDB query (enhanced version)
+router.post('/:id/execute', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const connectionId = req.params.id;
+        const { collection, operation, args } = req.body;
+
+        if (!collection || !operation) {
+            return res.status(400).json({ message: 'Collection and operation are required.' });
+        }
+
+        // Prevent dangerous operations
+        const forbiddenOps = ['dropDatabase', 'drop', 'remove'];
+        if (forbiddenOps.includes(operation)) {
+            return res.status(403).json({ message: 'Operation not allowed.' });
+        }
+
+        // Get the connection info from DB
+        const dbConn = await Connection.findOne({ _id: connectionId, userId });
+        if (!dbConn) {
+            return res.status(404).json({ message: 'Connection not found.' });
+        }
+
+        // Get the database using the connection manager
+        const db = databaseManager.getDatabase(userId, connectionId);
+        if (!db) {
+            return res.status(400).json({ message: 'Not connected to the database.' });
+        }
+
+        // Convert extended JSON format to proper MongoDB types
+        const convertedArgs = args.map(convertExtendedJSON);
+
+        const col = db.collection(collection);
+        let result;
+
+        // Handle different MongoDB operations
+        switch (operation) {
+            case 'find':
+                result = await col.find(convertedArgs[0] || {}, convertedArgs[1] || {}).toArray();
+                break;
+            case 'findOne':
+                result = await col.findOne(convertedArgs[0] || {}, convertedArgs[1] || {});
+                break;
+            case 'insertOne':
+                result = await col.insertOne(convertedArgs[0]);
+                break;
+            case 'insertMany':
+                result = await col.insertMany(convertedArgs[0]);
+                break;
+            case 'updateOne':
+                result = await col.updateOne(convertedArgs[0], convertedArgs[1], convertedArgs[2] || {});
+                break;
+            case 'updateMany':
+                result = await col.updateMany(convertedArgs[0], convertedArgs[1], convertedArgs[2] || {});
+                break;
+            case 'deleteOne':
+                result = await col.deleteOne(convertedArgs[0], convertedArgs[1] || {});
+                break;
+            case 'deleteMany':
+                result = await col.deleteMany(convertedArgs[0], convertedArgs[1] || {});
+                break;
+            case 'countDocuments':
+                result = await col.countDocuments(convertedArgs[0] || {});
+                break;
+            case 'estimatedDocumentCount':
+                result = await col.estimatedDocumentCount();
+                break;
+            case 'aggregate':
+                result = await col.aggregate(convertedArgs[0] || []).toArray();
+                break;
+            case 'distinct':
+                result = await col.distinct(convertedArgs[0], convertedArgs[1] || {});
+                break;
+            case 'createIndex':
+                result = await col.createIndex(convertedArgs[0], convertedArgs[1] || {});
+                break;
+            case 'listIndexes':
+                result = await col.listIndexes().toArray();
+                break;
+            default:
+                return res.status(400).json({ message: `Unsupported operation: ${operation}` });
+        }
+
+        return res.status(200).json({ result });
+    } catch (error) {
+        console.error('Error executing query:', error);
+        return res.status(500).json({ 
+            message: 'Failed to execute query', 
+            details: error.message 
+        });
+    }
+});
+
+// Get database schema information
+router.get('/:id/schema', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const connectionId = req.params.id;
+
+        // Get the connection info from DB
+        const dbConn = await Connection.findOne({ _id: connectionId, userId });
+        if (!dbConn) {
+            return res.status(404).json({ message: 'Connection not found.' });
+        }
+
+        // Get the database using the connection manager
+        const db = databaseManager.getDatabase(userId, connectionId);
+        if (!db) {
+            return res.status(400).json({ message: 'Not connected to the database.' });
+        }
+
+        // Get all collections
+        const collections = await db.listCollections().toArray();
+        
+        const schema = {
+            databaseName: db.databaseName,
+            collections: []
+        };
+
+        // Get schema info for each collection
+        for (const collection of collections) {
+            const collectionName = collection.name;
+            const col = db.collection(collectionName);
+            
+            try {
+                // Get collection stats
+                const stats = await db.command({ collStats: collectionName });
+                
+                // Get indexes
+                const indexes = await col.listIndexes().toArray();
+                
+                // Get document count
+                const count = await col.estimatedDocumentCount();
+                
+                // Try to get schema analysis using MongoDB's analyzeSchema command
+                let schemaAnalysis = null;
+                let fields = [];
+                let sampleDoc = null;
+                
+                try {
+                    // Use MongoDB's analyzeSchema command for richer insights
+                    schemaAnalysis = await db.command({ 
+                        analyzeSchema: collectionName,
+                        sampleSize: 1000  // Analyze up to 1000 documents
+                    });
+                    
+                    // Extract field information from schema analysis
+                    if (schemaAnalysis && schemaAnalysis.schema) {
+                        fields = extractSchemaFields(schemaAnalysis.schema);
+                    }
+                } catch (schemaError) {
+                    console.log(`Schema analysis failed for ${collectionName}, falling back to sample document:`, schemaError.message);
+                    
+                    // Fallback to sample document analysis
+                    sampleDoc = await col.findOne({});
+                    if (sampleDoc) {
+                        fields = extractFields(sampleDoc);
+                    }
+                }
+                
+                schema.collections.push({
+                    name: collectionName,
+                    type: collection.type,
+                    count: count,
+                    size: stats.size || 0,
+                    avgObjSize: stats.avgObjSize || 0,
+                    indexes: indexes.map(idx => ({
+                        name: idx.name,
+                        key: idx.key,
+                        unique: idx.unique || false,
+                        sparse: idx.sparse || false,
+                        background: idx.background || false
+                    })),
+                    sampleDocument: sampleDoc,
+                    fields: fields,
+                    schemaAnalysis: schemaAnalysis,
+                    hasSchemaAnalysis: !!schemaAnalysis
+                });
+            } catch (error) {
+                // If we can't get stats for a collection, still include basic info
+                schema.collections.push({
+                    name: collectionName,
+                    type: collection.type,
+                    count: 0,
+                    size: 0,
+                    avgObjSize: 0,
+                    indexes: [],
+                    sampleDocument: null,
+                    fields: [],
+                    schemaAnalysis: null,
+                    hasSchemaAnalysis: false,
+                    error: 'Could not retrieve collection details'
+                });
+            }
+        }
+
+        return res.status(200).json({ schema });
+    } catch (error) {
+        console.error('Error getting database schema:', error);
+        return res.status(500).json({ 
+            message: 'Failed to get database schema', 
+            details: error.message 
+        });
+    }
+});
+
+// Helper function to extract field information from MongoDB schema analysis
+const extractSchemaFields = (schemaData, prefix = '') => {
+    const fields = [];
+    
+    if (!schemaData || typeof schemaData !== 'object') {
+        return fields;
+    }
+    
+    for (const [fieldName, fieldInfo] of Object.entries(schemaData)) {
+        const fullFieldName = prefix ? `${prefix}.${fieldName}` : fieldName;
+        
+        if (fieldInfo && typeof fieldInfo === 'object') {
+            // Extract type information
+            const types = fieldInfo.types || [];
+            const primaryType = types.length > 0 ? types[0].type : 'unknown';
+            
+            // Get type statistics
+            const typeStats = types.reduce((acc, typeInfo) => {
+                acc[typeInfo.type] = {
+                    count: typeInfo.count || 0,
+                    percentage: typeInfo.percentage || 0
+                };
+                return acc;
+            }, {});
+            
+            // Check if field has nested fields
+            const hasNestedFields = fieldInfo.schema && Object.keys(fieldInfo.schema).length > 0;
+            
+            fields.push({
+                name: fullFieldName,
+                type: primaryType,
+                types: types,
+                typeStats: typeStats,
+                hasNestedFields: hasNestedFields,
+                totalCount: fieldInfo.count || 0,
+                nullCount: fieldInfo.nullCount || 0,
+                nullPercentage: fieldInfo.nullPercentage || 0,
+                uniqueCount: fieldInfo.uniqueCount || 0,
+                uniquePercentage: fieldInfo.uniquePercentage || 0,
+                avgLength: fieldInfo.avgLength,
+                minLength: fieldInfo.minLength,
+                maxLength: fieldInfo.maxLength,
+                avgValue: fieldInfo.avgValue,
+                minValue: fieldInfo.minValue,
+                maxValue: fieldInfo.maxValue
+            });
+            
+            // Recursively extract nested fields (limit depth to prevent infinite recursion)
+            if (hasNestedFields && prefix.split('.').length < 3) {
+                const nestedFields = extractSchemaFields(fieldInfo.schema, fullFieldName);
+                fields.push(...nestedFields);
+            }
+        }
+    }
+    
+    return fields;
+};
+
+// Enhanced helper function to extract field types from a document (fallback)
+const extractFields = (doc, prefix = '') => {
+    const fields = [];
+    
+    for (const [key, value] of Object.entries(doc)) {
+        const fieldName = prefix ? `${prefix}.${key}` : key;
+        const fieldType = getFieldType(value);
+        
+        fields.push({
+            name: fieldName,
+            type: fieldType,
+            hasNestedFields: fieldType === 'object' && value !== null,
+            types: [{ type: fieldType, count: 1, percentage: 100 }],
+            typeStats: { [fieldType]: { count: 1, percentage: 100 } },
+            totalCount: 1,
+            nullCount: value === null ? 1 : 0,
+            nullPercentage: value === null ? 100 : 0
+        });
+        
+        // Recursively extract nested fields for objects (but limit depth)
+        if (fieldType === 'object' && value !== null && prefix.split('.').length < 2) {
+            fields.push(...extractFields(value, fieldName));
+        }
+    }
+    
+    return fields;
+};
+
+// Helper function to determine field type
+const getFieldType = (value) => {
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'string') return 'string';
+    if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'double';
+    if (typeof value === 'boolean') return 'boolean';
+    if (value instanceof Date) return 'date';
+    if (value instanceof ObjectId) return 'objectId';
+    if (Array.isArray(value)) return 'array';
+    if (typeof value === 'object') return 'object';
+    return 'unknown';
+};
+
 const testConnection = async (uri) => {
     // Create client with timeout options
     const client = new MongoClient(uri, {
@@ -605,5 +1069,61 @@ const testConnection = async (uri) => {
         }
     }
 };
+
+// Get detailed schema analysis for a specific collection
+router.get('/:id/schema/:collection', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const connectionId = req.params.id;
+        const collectionName = req.params.collection;
+
+        // Get the connection info from DB
+        const dbConn = await Connection.findOne({ _id: connectionId, userId });
+        if (!dbConn) {
+            return res.status(404).json({ message: 'Connection not found.' });
+        }
+
+        // Get the database using the connection manager
+        const db = databaseManager.getDatabase(userId, connectionId);
+        if (!db) {
+            return res.status(400).json({ message: 'Not connected to the database.' });
+        }
+
+        const col = db.collection(collectionName);
+        
+        // Get comprehensive schema analysis
+        const schemaAnalysis = await db.command({ 
+            analyzeSchema: collectionName,
+            sampleSize: 5000  // Larger sample for detailed analysis
+        });
+        
+        // Get additional collection information
+        const stats = await db.command({ collStats: collectionName });
+        const indexes = await col.listIndexes().toArray();
+        const count = await col.estimatedDocumentCount();
+        
+        // Get sample documents for reference
+        const sampleDocs = await col.find({}).limit(5).toArray();
+        
+        return res.status(200).json({
+            collection: {
+                name: collectionName,
+                count: count,
+                size: stats.size || 0,
+                avgObjSize: stats.avgObjSize || 0,
+                indexes: indexes,
+                schemaAnalysis: schemaAnalysis,
+                sampleDocuments: sampleDocs
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error getting collection schema:', error);
+        return res.status(500).json({ 
+            message: 'Failed to get collection schema', 
+            details: error.message 
+        });
+    }
+});
 
 module.exports = router;

@@ -248,7 +248,7 @@ function Connect() {
                 }
                 
                 // Navigate to connection status page
-                navigate(`/connection-status?data=${encodeURIComponent(JSON.stringify(data.connection))}`);
+                navigate(`/query-console?connectionId=${data.connection._id}`);
             } else {
                 const errorData = await connectResponse.json();
                 console.error('Connect error response:', errorData);

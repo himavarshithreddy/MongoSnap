@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom';
 import '../App.css'
 import { Eye, EyeOff } from 'lucide-react';     
 import { useUser } from '../hooks/useUser';
@@ -14,11 +15,20 @@ const passwordChecks = [
 ];
 
 function Login() {
+    const navigate = useNavigate();
+    
+    const { login, user, loading: userLoading, isAuthenticated } = useUser();
+    
     useEffect(() => {
         document.title = "MongoSnap - Login";
     }, []);
-    
-    const { login } = useUser();
+
+    // Auto-redirect to connect page if user is already authenticated
+    useEffect(() => {
+        if (!userLoading && isAuthenticated) {
+            navigate('/connect');
+        }
+    }, [userLoading, isAuthenticated, navigate]);
     
     const [showpassword, setShowpassword] = useState(false);
     const [mode, setMode] = useState('login');
@@ -215,6 +225,30 @@ function Login() {
         // Focus the popup
         popup.focus();
     };
+
+    // Show loading screen while checking authentication status
+    if (userLoading) {
+        return (
+            <div className='w-full min-h-screen bg-[#101813] flex justify-center items-center'>
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3CBC6B] mx-auto mb-4"></div>
+                    <p className="text-white text-lg">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Show redirecting screen if user is authenticated
+    if (isAuthenticated) {
+        return (
+            <div className='w-full min-h-screen bg-[#101813] flex justify-center items-center'>
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3CBC6B] mx-auto mb-4"></div>
+                    <p className="text-white text-lg">Already signed in! Redirecting to connect page...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div id='main' className='w-full min-h-screen bg-[#101813] flex justify-center items-center'>
