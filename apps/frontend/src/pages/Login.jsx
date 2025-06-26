@@ -17,7 +17,7 @@ const passwordChecks = [
 function Login() {
     const navigate = useNavigate();
     
-    const { login, user, loading: userLoading, isAuthenticated } = useUser();
+    const { login, loading: userLoading, isAuthenticated } = useUser();
     
     useEffect(() => {
         document.title = "MongoSnap - Login";
@@ -132,9 +132,6 @@ function Login() {
                 login(data.token, data.user);
                 setSuccess('Login successful! Redirecting...');
                 setRedirecting(true);
-                setTimeout(() => {
-                    window.location.href = '/connect';
-                }, 500); 
             } else {
                 setSuccess(data.message);
                 setForm({ name: '', email: '', password: '' });

@@ -14,7 +14,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendVerificationEmail = async (email, token) => {
-  const link = `http://mongosnap.mp:5173/api/verify-email/${token}`;
+  const link = `https://mongosnap.mp:5173/api/verify-email/${token}`;
   await transporter.sendMail({
     from: `"MongoSnap" <noreply@mongosnap.live>`,
     to: email,

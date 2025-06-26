@@ -3,18 +3,20 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-
+const fs = require('fs');
+const https = require('https');
 const authRoutes = require('./routes/auth');
 const testRoutes = require('./routes/test');
 const forgotPasswordRoutes = require('./routes/forgotpassword');
 const verifyRoutes = require('./routes/verify');
 const oauthRoutes = require('./routes/oauth');
 const connectionRoutes = require('./routes/connection');
+const path = require('path');
 dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: ['http://mongosnap.mp:5173'],
+  origin: ['https://mongosnap.mp:5173'],
   credentials: true,
   sameSite: 'lax'
 }));
@@ -35,8 +37,12 @@ mongoose.connect(process.env.MONGO_URI, {
 .then(() => console.log('✅ MongoDB connected'))
 .catch((err) => console.error('❌ MongoDB connection failed:', err));
 
+const sslOptions = {
+  key: fs.readFileSync(path.resolve(__dirname, '../../mongosnap.mp-key.pem')),
+  cert: fs.readFileSync(path.resolve(__dirname, '../../mongosnap.mp.pem')),
+};
 
-app.listen(4000,'0.0.0.0', () => {
-  console.log(`🚀 Server running on http://mongosnap.mp:4000`);
-  console.log(`🚀 Frontend running on http://mongosnap.mp:5173`);
+https.createServer(sslOptions, app).listen(4000, '0.0.0.0', () => {
+  console.log(`🔒 HTTPS server running at https://mongosnap.mp:4000`);
+  console.log(`🚀 Frontend expected at https://mongosnap.mp:5173`);
 });

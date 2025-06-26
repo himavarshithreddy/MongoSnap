@@ -18,7 +18,7 @@ router.post('/forgot-password', async (req, res) => {
          
             await user.save();
 
-            const resetLink = `http://mongosnap.mp:5173/reset-password/${resetToken}`;
+            const resetLink = `https://mongosnap.mp:5173/reset-password/${resetToken}`;
             await sendResetPasswordEmail(user.email, resetLink);
         }
 

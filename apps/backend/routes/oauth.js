@@ -156,7 +156,7 @@ router.get('/google/callback', async (req, res) => {
         console.log('Redirecting to frontend...');
 
         // Redirect to frontend popup with token
-        return res.redirect(`http://mongosnap.mp:5173/oauth-popup?token=${token}`);
+        return res.redirect(`https://mongosnap.mp:5173/oauth-popup?token=${token}`);
 
     } catch (err) {
         console.error('OAuth error details:', err.response?.data || err.message);
@@ -276,7 +276,7 @@ router.get('/github/callback', async (req, res) => {
         console.log('Redirecting to frontend...');
 
         // Redirect to frontend popup with token
-        return res.redirect(`http://mongosnap.mp:5173/oauth-popup?token=${token}`);
+        return res.redirect(`https://mongosnap.mp:5173/oauth-popup?token=${token}`);
 
     } catch (err) {
         console.error('GitHub OAuth error details:', err.response?.data || err.message);
