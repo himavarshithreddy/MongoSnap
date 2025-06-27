@@ -1,4 +1,5 @@
 import React from 'react';
+import { Save, Check, AlertCircle } from 'lucide-react';
 
 function QueryInterface({ 
     queryInput, 
@@ -6,8 +7,47 @@ function QueryInterface({
     queryLoading, 
     queryError, 
     queryResult, 
-    handleQuerySubmit 
+    handleQuerySubmit,
+    onSaveQuery,
+    saveMessage 
 }) {
+    const handleSaveClick = () => {
+        if (!queryInput.trim()) {
+            return;
+        }
+        
+        if (onSaveQuery) {
+            onSaveQuery(queryInput);
+        }
+    };
+
+    // Determine button state based on saveMessage
+    const getSaveButtonState = () => {
+        if (!saveMessage) {
+            return {
+                text: 'Save',
+                icon: <Save size={14} />,
+                className: 'bg-[#35c56a69] hover:bg-[#35c56a7e]'
+            };
+        }
+        
+        if (saveMessage.includes('already')) {
+            return {
+                text: 'Already Saved',
+                icon: <AlertCircle size={14} />,
+                className: 'bg-yellow-600 hover:bg-yellow-500'
+            };
+        }
+        
+        return {
+            text: 'Saved!',
+            icon: <Check size={14} />,
+            className: 'bg-green-600 hover:bg-green-500'
+        };
+    };
+
+    const buttonState = getSaveButtonState();
+
     return (
         <>
             {/* Query Interface */}
@@ -16,13 +56,24 @@ function QueryInterface({
                     <label className='text-gray-400 text-md font-semibold'>MongoDB Query</label>
                 </div>
                 
-                <textarea 
-                    className="w-full px-3 py-2 rounded bg-[#2d4c38] text-white border border-brand-tertiary font-mono text-sm h-32 resize-none cursor-text" 
-                    value={queryInput} 
-                    onChange={e => setQueryInput(e.target.value)} 
-                    placeholder="db.collection.find({})"
-                    required 
-                />
+                <div className="relative">
+                    <textarea 
+                        className="w-full px-3 py-2 pr-20 rounded bg-[#2d4c38] text-white border border-brand-tertiary font-mono text-sm h-32 resize-none cursor-text" 
+                        value={queryInput} 
+                        onChange={e => setQueryInput(e.target.value)} 
+                        placeholder="db.collection.find({})"
+                        required 
+                    />
+                    <button 
+                        onClick={handleSaveClick}
+                        disabled={queryLoading || !queryInput.trim()}
+                        className={`absolute bottom-4 right-2 px-3 py-1.5 rounded-md text-white text-sm transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${buttonState.className} ${(!queryInput.trim() || queryLoading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-80'}`}
+                        title="Save Query"
+                    >
+                        {buttonState.icon}
+                        {buttonState.text}
+                    </button>
+                </div>
                 <p className='text-xs text-gray-500'>
                     Use MongoDB syntax like: db.collection.find(&#123;&#125;), db.collection.insertOne(&#123;...&#125;), etc.
                 </p>

@@ -33,6 +33,8 @@ function Playground() {
     const [activeTab, setActiveTab] = useState('query'); // 'query', 'schema', 'history'
     const [showConnectionConfirm, setShowConnectionConfirm] = useState(false);
     const [queryHistory, setQueryHistory] = useState([]);
+    const [savedQueries, setSavedQueries] = useState([]);
+    const [saveMessage, setSaveMessage] = useState('');
     
     // Mock query history data
     const mockQueryHistory = [
@@ -73,9 +75,29 @@ function Playground() {
         }
     ];
 
-    // Initialize query history with mock data
+    // Mock saved queries data - simplified structure
+    const mockSavedQueries = [
+        {
+            id: 1,
+            query: 'db.users.find({"status": "active", "verified": true})',
+            timestamp: '2024-01-14T15:30:00Z'
+        },
+        {
+            id: 2,
+            query: 'db.orders.aggregate([{"$match": {"date": {"$gte": new Date("2024-01-01")}}}, {"$group": {"_id": "$productId", "totalSales": {"$sum": "$amount"}, "orderCount": {"$sum": 1}}}, {"$sort": {"totalSales": -1}}])',
+            timestamp: '2024-01-13T09:15:00Z'
+        },
+        {
+            id: 3,
+            query: 'db.comments.find({"createdAt": {"$gte": new Date(Date.now() - 7*24*60*60*1000)}}).sort({"createdAt": -1})',
+            timestamp: '2024-01-12T14:20:00Z'
+        }
+    ];
+
+    // Initialize data with mock data
     useEffect(() => {
         setQueryHistory(mockQueryHistory);
+        setSavedQueries(mockSavedQueries);
     }, []);
 
     useEffect(() => {
@@ -556,6 +578,33 @@ function Playground() {
         setQueryHistory(prev => [historyItem, ...prev.slice(0, 9)]); // Keep last 10 items
     };
 
+    // Simplified save query function
+    const handleSaveQuery = (query) => {
+        // Check if query already exists
+        const queryExists = savedQueries.some(saved => saved.query === query);
+        
+        if (queryExists) {
+            setSaveMessage('Query already saved!');
+            setTimeout(() => setSaveMessage(''), 2000);
+            return;
+        }
+
+        const savedQuery = {
+            id: Date.now(),
+            query: query,
+            timestamp: new Date().toISOString()
+        };
+        
+        setSavedQueries(prev => [savedQuery, ...prev]);
+        setSaveMessage('Query saved successfully!');
+        setTimeout(() => setSaveMessage(''), 2000);
+    };
+
+    // Delete saved query
+    const deleteSavedQuery = (index) => {
+        setSavedQueries(prev => prev.filter((_, i) => i !== index));
+    };
+
     if (userLoading) {
         return (
             <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -714,50 +763,6 @@ function Playground() {
                     </div>
                 </div>
 
-                {/* Main Tabs */}
-                <div className='space-y-2'>
-                    <button
-                        onClick={() => setActiveTab('query')}
-                        className={`w-full flex items-center gap-2 p-3 rounded-lg transition-all duration-200 text-sm cursor-pointer ${
-                            activeTab === 'query' 
-                                ? 'bg-brand-quaternary text-white' 
-                                : 'bg-brand-tertiary text-white hover:bg-opacity-80'
-                        }`}
-                    >
-                        <Database size={16} />
-                        Query Interface
-                    </button>
-                    
-                    <button
-                        onClick={() => {
-                            setActiveTab('schema');
-                            if (!schema) {
-                                fetchSchema();
-                            }
-                        }}
-                        className={`w-full flex items-center gap-2 p-3 rounded-lg transition-all duration-200 text-sm cursor-pointer ${
-                            activeTab === 'schema' 
-                                ? 'bg-brand-quaternary text-white' 
-                                : 'bg-brand-tertiary text-white hover:bg-opacity-80'
-                        }`}
-                    >
-                        <FileText size={16} />
-                        Schema Explorer
-                    </button>
-                    
-                    <button
-                        onClick={() => setActiveTab('history')}
-                        className={`w-full flex items-center gap-2 p-3 rounded-lg transition-all duration-200 text-sm cursor-pointer ${
-                            activeTab === 'history' 
-                                ? 'bg-brand-quaternary text-white' 
-                                : 'bg-brand-tertiary text-white hover:bg-opacity-80'
-                        }`}
-                    >
-                        <Clock size={16} />
-                        Query History
-                    </button>
-                </div>
-
                 {/* Connection Actions */}
                 <div className='space-y-2'>
                     <button
@@ -781,7 +786,7 @@ function Playground() {
                     <button
                         onClick={handleDisconnect}
                         disabled={isDisconnecting}
-                        className='w-full flex items-center gap-2 p-3 bg-red-600 text-white rounded-lg hover:bg-opacity-80 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
+                        className='w-full flex items-center gap-2 p-3 bg-gray-600 text-white rounded-lg hover:bg-red-800 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
                     >
                         {isDisconnecting ? (
                             <>
@@ -808,7 +813,7 @@ function Playground() {
                             Change Connection
                         </button>
                     ) : (
-                        <div className='bg-gray-800 rounded-lg p-3 border border-gray-700'>
+                        <div className='bg-[#2d4c38] rounded-lg p-3 border border-gray-700'>
                             <div className='flex items-center gap-2 mb-3'>
                                 <Server size={14} className="text-gray-400" />
                                 <span className='text-gray-300 text-sm font-medium'>Change Connection</span>
@@ -907,10 +912,56 @@ function Playground() {
                 )}
             </div>
           
-            <h1 className='text-white text-4xl font-bold'>MongoSnap <span className='text-brand-quaternary'>Playground</span></h1>
+            <h1 className='text-white text-4xl font-bold mt-5'>MongoSnap <span className='text-brand-quaternary'>Playground</span></h1>
             
             {/* Main Playground Content */}
             <div className='w-[80%] bg-brand-secondary rounded-4xl flex flex-col gap-7 justify-center px-10 py-8'>
+                {/* Horizontal Tabs */}
+                <div className='flex justify-center'>
+                    <div className='flex bg-brand-tertiary rounded-lg p-1 gap-1'>
+                        <button
+                            onClick={() => setActiveTab('query')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 text-sm cursor-pointer ${
+                                activeTab === 'query' 
+                                    ? 'bg-brand-quaternary text-white shadow-md' 
+                                    : 'text-gray-300 hover:text-white hover:bg-brand-secondary'
+                            }`}
+                        >
+                            <Database size={16} />
+                            Query Interface
+                        </button>
+                        
+                        <button
+                            onClick={() => {
+                                setActiveTab('schema');
+                                if (!schema) {
+                                    fetchSchema();
+                                }
+                            }}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 text-sm cursor-pointer ${
+                                activeTab === 'schema' 
+                                    ? 'bg-brand-quaternary text-white shadow-md' 
+                                    : 'text-gray-300 hover:text-white hover:bg-brand-secondary'
+                            }`}
+                        >
+                            <FileText size={16} />
+                            Schema Explorer
+                        </button>
+                        
+                        <button
+                            onClick={() => setActiveTab('history')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 text-sm cursor-pointer ${
+                                activeTab === 'history' 
+                                    ? 'bg-brand-quaternary text-white shadow-md' 
+                                    : 'text-gray-300 hover:text-white hover:bg-brand-secondary'
+                            }`}
+                        >
+                            <Clock size={16} />
+                            Query History
+                        </button>
+                    </div>
+                </div>
+                
                 {activeTab === 'schema' ? (
                     <SchemaExplorer 
                         schema={schema}
@@ -928,9 +979,11 @@ function Playground() {
                 ) : activeTab === 'history' ? (
                     <QueryHistory 
                         queryHistory={queryHistory}
+                        savedQueries={savedQueries}
                         executeHistoryQuery={executeHistoryQuery}
                         copyToQueryInput={copyToQueryInput}
                         deleteHistoryItem={deleteHistoryItem}
+                        deleteSavedQuery={deleteSavedQuery}
                         formatTimestamp={formatTimestamp}
                     />
                 ) : (
@@ -941,6 +994,8 @@ function Playground() {
                         queryError={queryError}
                         queryResult={queryResult}
                         handleQuerySubmit={handleQuerySubmit}
+                        onSaveQuery={handleSaveQuery}
+                        saveMessage={saveMessage}
                     />
                 )}
             </div>
