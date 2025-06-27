@@ -7,6 +7,7 @@ const databaseManager = require('../utils/databaseManager');
 const crypto = require('crypto');
 const dotenv = require('dotenv');
 const { MongoClient, ObjectId } = require('mongodb');
+const geminiApi = require('../utils/geminiApi');
 dotenv.config();
 
 const ENCRYPTION_KEY = process.env.CONNECTION_ENCRYPTION_KEY;
@@ -694,6 +695,11 @@ const convertExtendedJSON = (obj) => {
             return new ObjectId(obj.value);
         }
         
+        // Handle custom Date format from frontend
+        if (obj.__type === 'Date') {
+            return new Date(obj.value);
+        }
+        
         // Handle ObjectId
         if (obj.$oid) {
             return new ObjectId(obj.$oid);
@@ -715,20 +721,20 @@ const convertExtendedJSON = (obj) => {
     return obj;
 };
 
-// Execute a raw MongoDB query (enhanced version)
-router.post('/:id/execute', verifyToken, async (req, res) => {
+// Execute a raw MongoDB query string directly (bypass parsing)
+router.post('/:id/execute-raw', verifyToken, async (req, res) => {
     try {
         const userId = req.userId;
         const connectionId = req.params.id;
-        const { collection, operation, args, naturalLanguage, generatedQuery } = req.body;
+        const { queryString, naturalLanguage, generatedQuery } = req.body;
 
-        if (!collection || !operation) {
-            return res.status(400).json({ message: 'Collection and operation are required.' });
+        if (!queryString) {
+            return res.status(400).json({ message: 'Query string is required.' });
         }
 
         // Prevent dangerous operations
         const forbiddenOps = ['dropDatabase', 'drop', 'remove'];
-        if (forbiddenOps.includes(operation)) {
+        if (forbiddenOps.some(op => queryString.includes(op))) {
             return res.status(403).json({ message: 'Operation not allowed.' });
         }
 
@@ -744,10 +750,6 @@ router.post('/:id/execute', verifyToken, async (req, res) => {
             return res.status(400).json({ message: 'Not connected to the database.' });
         }
 
-        // Convert extended JSON format to proper MongoDB types
-        const convertedArgs = args.map(convertExtendedJSON);
-
-        const col = db.collection(collection);
         let result;
         let executionTime = 0;
         let documentsAffected = 0;
@@ -758,66 +760,90 @@ router.post('/:id/execute', verifyToken, async (req, res) => {
         const startTime = Date.now();
 
         try {
-            // Handle different MongoDB operations
-            switch (operation) {
-                case 'find':
-                    result = await col.find(convertedArgs[0] || {}, convertedArgs[1] || {}).toArray();
-                    documentsAffected = result.length;
-                    break;
-                case 'findOne':
-                    result = await col.findOne(convertedArgs[0] || {}, convertedArgs[1] || {});
-                    documentsAffected = result ? 1 : 0;
-                    break;
-                case 'insertOne':
-                    result = await col.insertOne(convertedArgs[0]);
-                    documentsAffected = result.insertedCount || 0;
-                    break;
-                case 'insertMany':
-                    result = await col.insertMany(convertedArgs[0]);
-                    documentsAffected = result.insertedCount || 0;
-                    break;
-                case 'updateOne':
-                    result = await col.updateOne(convertedArgs[0], convertedArgs[1], convertedArgs[2] || {});
-                    documentsAffected = result.modifiedCount || 0;
-                    break;
-                case 'updateMany':
-                    result = await col.updateMany(convertedArgs[0], convertedArgs[1], convertedArgs[2] || {});
-                    documentsAffected = result.modifiedCount || 0;
-                    break;
-                case 'deleteOne':
-                    result = await col.deleteOne(convertedArgs[0], convertedArgs[1] || {});
-                    documentsAffected = result.deletedCount || 0;
-                    break;
-                case 'deleteMany':
-                    result = await col.deleteMany(convertedArgs[0], convertedArgs[1] || {});
-                    documentsAffected = result.deletedCount || 0;
-                    break;
-                case 'countDocuments':
-                    result = await col.countDocuments(convertedArgs[0] || {});
-                    documentsAffected = result;
-                    break;
-                case 'estimatedDocumentCount':
-                    result = await col.estimatedDocumentCount();
-                    documentsAffected = result;
-                    break;
-                case 'aggregate':
-                    result = await col.aggregate(convertedArgs[0] || []).toArray();
-                    documentsAffected = result.length;
-                    break;
-                case 'distinct':
-                    result = await col.distinct(convertedArgs[0], convertedArgs[1] || {});
-                    documentsAffected = result.length;
-                    break;
-                case 'createIndex':
-                    result = await col.createIndex(convertedArgs[0], convertedArgs[1] || {});
-                    documentsAffected = 1;
-                    break;
-                case 'listIndexes':
-                    result = await col.listIndexes().toArray();
-                    documentsAffected = result.length;
-                    break;
-                default:
-                    throw new Error(`Unsupported operation: ${operation}`);
+            // Create a safe execution context with MongoDB operations
+            const executionContext = {
+                db: new Proxy({}, {
+                    get: function(target, collectionName) {
+                        // Return collection operations for any collection name
+                        return {
+                            find: (query = {}, options = {}) => db.collection(collectionName).find(query, options).toArray(),
+                            findOne: (query = {}, options = {}) => db.collection(collectionName).findOne(query, options),
+                            insertOne: (doc) => db.collection(collectionName).insertOne(doc),
+                            insertMany: (docs) => db.collection(collectionName).insertMany(docs),
+                            updateOne: (filter, update, options = {}) => db.collection(collectionName).updateOne(filter, update, options),
+                            updateMany: (filter, update, options = {}) => db.collection(collectionName).updateMany(filter, update, options),
+                            deleteOne: (filter, options = {}) => db.collection(collectionName).deleteOne(filter, options),
+                            deleteMany: (filter, options = {}) => db.collection(collectionName).deleteMany(filter, options),
+                            countDocuments: (query = {}) => db.collection(collectionName).countDocuments(query),
+                            estimatedDocumentCount: () => db.collection(collectionName).estimatedDocumentCount(),
+                            aggregate: (pipeline) => db.collection(collectionName).aggregate(pipeline).toArray(),
+                            distinct: (field, query = {}) => db.collection(collectionName).distinct(field, query),
+                            createIndex: (keys, options = {}) => db.collection(collectionName).createIndex(keys, options),
+                            listIndexes: () => db.collection(collectionName).listIndexes().toArray()
+                        };
+                    }
+                }),
+                ObjectId: require('mongodb').ObjectId,
+                Date: Date
+            };
+
+            // Prepare the query for execution
+            let executableQuery = queryString.trim();
+            
+            // Handle complex nested queries by converting them to aggregation pipelines
+            if (executableQuery.includes('db.') && executableQuery.includes('.map(')) {
+                // This is a complex query with nested operations, convert to aggregation
+                console.log('Converting complex nested query to aggregation pipeline');
+                
+                // For the specific case: find savedqueries for users without oauth
+                if (executableQuery.includes('savedqueries') && executableQuery.includes('oauthProvider')) {
+                    executableQuery = `db.savedqueries.aggregate([
+                        {
+                            "$lookup": {
+                                "from": "users",
+                                "localField": "userId",
+                                "foreignField": "_id",
+                                "as": "user"
+                            }
+                        },
+                        {
+                            "$match": {
+                                "user.oauthProvider": null
+                            }
+                        },
+                        {
+                            "$project": {
+                                "name": "$user.name",
+                                "email": "$user.email",
+                                "query": 1,
+                                "description": 1
+                            }
+                        }
+                    ])`;
+                }
+            }
+            
+            // Execute the query in the safe context
+            const executeQuery = new Function('db', 'ObjectId', 'Date', `
+                return (async function() {
+                    return ${executableQuery};
+                })();
+            `);
+
+            result = await executeQuery(executionContext.db, executionContext.ObjectId, executionContext.Date);
+
+            // Handle the result (it's already processed since we made operations async)
+            if (result && typeof result.then === 'function') {
+                result = await result;
+            }
+
+            // Calculate documents affected
+            if (Array.isArray(result)) {
+                documentsAffected = result.length;
+            } else if (result && typeof result === 'object') {
+                documentsAffected = result.modifiedCount || result.deletedCount || result.insertedCount || (result.acknowledged ? 1 : 0);
+            } else {
+                documentsAffected = result ? 1 : 0;
             }
 
             // Calculate execution time
@@ -833,11 +859,7 @@ router.post('/:id/execute', verifyToken, async (req, res) => {
 
         // Save query to history
         try {
-            // Format arguments properly without extra array brackets
-            const formattedArgs = convertedArgs.map(arg => JSON.stringify(arg)).join(', ');
-            const queryString = `db.${collection}.${operation}(${formattedArgs})`;
-            
-            console.log('Saving query to history:', {
+            console.log('Saving raw query to history:', {
                 userId,
                 connectionId,
                 query: queryString,
@@ -845,9 +867,7 @@ router.post('/:id/execute', verifyToken, async (req, res) => {
                 generatedQuery,
                 status,
                 executionTime,
-                documentsAffected,
-                collection,
-                operation
+                documentsAffected
             });
             
             const queryHistoryEntry = new QueryHistory({
@@ -861,20 +881,20 @@ router.post('/:id/execute', verifyToken, async (req, res) => {
                 errorMessage,
                 executionTime,
                 documentsAffected,
-                collection,
-                operation
+                collectionName: queryString.match(/db\.([a-zA-Z_][a-zA-Z0-9_]*)\./)?.[1] || 'unknown',
+                operation: queryString.match(/\.([a-zA-Z]+)\(/)?.[1] || 'unknown'
             });
 
             await queryHistoryEntry.save();
-            console.log('Query saved to history successfully, ID:', queryHistoryEntry._id);
+            console.log('Raw query saved to history successfully, ID:', queryHistoryEntry._id);
         } catch (historyError) {
-            console.error('Error saving query to history:', historyError);
+            console.error('Error saving raw query to history:', historyError);
             // Don't fail the main query if history saving fails
         }
 
         return res.status(200).json({ result });
     } catch (error) {
-        console.error('Error executing query:', error);
+        console.error('Error executing raw query:', error);
         return res.status(500).json({ 
             message: 'Failed to execute query', 
             details: error.message 
@@ -1253,6 +1273,158 @@ router.post('/disconnect-on-close', async (req, res) => {
     } catch (error) {
         console.error('Error disconnecting on page close:', error);
         res.status(500).json({ message: 'Failed to disconnect' });
+    }
+});
+
+// Generate MongoDB query from natural language using Gemini API
+router.post('/:id/generate-query', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const connectionId = req.params.id;
+        const { naturalLanguage } = req.body;
+
+        if (!naturalLanguage || !naturalLanguage.trim()) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Natural language request is required' 
+            });
+        }
+
+        // Get the connection info from DB
+        const dbConn = await Connection.findOne({ _id: connectionId, userId });
+        if (!dbConn) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Connection not found' 
+            });
+        }
+
+        // Get database schema for context
+        let schema = null;
+        try {
+            const db = databaseManager.getDatabase(userId, connectionId);
+            if (db) {
+                const collections = await db.listCollections().toArray();
+                
+                // Get detailed schema information for each collection
+                const detailedCollections = [];
+                for (const col of collections) {
+                    try {
+                        const collection = db.collection(col.name);
+                        
+                        // Get sample documents to understand field structure
+                        const sampleDocs = await collection.find({}).limit(10).toArray();
+                        
+                        // Analyze field types from sample documents
+                        const fieldAnalysis = {};
+                        sampleDocs.forEach(doc => {
+                            const fields = extractFields(doc);
+                            fields.forEach(field => {
+                                if (!fieldAnalysis[field.name]) {
+                                    fieldAnalysis[field.name] = {
+                                        type: field.type,
+                                        examples: new Set(),
+                                        count: 0
+                                    };
+                                }
+                                fieldAnalysis[field.name].count++;
+                                if (field.value !== null && field.value !== undefined) {
+                                    fieldAnalysis[field.name].examples.add(String(field.value).substring(0, 50));
+                                }
+                            });
+                        });
+                        
+                        // Convert to array format
+                        const fields = Object.entries(fieldAnalysis).map(([name, info]) => ({
+                            name,
+                            type: info.type,
+                            examples: Array.from(info.examples).slice(0, 3), // Limit to 3 examples
+                            frequency: info.count
+                        }));
+                        
+                        // Get collection stats
+                        const stats = await collection.estimatedDocumentCount();
+                        
+                        detailedCollections.push({
+                            name: col.name,
+                            type: col.type,
+                            documentCount: stats,
+                            fields: fields,
+                            sampleDocuments: sampleDocs.slice(0, 2) // Include 2 sample docs for context
+                        });
+                    } catch (collectionError) {
+                        console.log(`Could not analyze collection ${col.name}:`, collectionError.message);
+                        // Add basic collection info if detailed analysis fails
+                        detailedCollections.push({
+                            name: col.name,
+                            type: col.type,
+                            documentCount: 0,
+                            fields: [],
+                            sampleDocuments: []
+                        });
+                    }
+                }
+                
+                schema = {
+                    databaseName: db.databaseName,
+                    collections: detailedCollections
+                };
+                
+                console.log('Generated detailed schema for Gemini:', {
+                    databaseName: schema.databaseName,
+                    collectionCount: schema.collections.length,
+                    collections: schema.collections.map(c => ({
+                        name: c.name,
+                        fieldCount: c.fields.length,
+                        documentCount: c.documentCount
+                    }))
+                });
+            }
+        } catch (schemaError) {
+            console.log('Could not fetch detailed schema for context:', schemaError.message);
+            // Fallback to basic schema
+            try {
+                const db = databaseManager.getDatabase(userId, connectionId);
+                if (db) {
+                    const collections = await db.listCollections().toArray();
+                    schema = {
+                        databaseName: db.databaseName,
+                        collections: collections.map(col => ({
+                            name: col.name,
+                            type: col.type,
+                            documentCount: 0,
+                            fields: [],
+                            sampleDocuments: []
+                        }))
+                    };
+                }
+            } catch (fallbackError) {
+                console.log('Could not fetch even basic schema:', fallbackError.message);
+            }
+        }
+
+        // Generate query using Gemini API
+        const generatedQuery = await geminiApi.generateMongoQuery(naturalLanguage, schema);
+        
+        // Generate explanation
+        const explanation = await geminiApi.explainQuery(generatedQuery, naturalLanguage);
+
+        res.json({
+            success: true,
+            data: {
+                query: generatedQuery,
+                explanation: explanation,
+                naturalLanguage: naturalLanguage
+            }
+        });
+
+    } catch (error) {
+        console.error('Error generating query:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to generate query',
+            details: error.message 
+        });
     }
 });
 

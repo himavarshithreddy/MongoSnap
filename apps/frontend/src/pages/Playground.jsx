@@ -108,7 +108,7 @@ function Playground() {
         };
     }, [location.search]);
 
-    // Add beforeunload event listener for page refresh/close
+    // Add beforeunload event listener for page close only
     useEffect(() => {
         const handleBeforeUnload = () => {
             if (connectionIdRef.current) {
@@ -137,20 +137,11 @@ function Playground() {
             }
         };
 
-        // Add visibility change listener for when tab becomes hidden
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden' && connectionIdRef.current) {
-                // Tab is being hidden (user switching tabs or closing)
-                handleAutoDisconnect(connectionIdRef.current);
-            }
-        };
-
+        // Only disconnect on actual page close, not tab switches
         window.addEventListener('beforeunload', handleBeforeUnload);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
         
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
 
@@ -280,10 +271,8 @@ function Playground() {
 
     // Handle navigation
     const handleNavigation = async (path) => {
-        // Auto-disconnect when navigating away
-        if (connectionIdRef.current) {
-            await handleAutoDisconnect(connectionIdRef.current);
-        }
+        // Keep connections alive when navigating - don't auto-disconnect
+        // Only disconnect on actual page close
         navigate(path);
     };
 
@@ -298,270 +287,73 @@ function Playground() {
     };
 
     // Handler for query submission
-    const handleQuerySubmit = async (e) => {
+    const handleQuerySubmit = async (e, queryToExecute = null) => {
         e.preventDefault();
         setQueryLoading(true);
         setQueryError('');
         setQueryResult(null);
 
         try {
-            let parsedQuery;
-            let actualQuery = queryInput.trim();
-            let naturalLanguage = null;
-            let generatedQuery = null;
+            let actualQuery = queryToExecute || queryInput.trim();
+            let naturalLanguageContext = null;
+            let generatedQueryContext = null;
 
-            if (queryMode === 'natural') {
-                // Convert natural language to MongoDB query using AI
-                const generatedQueryData = await convertNaturalLanguageToQuery(actualQuery);
-                if (!generatedQueryData) {
-                    setQueryError('Failed to generate MongoDB query from natural language. Please try rephrasing your request.');
-                    setQueryLoading(false);
-                    return;
+            // If a specific query is provided (like from natural language generation)
+            if (queryToExecute) {
+                // We're executing a generated query, preserve the natural language context
+                if (queryMode === 'natural') {
+                    naturalLanguageContext = queryInput; // Keep the original natural language
+                    generatedQueryContext = queryToExecute;
+                    actualQuery = queryToExecute;
                 }
-                
-                // Parse the generated MongoDB query
-                parsedQuery = parseMongoQuery(generatedQueryData);
-                if (!parsedQuery) {
-                    setQueryError('Generated query is invalid. Please try rephrasing your request.');
-                    setQueryLoading(false);
-                    return;
-                }
-                
-                // Store the original natural language and generated query
-                naturalLanguage = actualQuery;
-                generatedQuery = generatedQueryData;
-                actualQuery = generatedQueryData;
             } else {
-                // Parse the MongoDB query directly
-                parsedQuery = parseMongoQuery(actualQuery);
-                if (!parsedQuery) {
-                    setQueryError('Invalid query syntax. Use MongoDB syntax like: db.collection.find({})');
-                    setQueryLoading(false);
-                    return;
+                // Normal execution flow
+                if (queryMode === 'natural') {
+                    const generatedQueryElement = document.querySelector('pre');
+                    if (generatedQueryElement) {
+                        actualQuery = generatedQueryElement.textContent.trim();
+                        naturalLanguageContext = queryInput;
+                        generatedQueryContext = actualQuery;
+                    }
                 }
             }
 
-            const response = await fetchWithAuth(`/api/connection/${connectionIdRef.current}/execute`, {
+            if (!actualQuery) {
+                setQueryError('Please enter a query');
+                return;
+            }
+
+            console.log('Executing raw query:', actualQuery);
+
+            // Use the new raw execution endpoint
+            const response = await fetchWithAuth(`/api/connection/${connectionIdRef.current}/execute-raw`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...parsedQuery,
-                    naturalLanguage,
-                    generatedQuery
+                    queryString: actualQuery,
+                    naturalLanguage: naturalLanguageContext,
+                    generatedQuery: generatedQueryContext
                 })
             });
 
             if (response.ok) {
                 const data = await response.json();
                 setQueryResult(data.result);
+                console.log('Query executed successfully:', data.result);
                 
                 // Refresh query history after successful execution
                 fetchQueryHistory();
             } else {
                 const errorData = await response.json();
-                console.error('Backend error:', errorData);
-                const errorMessage = errorData.message || 'Query failed';
-                setQueryError(errorMessage);
-                
-                // Refresh query history even for failed queries
-                fetchQueryHistory();
+                setQueryError(errorData.message || 'Failed to execute query');
+                console.error('Query execution failed:', errorData);
             }
-        } catch (err) {
-            const errorMessage = 'Failed to execute query: ' + err.message;
-            setQueryError(errorMessage);
-            
-            // Refresh query history even for failed queries
-            fetchQueryHistory();
+        } catch (error) {
+            console.error('Error executing query:', error);
+            setQueryError('Failed to execute query: ' + error.message);
         } finally {
             setQueryLoading(false);
         }
-    };
-
-    // Convert natural language to MongoDB query
-    const convertNaturalLanguageToQuery = async (naturalLanguage) => {
-        try {
-            // For now, we'll implement a simple rule-based conversion
-            // In a real implementation, this would call an AI service
-            const query = await generateMongoQueryFromNaturalLanguage(naturalLanguage);
-            return query;
-        } catch (error) {
-            console.error('Error converting natural language to query:', error);
-            return null;
-        }
-    };
-
-    // Simple rule-based natural language to MongoDB query conversion
-    const generateMongoQueryFromNaturalLanguage = async (text) => {
-        const lowerText = text.toLowerCase();
-        
-        // Find operations
-        if (lowerText.includes('find') || lowerText.includes('get') || lowerText.includes('show') || lowerText.includes('list')) {
-            // Extract collection name
-            const collectionMatch = text.match(/(?:find|get|show|list)\s+(?:all\s+)?(\w+)/i);
-            if (collectionMatch) {
-                const collection = collectionMatch[1];
-                
-                // Handle specific filters
-                if (lowerText.includes('active') || lowerText.includes('status')) {
-                    return `db.${collection}.find({"status": "active"})`;
-                }
-                if (lowerText.includes('this month') || lowerText.includes('current month')) {
-                    const startOfMonth = new Date();
-                    startOfMonth.setDate(1);
-                    startOfMonth.setHours(0, 0, 0, 0);
-                    return `db.${collection}.find({"createdAt": {"$gte": new Date("${startOfMonth.toISOString()}")}})`;
-                }
-                if (lowerText.includes('recent') || lowerText.includes('latest')) {
-                    return `db.${collection}.find({}).sort({"createdAt": -1}).limit(10)`;
-                }
-                
-                return `db.${collection}.find({})`;
-            }
-        }
-        
-        // Insert operations
-        if (lowerText.includes('insert') || lowerText.includes('add') || lowerText.includes('create')) {
-            const collectionMatch = text.match(/(?:insert|add|create)\s+(?:a\s+)?(\w+)/i);
-            if (collectionMatch) {
-                const collection = collectionMatch[1];
-                // Generate a basic insert template
-                return `db.${collection}.insertOne({"name": "example", "createdAt": new Date()})`;
-            }
-        }
-        
-        // Update operations
-        if (lowerText.includes('update') || lowerText.includes('modify') || lowerText.includes('change')) {
-            const collectionMatch = text.match(/(?:update|modify|change)\s+(\w+)/i);
-            if (collectionMatch) {
-                const collection = collectionMatch[1];
-                if (lowerText.includes('status')) {
-                    return `db.${collection}.updateOne({"_id": ObjectId("...")}, {"$set": {"status": "active"}})`;
-                }
-                return `db.${collection}.updateOne({"_id": ObjectId("...")}, {"$set": {"field": "value"}})`;
-            }
-        }
-        
-        // Delete operations
-        if (lowerText.includes('delete') || lowerText.includes('remove')) {
-            const collectionMatch = text.match(/(?:delete|remove)\s+(\w+)/i);
-            if (collectionMatch) {
-                const collection = collectionMatch[1];
-                return `db.${collection}.deleteOne({"_id": ObjectId("...")})`;
-            }
-        }
-        
-        // Default fallback
-        return `db.collection.find({})`;
-    };
-
-    // Parse MongoDB query syntax
-    const parseMongoQuery = (query) => {
-        try {
-            // Remove whitespace and semicolons
-            query = query.trim().replace(/;$/, '');
-            
-            // Match db.collection.operation() pattern
-            const dbPattern = /^db\.([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z]+)\s*\(\s*(.*?)\s*\)$/s;
-            const match = query.match(dbPattern);
-            
-            if (!match) {
-                return null;
-            }
-
-            const [, collection, operation, argsString] = match;
-            
-            // Parse arguments
-            let args = [];
-            if (argsString.trim()) {
-                try {
-                    args = parseArguments(argsString);
-                } catch (e) {
-                    throw new Error('Invalid arguments: ' + e.message);
-                }
-            }
-
-            return {
-                collection,
-                operation,
-                args
-            };
-        } catch (error) {
-            throw new Error('Query parsing failed: ' + error.message);
-        }
-    };
-
-    // Parse function arguments from string
-    const parseArguments = (argsString) => {
-        const args = [];
-        let depth = 0;
-        let current = '';
-        let inString = false;
-        let stringChar = '';
-        
-        for (let i = 0; i < argsString.length; i++) {
-            const char = argsString[i];
-            
-            if (!inString && (char === '"' || char === "'")) {
-                inString = true;
-                stringChar = char;
-                current += char;
-            } else if (inString && char === stringChar && argsString[i-1] !== '\\') {
-                inString = false;
-                current += char;
-            } else if (!inString && (char === '{' || char === '[')) {
-                depth++;
-                current += char;
-            } else if (!inString && (char === '}' || char === ']')) {
-                depth--;
-                current += char;
-            } else if (!inString && char === ',' && depth === 0) {
-                if (current.trim()) {
-                    args.push(parseValue(current.trim()));
-                }
-                current = '';
-            } else {
-                current += char;
-            }
-        }
-        
-        if (current.trim()) {
-            args.push(parseValue(current.trim()));
-        }
-        
-        return args;
-    };
-
-    // Parse individual values, handling ObjectId and other MongoDB types
-    const parseValue = (value) => {
-        value = value.trim();
-        
-        // Handle ObjectId calls first
-        const objectIdMatch = value.match(/^ObjectId\(\s*"([^"]+)"\s*\)$/);
-        if (objectIdMatch) {
-            return { __type: 'ObjectId', value: objectIdMatch[1] };
-        }
-        
-        const objectIdMatchUnquoted = value.match(/^ObjectId\(\s*([a-fA-F0-9]{24})\s*\)$/);
-        if (objectIdMatchUnquoted) {
-            return { __type: 'ObjectId', value: objectIdMatchUnquoted[1] };
-        }
-        
-        // Convert MongoDB shell syntax to valid JSON
-        const convertToJSON = (str) => {
-            // First handle ObjectId() calls within the string
-            str = str.replace(/ObjectId\(\s*"([^"]+)"\s*\)/g, '{"__type":"ObjectId","value":"$1"}');
-            str = str.replace(/ObjectId\(\s*([a-fA-F0-9]{24})\s*\)/g, '{"__type":"ObjectId","value":"$1"}');
-            
-            // Then fix unquoted property names in objects
-            // This regex finds property names like { key: value } and converts to { "key": value }
-            str = str.replace(/(\{|\s|,)\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
-            
-            return str;
-        };
-        
-        const jsonValue = convertToJSON(value);
-        
-        return JSON.parse(jsonValue);
     };
 
     // Fetch database schema
@@ -676,6 +468,11 @@ function Playground() {
     };
 
     const executeHistoryQuery = async (query) => {
+        if (!query.trim() || !connectionIdRef.current) {
+            return;
+        }
+        
+        // Set the query in the input field
         setQueryInput(query);
         setActiveTab('query'); // Switch to query tab
         
@@ -684,34 +481,29 @@ function Playground() {
             setQueryLoading(true);
             setQueryError('');
             
-            // Parse the query to extract collection and operation
-            const parsedQuery = parseMongoQuery(query);
-            if (!parsedQuery) {
-                setQueryError('Invalid query format');
-                setQueryLoading(false);
-                return;
-            }
+            console.log('Executing history query:', query);
 
-            const response = await fetchWithAuth(`/api/connection/${connectionIdRef.current}/execute`, {
+            // Use the raw execution endpoint
+            const response = await fetchWithAuth(`/api/connection/${connectionIdRef.current}/execute-raw`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    collection: parsedQuery.collection,
-                    operation: parsedQuery.operation,
-                    args: parsedQuery.args
+                    queryString: query
                 })
             });
 
             if (response.ok) {
                 const data = await response.json();
                 setQueryResult(data.result);
+                console.log('History query executed successfully:', data.result);
             } else {
                 const errorData = await response.json();
                 setQueryError(errorData.message || 'Failed to execute query');
+                console.error('History query execution failed:', errorData);
             }
         } catch (error) {
-            console.error('Error executing query:', error);
-            setQueryError('Failed to execute query');
+            console.error('Error executing history query:', error);
+            setQueryError('Failed to execute query: ' + error.message);
         } finally {
             setQueryLoading(false);
         }
@@ -750,16 +542,15 @@ function Playground() {
         }
 
         try {
-            // Parse the query to extract collection and operation
-            const parsedQuery = parseMongoQuery(query);
-            if (!parsedQuery) {
-                setSaveMessage('Invalid query format');
-                setTimeout(() => setSaveMessage(''), 2000);
-                return;
-            }
+            // Simple regex to extract collection and operation from query
+            const collectionMatch = query.match(/db\.([a-zA-Z_][a-zA-Z0-9_]*)\./);
+            const operationMatch = query.match(/\.([a-zA-Z]+)\(/);
+            
+            const collection = collectionMatch ? collectionMatch[1] : 'unknown';
+            const operation = operationMatch ? operationMatch[1] : 'unknown';
 
             // Generate a default name based on the query
-            const defaultName = `${parsedQuery.collection}_${parsedQuery.operation}_${Date.now()}`;
+            const defaultName = `${collection}_${operation}_${Date.now()}`;
 
             const response = await fetchWithAuth('/api/query/saved', {
                 method: 'POST',
@@ -767,11 +558,11 @@ function Playground() {
                 body: JSON.stringify({
                     connectionId: connectionIdRef.current,
                     name: defaultName,
-                    description: `Saved query for ${parsedQuery.collection}.${parsedQuery.operation}`,
+                    description: `Saved query for ${collection}.${operation}`,
                     query: query,
                     result: queryResult, // Include the current query result
-                    collection: parsedQuery.collection,
-                    operation: parsedQuery.operation
+                    collection: collection,
+                    operation: operation
                 })
             });
 

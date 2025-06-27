@@ -78,125 +78,57 @@ function QueryInterface({
         setQueryError('');
         
         try {
-            // Simulate API call to generate query
-            const response = await fetch('/api/generate-query', {
+            // Get connection ID from URL or context
+            const urlParams = new URLSearchParams(window.location.search);
+            const connectionId = urlParams.get('connectionId');
+            
+            if (!connectionId) {
+                throw new Error('No active connection found');
+            }
+
+            // Call Gemini API to generate query
+            const response = await fetch(`/api/connection/${connectionId}/generate-query`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
                 body: JSON.stringify({ naturalLanguage: queryInput })
             });
             
             if (response.ok) {
                 const data = await response.json();
-                setGeneratedQuery(data.query);
-                setQueryExplanation(data.explanation);
-                setShowGeneratedQuery(true);
+                if (data.success) {
+                    setGeneratedQuery(data.data.query);
+                    setQueryExplanation(data.data.explanation);
+                    setShowGeneratedQuery(true);
+                } else {
+                    throw new Error(data.message || 'Failed to generate query');
+                }
             } else {
-                throw new Error('Failed to generate query');
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to generate query');
             }
-        } catch {
-            // Fallback to local generation for demo
-            const { query, explanation } = generateQueryLocally(queryInput);
-            setGeneratedQuery(query);
-            setQueryExplanation(explanation);
-            setShowGeneratedQuery(true);
+        } catch (error) {
+            console.error('Error generating query:', error);
+            setQueryError(error.message || 'Failed to generate query');
         } finally {
             setIsGenerating(false);
         }
     };
 
-    // Local query generation for demo purposes
-    const generateQueryLocally = (naturalLanguage) => {
-        const lowerText = naturalLanguage.toLowerCase();
-        
-        // Find operations
-        if (lowerText.includes('find') || lowerText.includes('get') || lowerText.includes('show') || lowerText.includes('list')) {
-            const collectionMatch = naturalLanguage.match(/(?:find|get|show|list)\s+(?:all\s+)?(\w+)/i);
-            if (collectionMatch) {
-                const collection = collectionMatch[1];
-                
-                if (lowerText.includes('active') || lowerText.includes('status')) {
-                    return {
-                        query: `db.${collection}.find({"status": "active"})`,
-                        explanation: `This query searches the '${collection}' collection for all documents where the 'status' field equals 'active'. It will return all active ${collection} from the database.`
-                    };
-                }
-                if (lowerText.includes('this month') || lowerText.includes('current month')) {
-                    const startOfMonth = new Date();
-                    startOfMonth.setDate(1);
-                    startOfMonth.setHours(0, 0, 0, 0);
-                    return {
-                        query: `db.${collection}.find({"createdAt": {"$gte": new Date("${startOfMonth.toISOString()}")}})`,
-                        explanation: `This query finds all ${collection} created from the beginning of the current month until now. It uses the '$gte' (greater than or equal) operator to filter documents with 'createdAt' dates on or after the first day of this month.`
-                    };
-                }
-                if (lowerText.includes('recent') || lowerText.includes('latest')) {
-                    return {
-                        query: `db.${collection}.find({}).sort({"createdAt": -1}).limit(10)`,
-                        explanation: `This query retrieves the 10 most recent ${collection} from the database. It sorts all documents by 'createdAt' in descending order (-1) and limits the result to 10 documents.`
-                    };
-                }
-                
-                return {
-                    query: `db.${collection}.find({})`,
-                    explanation: `This query retrieves all documents from the '${collection}' collection. The empty object {} means no filters are applied, so it will return every document in the collection.`
-                };
-            }
-        }
-        
-        // Insert operations
-        if (lowerText.includes('insert') || lowerText.includes('add') || lowerText.includes('create')) {
-            const collectionMatch = naturalLanguage.match(/(?:insert|add|create)\s+(?:a\s+)?(\w+)/i);
-            if (collectionMatch) {
-                const collection = collectionMatch[1];
-                return {
-                    query: `db.${collection}.insertOne({"name": "example", "createdAt": new Date()})`,
-                    explanation: `This query inserts a new document into the '${collection}' collection. The document contains a 'name' field with value 'example' and a 'createdAt' field with the current timestamp. You can modify the field values as needed.`
-                };
-            }
-        }
-        
-        // Update operations
-        if (lowerText.includes('update') || lowerText.includes('modify') || lowerText.includes('change')) {
-            const collectionMatch = naturalLanguage.match(/(?:update|modify|change)\s+(\w+)/i);
-            if (collectionMatch) {
-                const collection = collectionMatch[1];
-                if (lowerText.includes('status')) {
-                    return {
-                        query: `db.${collection}.updateOne({"_id": ObjectId("...")}, {"$set": {"status": "active"}})`,
-                        explanation: `This query updates a single document in the '${collection}' collection. It finds a document by its '_id' and sets the 'status' field to 'active'. You'll need to replace the ObjectId with the actual document ID you want to update.`
-                    };
-                }
-                return {
-                    query: `db.${collection}.updateOne({"_id": ObjectId("...")}, {"$set": {"field": "value"}})`,
-                    explanation: `This query updates a single document in the '${collection}' collection. It finds a document by its '_id' and sets a field to a new value. You'll need to replace the ObjectId and field values as needed.`
-                };
-            }
-        }
-        
-        // Delete operations
-        if (lowerText.includes('delete') || lowerText.includes('remove')) {
-            const collectionMatch = naturalLanguage.match(/(?:delete|remove)\s+(\w+)/i);
-            if (collectionMatch) {
-                const collection = collectionMatch[1];
-                return {
-                    query: `db.${collection}.deleteOne({"_id": ObjectId("...")})`,
-                    explanation: `This query deletes a single document from the '${collection}' collection. It finds the document by its '_id' and removes it from the database. You'll need to replace the ObjectId with the actual document ID you want to delete.`
-                };
-            }
-        }
-        
-        // Default fallback
-        return {
-            query: `db.collection.find({})`,
-            explanation: `This is a basic query that retrieves all documents from a collection. Replace 'collection' with your actual collection name and add filters as needed.`
-        };
-    };
+
 
     // Handle execute for natural language mode
     const handleExecuteGeneratedQuery = () => {
         if (generatedQuery) {
-            setQueryInput(generatedQuery);
-            handleQuerySubmit(new Event('submit'));
+            // Don't replace the natural language input, just execute the generated query
+            // Create a custom event with the generated query
+            const customEvent = {
+                preventDefault: () => {},
+                target: { value: generatedQuery }
+            };
+            handleQuerySubmit(customEvent, generatedQuery);
         }
     };
 
@@ -321,7 +253,7 @@ function QueryInterface({
                                 </button>
                             </div>
                         </div>
-                        <pre className="font-mono text-sm bg-[#1a2f24] p-3 rounded border border-gray-600 mb-4 overflow-x-auto">{generatedQuery}</pre>
+                        <pre className="font-mono text-sm bg-[#1a2f24] p-3 rounded border border-gray-600 mb-4 overflow-x-auto scrollbar-thin scrollbar-thumb-brand-quaternary scrollbar-track-gray-700 hover:scrollbar-thumb-brand-tertiary">{generatedQuery}</pre>
                         
                         {/* Query Explanation - More Prominent */}
                         {queryExplanation && (
@@ -392,7 +324,7 @@ function QueryInterface({
                             {Array.isArray(queryResult) ? `${queryResult.length} document(s)` : 'Single result'}
                         </span>
                     </div>
-                    <pre className="font-mono text-sm max-h-96 overflow-y-auto">{JSON.stringify(queryResult, null, 2)}</pre>
+                    <pre className="font-mono text-sm max-h-96 overflow-y-auto query-results-scroll">{JSON.stringify(queryResult, null, 2)}</pre>
                 </div>
             )}
 

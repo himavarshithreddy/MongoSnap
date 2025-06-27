@@ -197,7 +197,7 @@ function SchemaExplorer({
                     ) : (
                         <div className="flex flex-col items-center gap-4">
                             <FileText size={48} className="text-gray-500" />
-                            <p>Click "Refresh Schema or Reconnect to the Database" to explore your database structure</p>
+                            <p>Click "Refresh Schema" or "Reconnect to the Database" to explore your database structure</p>
                         </div>
                     )}
                 </div>

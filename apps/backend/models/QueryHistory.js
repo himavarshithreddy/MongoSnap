@@ -44,7 +44,7 @@ const queryHistorySchema = new mongoose.Schema({
         type: Number,
         default: null,
     },
-    collection: {
+    collectionName: {
         type: String,
         default: null,
     },
@@ -62,7 +62,7 @@ const queryHistorySchema = new mongoose.Schema({
 queryHistorySchema.index({ userId: 1, createdAt: -1 });
 queryHistorySchema.index({ userId: 1, connectionId: 1, createdAt: -1 });
 queryHistorySchema.index({ userId: 1, status: 1 });
-queryHistorySchema.index({ userId: 1, collection: 1 });
+queryHistorySchema.index({ userId: 1, collectionName: 1 });
 
 const QueryHistory = mongoose.model('QueryHistory', queryHistorySchema);
 

@@ -41,8 +41,7 @@ console.log('  - /api/query/* (query history and saved queries routes)');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+  // Removed deprecated options: useNewUrlParser and useUnifiedTopology
 })
 .then(() => console.log('✅ MongoDB connected'))
 .catch((err) => console.error('❌ MongoDB connection failed:', err));
@@ -52,12 +51,23 @@ const sslOptions = {
   cert: fs.readFileSync(path.resolve(__dirname, '../../mongosnap.mp.pem')),
 };
 
-https.createServer(sslOptions, app).listen(4000, '0.0.0.0', () => {
+const server = https.createServer(sslOptions, app);
+
+server.listen(4000, '0.0.0.0', () => {
   console.log(`🔒 HTTPS server running at https://mongosnap.mp:4000`);
   console.log(`🚀 Frontend expected at https://mongosnap.mp:5173`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error('❌ Port 4000 is already in use. Please stop any other services using this port.');
+    console.error('💡 You can kill the process using: netstat -ano | findstr :4000');
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', err);
+    process.exit(1);
+  }
 });
 
-// Start periodic connection cleanup (every 15 minutes)
+// Start periodic connection cleanup (every hour)
 setInterval(async () => {
   try {
     await databaseManager.cleanupStaleConnections();
@@ -66,6 +76,6 @@ setInterval(async () => {
   } catch (error) {
     console.error('❌ Error during periodic cleanup:', error);
   }
-}, 15 * 60 * 1000); // 15 minutes
+}, 60 * 60 * 1000); // 1 hour instead of 15 minutes
 
-console.log('🧹 Connection cleanup scheduled (every 15 minutes)');
+console.log('🧹 Connection cleanup scheduled (every hour)');

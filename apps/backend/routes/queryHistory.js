@@ -30,7 +30,7 @@ router.get('/history', verifyToken, async (req, res) => {
         const filter = { userId: req.userId };
         if (connectionId) filter.connectionId = connectionId;
         if (status) filter.status = status;
-        if (collection) filter.collection = collection;
+        if (collection) filter.collectionName = collection;
         if (operation) filter.operation = operation;
 
         console.log('Query history filter:', filter);
@@ -92,7 +92,7 @@ router.get('/history/stats', verifyToken, async (req, res) => {
         // Get top collections
         const topCollections = await QueryHistory.aggregate([
             { $match: filter },
-            { $group: { _id: '$collection', count: { $sum: 1 } } },
+            { $group: { _id: '$collectionName', count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $limit: 5 }
         ]);
@@ -153,7 +153,7 @@ router.post('/history', verifyToken, async (req, res) => {
             errorMessage,
             executionTime,
             documentsAffected,
-            collection,
+            collectionName: collection,
             operation
         });
 
@@ -222,7 +222,7 @@ router.get('/saved', verifyToken, async (req, res) => {
         const { connectionId, collection, tags } = req.query;
         const filter = { userId: req.userId };
         if (connectionId) filter.connectionId = connectionId;
-        if (collection) filter.collection = collection;
+        if (collection) filter.collectionName = collection;
         if (tags) filter.tags = { $in: tags.split(',') };
 
         console.log('Saved queries filter:', filter);
@@ -299,7 +299,7 @@ router.post('/saved', verifyToken, async (req, res) => {
             generatedQuery,
             result,
             tags: tags || [],
-            collection,
+            collectionName: collection,
             operation
         });
 
@@ -357,7 +357,7 @@ router.put('/saved/:id', verifyToken, async (req, res) => {
                 generatedQuery,
                 result,
                 tags,
-                collection,
+                collectionName: collection,
                 operation,
                 updatedAt: new Date()
             },

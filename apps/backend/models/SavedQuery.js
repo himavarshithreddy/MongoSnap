@@ -41,7 +41,7 @@ const savedQuerySchema = new mongoose.Schema({
         type: String,
         trim: true,
     }],
-    collection: {
+    collectionName: {
         type: String,
         default: null,
     },
@@ -76,7 +76,7 @@ savedQuerySchema.index({ userId: 1, createdAt: -1 });
 savedQuerySchema.index({ userId: 1, connectionId: 1 });
 savedQuerySchema.index({ userId: 1, name: 1 }, { unique: true });
 savedQuerySchema.index({ userId: 1, tags: 1 });
-savedQuerySchema.index({ userId: 1, collection: 1 });
+savedQuerySchema.index({ userId: 1, collectionName: 1 });
 
 // Update the updatedAt field before saving
 savedQuerySchema.pre('save', function(next) {

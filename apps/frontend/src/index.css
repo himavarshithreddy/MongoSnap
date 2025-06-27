@@ -3,3 +3,82 @@
 body {
     background-color: #101813;
 }
+
+/* Custom scrollbar styles with subtle green aesthetics */
+.scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #4a6741 #1a2f24;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+}
+
+.scrollbar-track-gray-700::-webkit-scrollbar-track {
+    background: linear-gradient(90deg, #1a2f24 0%, #243c2d 100%);
+    border-radius: 6px;
+    border: 1px solid #2d4c38;
+}
+
+.scrollbar-thumb-brand-quaternary::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #4a6741 0%, #3d5a36 50%, #36523f 100%);
+    border-radius: 6px;
+    border: 2px solid #1a2f24;
+    box-shadow: inset 0 1px 2px rgba(74, 103, 65, 0.2);
+    transition: all 0.3s ease;
+}
+
+.scrollbar-thumb-brand-quaternary::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #5a7851 0%, #4d6744 50%, #456e4a 100%);
+    box-shadow: inset 0 1px 3px rgba(74, 103, 65, 0.3), 0 0 6px rgba(74, 103, 65, 0.2);
+    transform: scale(1.03);
+}
+
+.scrollbar-thumb-brand-quaternary::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, #3d5a36 0%, #36523f 50%, #4a6741 100%);
+    box-shadow: inset 0 2px 4px rgba(74, 103, 65, 0.4);
+}
+
+.hover\:scrollbar-thumb-brand-tertiary:hover::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #4d6744 0%, #4a6741 100%);
+    glow: 0 0 8px #4a6741;
+}
+
+/* Enhanced scrollbar for query results */
+.query-results-scroll::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.query-results-scroll::-webkit-scrollbar-track {
+    background: linear-gradient(90deg, #1a2f24 0%, #243c2d 100%);
+    border-radius: 6px;
+    border: 1px solid #2d4c38;
+}
+
+.query-results-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #4a6741 0%, #3d5a36 50%, #36523f 100%);
+    border-radius: 6px;
+    border: 2px solid #1a2f24;
+    box-shadow: inset 0 1px 2px rgba(74, 103, 65, 0.2);
+    transition: all 0.3s ease;
+}
+
+.query-results-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #5a7851 0%, #4d6744 50%, #456e4a 100%);
+    box-shadow: inset 0 1px 3px rgba(74, 103, 65, 0.3), 0 0 6px rgba(74, 103, 65, 0.2);
+    transform: scale(1.03);
+}
+
+.query-results-scroll::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, #3d5a36 0%, #36523f 50%, #4a6741 100%);
+    box-shadow: inset 0 2px 4px rgba(74, 103, 65, 0.4);
+}
+
+/* Corner styling for when both scrollbars are present */
+.query-results-scroll::-webkit-scrollbar-corner,
+.scrollbar-thin::-webkit-scrollbar-corner {
+    background: linear-gradient(135deg, #1a2f24 0%, #243c2d 100%);
+    border: 1px solid #2d4c38;
+}

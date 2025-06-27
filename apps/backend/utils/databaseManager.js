@@ -159,7 +159,7 @@ class DatabaseManager {
         try {
             console.log('Starting connection cleanup...');
             const now = new Date();
-            const staleThreshold = 30 * 60 * 1000; // 30 minutes
+            const staleThreshold = 2 * 60 * 60 * 1000; // 2 hours instead of 30 minutes
 
             for (const [userId, userConnections] of this.connections) {
                 for (const [connectionId, client] of userConnections) {
