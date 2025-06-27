@@ -76,7 +76,7 @@ function SchemaExplorer({
                     {/* Collections List */}
                     <div>
                         <h3 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
-                            <FileText size={20} className="text-blue-400" />
+                            <FileText size={20} className="text-green-400" />
                             Collections ({schema.collections.length})
                         </h3>
                         
@@ -91,7 +91,7 @@ function SchemaExplorer({
                                             <ChevronDown size={20} className="text-gray-400" /> : 
                                             <ChevronRight size={20} className="text-gray-400" />
                                         }
-                                        <FileText size={20} className="text-blue-400" />
+                                        <FileText size={20} className="text-green-400" />
                                         <span 
                                             className="text-white text-lg font-medium hover:text-brand-quaternary cursor-pointer"
                                             onClick={(e) => {
