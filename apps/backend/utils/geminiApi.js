@@ -83,7 +83,7 @@ class GeminiAPI {
 Natural Language Request: "${naturalLanguage}"
 
 Requirements:
-1. Return ONLY the MongoDB query in valid syntax
+1. Return ONLY the MongoDB query in valid syntax compatible with Node.js MongoDB driver
 2. Use proper MongoDB operators and syntax
 3. If the request is unclear, make reasonable assumptions
 4. For find operations, include appropriate filters
@@ -91,6 +91,8 @@ Requirements:
 6. For inserts, create realistic document structures
 7. Use proper data types (strings, numbers, dates, ObjectIds)
 8. Format the output exactly as shown in examples below
+9. NEVER use MongoDB shell-specific functions like getCollectionNames(), listCollections(), or similar
+10. For multi-collection operations, use aggregation pipelines with $lookup or separate queries
 
 OUTPUT FORMAT:
 Return ONLY the MongoDB query, no explanations, no markdown, no code blocks.
@@ -119,6 +121,12 @@ AGGREGATION PIPELINES:
 - "Find products by price range" → db.products.aggregate([{"$bucket": {"groupBy": "$price", "boundaries": [0, 50, 100, 200, 500], "default": "500+", "output": {"count": {"$sum": 1}, "products": {"$push": "$name"}}}}])
 - "Get customer purchase history" → db.orders.aggregate([{"$match": {"customerId": ObjectId("...")}}, {"$lookup": {"from": "products", "localField": "productId", "foreignField": "_id", "as": "product"}}, {"$unwind": "$product"}, {"$project": {"date": 1, "productName": "$product.name", "amount": 1}}])
 
+MULTI-COLLECTION OPERATIONS:
+- "Count documents in all collections" → db.users.countDocuments({})
+- "Total documents across collections" → db.users.countDocuments({})
+- "Get collection statistics" → db.users.aggregate([{"$group": {"_id": null, "totalDocuments": {"$sum": 1}}}])
+- "Compare data between collections" → db.users.aggregate([{"$lookup": {"from": "orders", "localField": "_id", "foreignField": "userId", "as": "userOrders"}}, {"$project": {"name": 1, "orderCount": {"$size": "$userOrders"}}}])
+
 INDEX OPERATIONS:
 - "Create index on email field" → db.users.createIndex({"email": 1})
 - "Create unique index on username" → db.users.createIndex({"username": 1}, {"unique": true})
@@ -146,6 +154,9 @@ IMPORTANT:
 - For nested objects, use: {"field": {"nested": "value"}}
 - For aggregations, use proper pipeline syntax with array of stages
 - For indexes, use proper index specification with options
+- NEVER use shell functions: getCollectionNames(), listCollections(), forEach(), print(), etc.
+- For multi-collection queries, use aggregation pipelines with $lookup or focus on a single collection
+- If asked about "all collections", pick the most relevant collection from the schema context
 
 `;
 
@@ -201,29 +212,86 @@ IMPORTANT:
             
             // Remove any explanatory text and keep only the query
             const lines = query.split('\n');
-            const queryLines = lines.filter(line => {
+            
+            // Find the start of the actual query (line that starts with db.)
+            let queryStartIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim().startsWith('db.')) {
+                    queryStartIndex = i;
+                    break;
+                }
+            }
+            
+            if (queryStartIndex === -1) {
+                throw new Error('No MongoDB query found in response');
+            }
+            
+            // For multi-line queries, we need to include all lines that are part of the query structure
+            const queryLines = [];
+            let inQuery = false;
+            let bracketDepth = 0;
+            let parenDepth = 0;
+            
+            for (let i = queryStartIndex; i < lines.length; i++) {
+                const line = lines[i];
                 const trimmedLine = line.trim();
-                return trimmedLine.startsWith('db.') || 
-                       trimmedLine.startsWith('//') ||
-                       trimmedLine === '' ||
-                       trimmedLine.match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*[:=]/); // Handle variable assignments
-            });
+                
+                // Skip empty lines and comments within the query
+                if (trimmedLine === '' || trimmedLine.startsWith('//')) {
+                    if (inQuery) queryLines.push(line);
+                    continue;
+                }
+                
+                // If we haven't started the query yet and this line starts with db., start here
+                if (!inQuery && trimmedLine.startsWith('db.')) {
+                    inQuery = true;
+                    queryLines.push(line);
+                    
+                    // Count brackets and parentheses in this line
+                    for (const char of line) {
+                        if (char === '[') bracketDepth++;
+                        if (char === ']') bracketDepth--;
+                        if (char === '(') parenDepth++;
+                        if (char === ')') parenDepth--;
+                    }
+                    continue;
+                }
+                
+                // If we're in a query, include lines that are part of the structure
+                if (inQuery) {
+                    // Count brackets and parentheses
+                    for (const char of line) {
+                        if (char === '[') bracketDepth++;
+                        if (char === ']') bracketDepth--;
+                        if (char === '(') parenDepth++;
+                        if (char === ')') parenDepth--;
+                    }
+                    
+                    queryLines.push(line);
+                    
+                    // If we've closed all brackets and parentheses, the query is complete
+                    if (bracketDepth === 0 && parenDepth === 0) {
+                        break;
+                    }
+                }
+            }
             
             query = queryLines.join('\n').trim();
             
             // Remove any trailing semicolons
             query = query.replace(/;$/, '');
             
-            // Handle cases where Gemini might return multiple queries - take the first one
-            if (query.includes('\n')) {
-                const firstQuery = query.split('\n')[0].trim();
-                if (firstQuery.match(/^db\.[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z]+\(/)) {
-                    query = firstQuery;
-                }
+            // Check for shell-specific functions that won't work in Node.js
+            const shellFunctions = ['getCollectionNames', 'listCollections', 'forEach', 'print', 'printjson', 'show'];
+            const hasShellFunction = shellFunctions.some(func => query.includes(func));
+            if (hasShellFunction) {
+                console.error('Generated query contains shell-specific functions:', query);
+                throw new Error('Generated query uses MongoDB shell functions not available in Node.js environment');
             }
             
             // Validate that it looks like a MongoDB query (improved to handle complex queries)
-            if (!query.match(/^db\.[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z]+\(/) && !query.includes('db.')) {
+            const firstLine = query.split('\n')[0].trim();
+            if (!firstLine.match(/^db\.[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z]+\(/) && !query.includes('db.')) {
                 console.error('Generated response does not match MongoDB query pattern:', query);
                 throw new Error('Generated response does not look like a valid MongoDB query');
             }

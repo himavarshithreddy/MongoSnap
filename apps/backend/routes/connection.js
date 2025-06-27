@@ -580,7 +580,7 @@ router.post('/:id/query', verifyToken, async (req, res) => {
         // Prevent dangerous operations
         const forbiddenOps = ['dropDatabase', 'drop', 'remove'];
         if (forbiddenOps.includes(operation)) {
-            return res.status(403).json({ message: 'Operation not allowed.' });
+            return res.status(403).json({ message: 'DropDatabase, Drop and Remove Operations are not allowed.' });
         }
 
         // Get the connection info from DB
@@ -735,7 +735,7 @@ router.post('/:id/execute-raw', verifyToken, async (req, res) => {
         // Prevent dangerous operations
         const forbiddenOps = ['dropDatabase', 'drop', 'remove'];
         if (forbiddenOps.some(op => queryString.includes(op))) {
-            return res.status(403).json({ message: 'Operation not allowed.' });
+            return res.status(403).json({ message: 'DropDatabase, Drop and Remove Operations are not allowed.' });
         }
 
         // Get the connection info from DB

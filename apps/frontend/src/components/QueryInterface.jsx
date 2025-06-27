@@ -56,6 +56,23 @@ function QueryInterface({
 
     const buttonState = getSaveButtonState();
 
+    // Function to render markdown-style bold text as JSX
+    const renderFormattedText = (text) => {
+        if (!text) return '';
+        
+        // Split text by **bold** markers and render accordingly
+        const parts = text.split(/(\*\*.*?\*\*)/g);
+        
+        return parts.map((part, index) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                // Remove the ** markers and render as bold
+                const boldText = part.slice(2, -2);
+                return <strong key={index} className="font-bold text-white">{boldText}</strong>;
+            }
+            return part;
+        });
+    };
+
     const getPlaceholder = () => {
         if (queryMode === 'natural') {
             return "Tell me what you want to do with your database...";
@@ -262,7 +279,7 @@ function QueryInterface({
                                     <span className="text-brand-quaternary text-lg">💡</span>
                                     <span className="text-brand-quaternary text-sm font-bold">How this query works:</span>
                                 </div>
-                                <p className="text-gray-200 text-sm leading-relaxed">{queryExplanation}</p>
+                                <p className="text-gray-200 text-sm leading-relaxed">{renderFormattedText(queryExplanation)}</p>
                             </div>
                         )}
                         
