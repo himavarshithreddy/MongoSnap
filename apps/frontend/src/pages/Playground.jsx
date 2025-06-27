@@ -21,7 +21,7 @@ function Playground() {
     const [connectionStatus, setConnectionStatus] = useState(null);
     const [isDisconnecting, setIsDisconnecting] = useState(false);
     const [isReconnecting, setIsReconnecting] = useState(false);
-    const [queryInput, setQueryInput] = useState('db.collection.find({})');
+    const [queryInput, setQueryInput] = useState('');
     const [queryResult, setQueryResult] = useState(null);
     const [queryLoading, setQueryLoading] = useState(false);
     const [queryError, setQueryError] = useState('');
@@ -35,70 +35,57 @@ function Playground() {
     const [queryHistory, setQueryHistory] = useState([]);
     const [savedQueries, setSavedQueries] = useState([]);
     const [saveMessage, setSaveMessage] = useState('');
-    
-    // Mock query history data
-    const mockQueryHistory = [
-        {
-            id: 1,
-            query: 'db.users.find({"status": "active"})',
-            result: '5 documents returned',
-            timestamp: '2024-01-15T10:30:00Z',
-            status: 'success'
-        },
-        {
-            id: 2,
-            query: 'db.products.insertOne({"name": "New Product", "price": 29.99})',
-            result: 'Document inserted successfully',
-            timestamp: '2024-01-15T10:25:00Z',
-            status: 'success'
-        },
-        {
-            id: 3,
-            query: 'db.users.updateOne({"_id": ObjectId("...")}, {"$set": {"lastLogin": new Date()}})',
-            result: '1 document modified',
-            timestamp: '2024-01-15T10:20:00Z',
-            status: 'success'
-        },
-        {
-            id: 4,
-            query: 'db.invalid_collection.find({})',
-            result: 'Collection not found',
-            timestamp: '2024-01-15T10:15:00Z',
-            status: 'error'
-        },
-        {
-            id: 5,
-            query: 'db.orders.aggregate([{"$match": {"status": "pending"}}, {"$group": {"_id": "$customerId", "total": {"$sum": "$amount"}}}])',
-            result: '3 documents returned',
-            timestamp: '2024-01-15T10:10:00Z',
-            status: 'success'
-        }
-    ];
+    const [queryMode, setQueryMode] = useState('natural'); // 'natural' or 'query'
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [savedQueriesLoading, setSavedQueriesLoading] = useState(false);
 
-    // Mock saved queries data - simplified structure
-    const mockSavedQueries = [
-        {
-            id: 1,
-            query: 'db.users.find({"status": "active", "verified": true})',
-            timestamp: '2024-01-14T15:30:00Z'
-        },
-        {
-            id: 2,
-            query: 'db.orders.aggregate([{"$match": {"date": {"$gte": new Date("2024-01-01")}}}, {"$group": {"_id": "$productId", "totalSales": {"$sum": "$amount"}, "orderCount": {"$sum": 1}}}, {"$sort": {"totalSales": -1}}])',
-            timestamp: '2024-01-13T09:15:00Z'
-        },
-        {
-            id: 3,
-            query: 'db.comments.find({"createdAt": {"$gte": new Date(Date.now() - 7*24*60*60*1000)}}).sort({"createdAt": -1})',
-            timestamp: '2024-01-12T14:20:00Z'
+    // Fetch query history from backend
+    const fetchQueryHistory = async () => {
+        if (!connectionIdRef.current) return;
+        
+        setHistoryLoading(true);
+        try {
+            const response = await fetchWithAuth(`/api/query/history?connectionId=${connectionIdRef.current}&limit=50`);
+            if (response.ok) {
+                const data = await response.json();
+                setQueryHistory(data.data.history || []);
+            } else {
+                console.error('Failed to fetch query history');
+            }
+        } catch (error) {
+            console.error('Error fetching query history:', error);
+        } finally {
+            setHistoryLoading(false);
         }
-    ];
+    };
 
-    // Initialize data with mock data
+    // Fetch saved queries from backend
+    const fetchSavedQueries = async () => {
+        if (!connectionIdRef.current) return;
+        
+        setSavedQueriesLoading(true);
+        try {
+            const response = await fetchWithAuth(`/api/query/saved?connectionId=${connectionIdRef.current}`);
+            if (response.ok) {
+                const data = await response.json();
+                setSavedQueries(data.data || []);
+            } else {
+                console.error('Failed to fetch saved queries');
+            }
+        } catch (error) {
+            console.error('Error fetching saved queries:', error);
+        } finally {
+            setSavedQueriesLoading(false);
+        }
+    };
+
+    // Initialize data with real backend data
     useEffect(() => {
-        setQueryHistory(mockQueryHistory);
-        setSavedQueries(mockSavedQueries);
-    }, []);
+        if (connectionIdRef.current) {
+            fetchQueryHistory();
+            fetchSavedQueries();
+        }
+    }, [connectionIdRef.current]);
 
     useEffect(() => {
         // Get connection ID from URL parameters
@@ -123,21 +110,47 @@ function Playground() {
 
     // Add beforeunload event listener for page refresh/close
     useEffect(() => {
-        const handleBeforeUnload = async () => {
+        const handleBeforeUnload = () => {
             if (connectionIdRef.current) {
+                // Use sendBeacon for more reliable cleanup on page close
+                const disconnectData = JSON.stringify({
+                    connectionId: connectionIdRef.current,
+                    action: 'disconnect'
+                });
+                
+                // Try to send disconnect request using sendBeacon (more reliable than fetch)
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon('/api/connection/disconnect-on-close', disconnectData);
+                }
+                
+                // Also try the regular disconnect as fallback
                 try {
-                    // Try to disconnect gracefully
-                    await handleAutoDisconnect(connectionIdRef.current);
+                    // Use synchronous XMLHttpRequest for immediate execution
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', `/api/connection/${connectionIdRef.current}/disconnect`, false); // synchronous
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token')}`);
+                    xhr.send();
                 } catch (error) {
                     console.error('Error during page unload disconnect:', error);
                 }
             }
         };
 
+        // Add visibility change listener for when tab becomes hidden
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden' && connectionIdRef.current) {
+                // Tab is being hidden (user switching tabs or closing)
+                handleAutoDisconnect(connectionIdRef.current);
+            }
+        };
+
         window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
         
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
 
@@ -292,40 +305,153 @@ function Playground() {
         setQueryResult(null);
 
         try {
-            // Parse the MongoDB query
-            const parsedQuery = parseMongoQuery(queryInput.trim());
-            
-            if (!parsedQuery) {
-                setQueryError('Invalid query syntax. Use MongoDB syntax like: db.collection.find({})');
-                setQueryLoading(false);
-                addToQueryHistory(queryInput, null, 'error', 'Invalid query syntax');
-                return;
+            let parsedQuery;
+            let actualQuery = queryInput.trim();
+            let naturalLanguage = null;
+            let generatedQuery = null;
+
+            if (queryMode === 'natural') {
+                // Convert natural language to MongoDB query using AI
+                const generatedQueryData = await convertNaturalLanguageToQuery(actualQuery);
+                if (!generatedQueryData) {
+                    setQueryError('Failed to generate MongoDB query from natural language. Please try rephrasing your request.');
+                    setQueryLoading(false);
+                    return;
+                }
+                
+                // Parse the generated MongoDB query
+                parsedQuery = parseMongoQuery(generatedQueryData);
+                if (!parsedQuery) {
+                    setQueryError('Generated query is invalid. Please try rephrasing your request.');
+                    setQueryLoading(false);
+                    return;
+                }
+                
+                // Store the original natural language and generated query
+                naturalLanguage = actualQuery;
+                generatedQuery = generatedQueryData;
+                actualQuery = generatedQueryData;
+            } else {
+                // Parse the MongoDB query directly
+                parsedQuery = parseMongoQuery(actualQuery);
+                if (!parsedQuery) {
+                    setQueryError('Invalid query syntax. Use MongoDB syntax like: db.collection.find({})');
+                    setQueryLoading(false);
+                    return;
+                }
             }
 
             const response = await fetchWithAuth(`/api/connection/${connectionIdRef.current}/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(parsedQuery)
+                body: JSON.stringify({
+                    ...parsedQuery,
+                    naturalLanguage,
+                    generatedQuery
+                })
             });
 
             if (response.ok) {
                 const data = await response.json();
                 setQueryResult(data.result);
-                addToQueryHistory(queryInput, data.result, 'success');
+                
+                // Refresh query history after successful execution
+                fetchQueryHistory();
             } else {
                 const errorData = await response.json();
                 console.error('Backend error:', errorData);
                 const errorMessage = errorData.message || 'Query failed';
                 setQueryError(errorMessage);
-                addToQueryHistory(queryInput, null, 'error', errorMessage);
+                
+                // Refresh query history even for failed queries
+                fetchQueryHistory();
             }
         } catch (err) {
             const errorMessage = 'Failed to execute query: ' + err.message;
             setQueryError(errorMessage);
-            addToQueryHistory(queryInput, null, 'error', errorMessage);
+            
+            // Refresh query history even for failed queries
+            fetchQueryHistory();
         } finally {
             setQueryLoading(false);
         }
+    };
+
+    // Convert natural language to MongoDB query
+    const convertNaturalLanguageToQuery = async (naturalLanguage) => {
+        try {
+            // For now, we'll implement a simple rule-based conversion
+            // In a real implementation, this would call an AI service
+            const query = await generateMongoQueryFromNaturalLanguage(naturalLanguage);
+            return query;
+        } catch (error) {
+            console.error('Error converting natural language to query:', error);
+            return null;
+        }
+    };
+
+    // Simple rule-based natural language to MongoDB query conversion
+    const generateMongoQueryFromNaturalLanguage = async (text) => {
+        const lowerText = text.toLowerCase();
+        
+        // Find operations
+        if (lowerText.includes('find') || lowerText.includes('get') || lowerText.includes('show') || lowerText.includes('list')) {
+            // Extract collection name
+            const collectionMatch = text.match(/(?:find|get|show|list)\s+(?:all\s+)?(\w+)/i);
+            if (collectionMatch) {
+                const collection = collectionMatch[1];
+                
+                // Handle specific filters
+                if (lowerText.includes('active') || lowerText.includes('status')) {
+                    return `db.${collection}.find({"status": "active"})`;
+                }
+                if (lowerText.includes('this month') || lowerText.includes('current month')) {
+                    const startOfMonth = new Date();
+                    startOfMonth.setDate(1);
+                    startOfMonth.setHours(0, 0, 0, 0);
+                    return `db.${collection}.find({"createdAt": {"$gte": new Date("${startOfMonth.toISOString()}")}})`;
+                }
+                if (lowerText.includes('recent') || lowerText.includes('latest')) {
+                    return `db.${collection}.find({}).sort({"createdAt": -1}).limit(10)`;
+                }
+                
+                return `db.${collection}.find({})`;
+            }
+        }
+        
+        // Insert operations
+        if (lowerText.includes('insert') || lowerText.includes('add') || lowerText.includes('create')) {
+            const collectionMatch = text.match(/(?:insert|add|create)\s+(?:a\s+)?(\w+)/i);
+            if (collectionMatch) {
+                const collection = collectionMatch[1];
+                // Generate a basic insert template
+                return `db.${collection}.insertOne({"name": "example", "createdAt": new Date()})`;
+            }
+        }
+        
+        // Update operations
+        if (lowerText.includes('update') || lowerText.includes('modify') || lowerText.includes('change')) {
+            const collectionMatch = text.match(/(?:update|modify|change)\s+(\w+)/i);
+            if (collectionMatch) {
+                const collection = collectionMatch[1];
+                if (lowerText.includes('status')) {
+                    return `db.${collection}.updateOne({"_id": ObjectId("...")}, {"$set": {"status": "active"}})`;
+                }
+                return `db.${collection}.updateOne({"_id": ObjectId("...")}, {"$set": {"field": "value"}})`;
+            }
+        }
+        
+        // Delete operations
+        if (lowerText.includes('delete') || lowerText.includes('remove')) {
+            const collectionMatch = text.match(/(?:delete|remove)\s+(\w+)/i);
+            if (collectionMatch) {
+                const collection = collectionMatch[1];
+                return `db.${collection}.deleteOne({"_id": ObjectId("...")})`;
+            }
+        }
+        
+        // Default fallback
+        return `db.collection.find({})`;
     };
 
     // Parse MongoDB query syntax
@@ -549,60 +675,141 @@ function Playground() {
         return new Date(timestamp).toLocaleString();
     };
 
-    const executeHistoryQuery = (query) => {
+    const executeHistoryQuery = async (query) => {
         setQueryInput(query);
-        setActiveTab('query');
-        // Optionally auto-execute the query
-        // handleQuerySubmit();
+        setActiveTab('query'); // Switch to query tab
+        
+        // Execute the query automatically
+        try {
+            setQueryLoading(true);
+            setQueryError('');
+            
+            // Parse the query to extract collection and operation
+            const parsedQuery = parseMongoQuery(query);
+            if (!parsedQuery) {
+                setQueryError('Invalid query format');
+                setQueryLoading(false);
+                return;
+            }
+
+            const response = await fetchWithAuth(`/api/connection/${connectionIdRef.current}/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    collection: parsedQuery.collection,
+                    operation: parsedQuery.operation,
+                    args: parsedQuery.args
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setQueryResult(data.result);
+            } else {
+                const errorData = await response.json();
+                setQueryError(errorData.message || 'Failed to execute query');
+            }
+        } catch (error) {
+            console.error('Error executing query:', error);
+            setQueryError('Failed to execute query');
+        } finally {
+            setQueryLoading(false);
+        }
     };
 
     const copyToQueryInput = (query) => {
-        setQueryInput(query);
-        setActiveTab('query');
+        // Copy query to clipboard
+        navigator.clipboard.writeText(query).then(() => {
+            // Optional: Show a brief success message
+            console.log('Query copied to clipboard');
+        }).catch(err => {
+            console.error('Failed to copy query to clipboard:', err);
+        });
     };
 
-    const deleteHistoryItem = (index) => {
-        setQueryHistory(prev => prev.filter((_, i) => i !== index));
+    const deleteHistoryItem = async (id) => {
+        try {
+            const response = await fetchWithAuth(`/api/query/history/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                // Refresh query history
+                fetchQueryHistory();
+            } else {
+                console.error('Failed to delete query history');
+            }
+        } catch (error) {
+            console.error('Error deleting query history:', error);
+        }
     };
 
-    const addToQueryHistory = (query, result, status, error = null) => {
-        const historyItem = {
-            id: Date.now(),
-            query,
-            result: status === 'success' ? 
-                (Array.isArray(result) ? `${result.length} document(s) returned` : 'Query executed successfully') :
-                (error || 'Query failed'),
-            timestamp: new Date().toISOString(),
-            status
-        };
-        setQueryHistory(prev => [historyItem, ...prev.slice(0, 9)]); // Keep last 10 items
-    };
-
-    // Simplified save query function
-    const handleSaveQuery = (query) => {
-        // Check if query already exists
-        const queryExists = savedQueries.some(saved => saved.query === query);
-        
-        if (queryExists) {
-            setSaveMessage('Query already saved!');
-            setTimeout(() => setSaveMessage(''), 2000);
+    const handleSaveQuery = async (query) => {
+        if (!query.trim() || !connectionIdRef.current) {
             return;
         }
 
-        const savedQuery = {
-            id: Date.now(),
-            query: query,
-            timestamp: new Date().toISOString()
-        };
-        
-        setSavedQueries(prev => [savedQuery, ...prev]);
-        setSaveMessage('Query saved successfully!');
+        try {
+            // Parse the query to extract collection and operation
+            const parsedQuery = parseMongoQuery(query);
+            if (!parsedQuery) {
+                setSaveMessage('Invalid query format');
+                setTimeout(() => setSaveMessage(''), 2000);
+                return;
+            }
+
+            // Generate a default name based on the query
+            const defaultName = `${parsedQuery.collection}_${parsedQuery.operation}_${Date.now()}`;
+
+            const response = await fetchWithAuth('/api/query/saved', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    connectionId: connectionIdRef.current,
+                    name: defaultName,
+                    description: `Saved query for ${parsedQuery.collection}.${parsedQuery.operation}`,
+                    query: query,
+                    result: queryResult, // Include the current query result
+                    collection: parsedQuery.collection,
+                    operation: parsedQuery.operation
+                })
+            });
+
+            if (response.ok) {
+                setSaveMessage('Query saved successfully!');
+                // Refresh saved queries
+                fetchSavedQueries();
+            } else {
+                const errorData = await response.json();
+                if (errorData.message.includes('already exists')) {
+                    setSaveMessage('Query already saved');
+                } else {
+                    setSaveMessage('Failed to save query');
+                }
+            }
+        } catch (error) {
+            console.error('Error saving query:', error);
+            setSaveMessage('Failed to save query');
+        }
+
         setTimeout(() => setSaveMessage(''), 2000);
     };
 
-    // Delete saved query
-    const deleteSavedQuery = (index) => {
-        setSavedQueries(prev => prev.filter((_, i) => i !== index));
+    const deleteSavedQuery = async (id) => {
+        try {
+            const response = await fetchWithAuth(`/api/query/saved/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                // Refresh saved queries
+                fetchSavedQueries();
+            } else {
+                console.error('Failed to delete saved query');
+            }
+        } catch (error) {
+            console.error('Error deleting saved query:', error);
+        }
     };
 
     if (userLoading) {
@@ -985,6 +1192,8 @@ function Playground() {
                         deleteHistoryItem={deleteHistoryItem}
                         deleteSavedQuery={deleteSavedQuery}
                         formatTimestamp={formatTimestamp}
+                        historyLoading={historyLoading}
+                        savedQueriesLoading={savedQueriesLoading}
                     />
                 ) : (
                     <QueryInterface 
@@ -992,10 +1201,13 @@ function Playground() {
                         setQueryInput={setQueryInput}
                         queryLoading={queryLoading}
                         queryError={queryError}
+                        setQueryError={setQueryError}
                         queryResult={queryResult}
                         handleQuerySubmit={handleQuerySubmit}
                         onSaveQuery={handleSaveQuery}
                         saveMessage={saveMessage}
+                        queryMode={queryMode}
+                        setQueryMode={setQueryMode}
                     />
                 )}
             </div>

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('./middleware');
 const Connection = require('../models/Connection');
+const QueryHistory = require('../models/QueryHistory');
 const databaseManager = require('../utils/databaseManager');
 const crypto = require('crypto');
 const dotenv = require('dotenv');
@@ -719,7 +720,7 @@ router.post('/:id/execute', verifyToken, async (req, res) => {
     try {
         const userId = req.userId;
         const connectionId = req.params.id;
-        const { collection, operation, args } = req.body;
+        const { collection, operation, args, naturalLanguage, generatedQuery } = req.body;
 
         if (!collection || !operation) {
             return res.status(400).json({ message: 'Collection and operation are required.' });
@@ -748,53 +749,127 @@ router.post('/:id/execute', verifyToken, async (req, res) => {
 
         const col = db.collection(collection);
         let result;
+        let executionTime = 0;
+        let documentsAffected = 0;
+        let status = 'success';
+        let errorMessage = null;
 
-        // Handle different MongoDB operations
-        switch (operation) {
-            case 'find':
-                result = await col.find(convertedArgs[0] || {}, convertedArgs[1] || {}).toArray();
-                break;
-            case 'findOne':
-                result = await col.findOne(convertedArgs[0] || {}, convertedArgs[1] || {});
-                break;
-            case 'insertOne':
-                result = await col.insertOne(convertedArgs[0]);
-                break;
-            case 'insertMany':
-                result = await col.insertMany(convertedArgs[0]);
-                break;
-            case 'updateOne':
-                result = await col.updateOne(convertedArgs[0], convertedArgs[1], convertedArgs[2] || {});
-                break;
-            case 'updateMany':
-                result = await col.updateMany(convertedArgs[0], convertedArgs[1], convertedArgs[2] || {});
-                break;
-            case 'deleteOne':
-                result = await col.deleteOne(convertedArgs[0], convertedArgs[1] || {});
-                break;
-            case 'deleteMany':
-                result = await col.deleteMany(convertedArgs[0], convertedArgs[1] || {});
-                break;
-            case 'countDocuments':
-                result = await col.countDocuments(convertedArgs[0] || {});
-                break;
-            case 'estimatedDocumentCount':
-                result = await col.estimatedDocumentCount();
-                break;
-            case 'aggregate':
-                result = await col.aggregate(convertedArgs[0] || []).toArray();
-                break;
-            case 'distinct':
-                result = await col.distinct(convertedArgs[0], convertedArgs[1] || {});
-                break;
-            case 'createIndex':
-                result = await col.createIndex(convertedArgs[0], convertedArgs[1] || {});
-                break;
-            case 'listIndexes':
-                result = await col.listIndexes().toArray();
-                break;
-            default:
-                return res.status(400).json({ message: `Unsupported operation: ${operation}` });
+        // Record start time
+        const startTime = Date.now();
+
+        try {
+            // Handle different MongoDB operations
+            switch (operation) {
+                case 'find':
+                    result = await col.find(convertedArgs[0] || {}, convertedArgs[1] || {}).toArray();
+                    documentsAffected = result.length;
+                    break;
+                case 'findOne':
+                    result = await col.findOne(convertedArgs[0] || {}, convertedArgs[1] || {});
+                    documentsAffected = result ? 1 : 0;
+                    break;
+                case 'insertOne':
+                    result = await col.insertOne(convertedArgs[0]);
+                    documentsAffected = result.insertedCount || 0;
+                    break;
+                case 'insertMany':
+                    result = await col.insertMany(convertedArgs[0]);
+                    documentsAffected = result.insertedCount || 0;
+                    break;
+                case 'updateOne':
+                    result = await col.updateOne(convertedArgs[0], convertedArgs[1], convertedArgs[2] || {});
+                    documentsAffected = result.modifiedCount || 0;
+                    break;
+                case 'updateMany':
+                    result = await col.updateMany(convertedArgs[0], convertedArgs[1], convertedArgs[2] || {});
+                    documentsAffected = result.modifiedCount || 0;
+                    break;
+                case 'deleteOne':
+                    result = await col.deleteOne(convertedArgs[0], convertedArgs[1] || {});
+                    documentsAffected = result.deletedCount || 0;
+                    break;
+                case 'deleteMany':
+                    result = await col.deleteMany(convertedArgs[0], convertedArgs[1] || {});
+                    documentsAffected = result.deletedCount || 0;
+                    break;
+                case 'countDocuments':
+                    result = await col.countDocuments(convertedArgs[0] || {});
+                    documentsAffected = result;
+                    break;
+                case 'estimatedDocumentCount':
+                    result = await col.estimatedDocumentCount();
+                    documentsAffected = result;
+                    break;
+                case 'aggregate':
+                    result = await col.aggregate(convertedArgs[0] || []).toArray();
+                    documentsAffected = result.length;
+                    break;
+                case 'distinct':
+                    result = await col.distinct(convertedArgs[0], convertedArgs[1] || {});
+                    documentsAffected = result.length;
+                    break;
+                case 'createIndex':
+                    result = await col.createIndex(convertedArgs[0], convertedArgs[1] || {});
+                    documentsAffected = 1;
+                    break;
+                case 'listIndexes':
+                    result = await col.listIndexes().toArray();
+                    documentsAffected = result.length;
+                    break;
+                default:
+                    throw new Error(`Unsupported operation: ${operation}`);
+            }
+
+            // Calculate execution time
+            executionTime = Date.now() - startTime;
+
+        } catch (queryError) {
+            // Calculate execution time even for failed queries
+            executionTime = Date.now() - startTime;
+            status = 'error';
+            errorMessage = queryError.message;
+            throw queryError;
+        }
+
+        // Save query to history
+        try {
+            // Format arguments properly without extra array brackets
+            const formattedArgs = convertedArgs.map(arg => JSON.stringify(arg)).join(', ');
+            const queryString = `db.${collection}.${operation}(${formattedArgs})`;
+            
+            console.log('Saving query to history:', {
+                userId,
+                connectionId,
+                query: queryString,
+                naturalLanguage,
+                generatedQuery,
+                status,
+                executionTime,
+                documentsAffected,
+                collection,
+                operation
+            });
+            
+            const queryHistoryEntry = new QueryHistory({
+                userId,
+                connectionId,
+                query: queryString,
+                naturalLanguage,
+                generatedQuery,
+                result: status === 'success' ? result : null,
+                status,
+                errorMessage,
+                executionTime,
+                documentsAffected,
+                collection,
+                operation
+            });
+
+            await queryHistoryEntry.save();
+            console.log('Query saved to history successfully, ID:', queryHistoryEntry._id);
+        } catch (historyError) {
+            console.error('Error saving query to history:', historyError);
+            // Don't fail the main query if history saving fails
         }
 
         return res.status(200).json({ result });
@@ -854,23 +929,43 @@ router.get('/:id/schema', verifyToken, async (req, res) => {
                 let sampleDoc = null;
                 
                 try {
+                    console.log(`Attempting schema analysis for collection: ${collectionName}`);
+                    
                     // Use MongoDB's analyzeSchema command for richer insights
                     schemaAnalysis = await db.command({ 
                         analyzeSchema: collectionName,
                         sampleSize: 1000  // Analyze up to 1000 documents
                     });
                     
+                    console.log(`Schema analysis successful for ${collectionName}:`, {
+                        hasSchema: !!schemaAnalysis.schema,
+                        fieldCount: schemaAnalysis.schema ? Object.keys(schemaAnalysis.schema).length : 0
+                    });
+                    
                     // Extract field information from schema analysis
                     if (schemaAnalysis && schemaAnalysis.schema) {
                         fields = extractSchemaFields(schemaAnalysis.schema);
+                        console.log(`Extracted ${fields.length} fields from schema analysis for ${collectionName}`);
                     }
                 } catch (schemaError) {
-                    console.log(`Schema analysis failed for ${collectionName}, falling back to sample document:`, schemaError.message);
+                    console.log(`Schema analysis failed for ${collectionName}:`, {
+                        error: schemaError.message,
+                        code: schemaError.code,
+                        name: schemaError.name
+                    });
                     
                     // Fallback to sample document analysis
-                    sampleDoc = await col.findOne({});
-                    if (sampleDoc) {
-                        fields = extractFields(sampleDoc);
+                    console.log(`Falling back to sample document analysis for ${collectionName}`);
+                    try {
+                        sampleDoc = await col.findOne({});
+                        if (sampleDoc) {
+                            fields = extractFields(sampleDoc);
+                            console.log(`Extracted ${fields.length} fields from sample document for ${collectionName}`);
+                        } else {
+                            console.log(`No sample document found for ${collectionName}`);
+                        }
+                    } catch (sampleError) {
+                        console.error(`Sample document analysis failed for ${collectionName}:`, sampleError.message);
                     }
                 }
                 
@@ -1123,6 +1218,41 @@ router.get('/:id/schema/:collection', verifyToken, async (req, res) => {
             message: 'Failed to get collection schema', 
             details: error.message 
         });
+    }
+});
+
+// Disconnect on page close (for sendBeacon)
+router.post('/disconnect-on-close', async (req, res) => {
+    try {
+        // Extract connection ID from request body
+        const { connectionId } = req.body;
+        
+        if (!connectionId) {
+            return res.status(400).json({ message: 'Connection ID is required.' });
+        }
+
+        // Get the connection info from DB (no user verification for cleanup)
+        const dbConn = await Connection.findOne({ _id: connectionId });
+        if (!dbConn) {
+            return res.status(404).json({ message: 'Connection not found.' });
+        }
+
+        // Disconnect from database using the correct method signature
+        await databaseManager.disconnect(dbConn.userId, connectionId);
+        
+        // Update connection status in database
+        await Connection.findByIdAndUpdate(connectionId, {
+            isActive: false,
+            isConnected: false,
+            isAlive: false,
+            disconnectedAt: new Date()
+        });
+        
+        console.log(`Connection ${connectionId} disconnected on page close`);
+        res.status(200).json({ message: 'Disconnected successfully' });
+    } catch (error) {
+        console.error('Error disconnecting on page close:', error);
+        res.status(500).json({ message: 'Failed to disconnect' });
     }
 });
 

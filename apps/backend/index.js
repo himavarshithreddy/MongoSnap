@@ -11,6 +11,8 @@ const forgotPasswordRoutes = require('./routes/forgotpassword');
 const verifyRoutes = require('./routes/verify');
 const oauthRoutes = require('./routes/oauth');
 const connectionRoutes = require('./routes/connection');
+const queryHistoryRoutes = require('./routes/queryHistory');
+const databaseManager = require('./utils/databaseManager');
 const path = require('path');
 dotenv.config();
 
@@ -29,6 +31,14 @@ app.use('/api', verifyRoutes);
 app.use('/api', forgotPasswordRoutes);
 app.use('/api/auth', oauthRoutes);
 app.use('/api/connection', connectionRoutes);
+app.use('/api/query', queryHistoryRoutes);
+
+console.log('✅ All routes registered successfully');
+console.log('📋 Available routes:');
+console.log('  - /api/auth/* (authentication routes)');
+console.log('  - /api/connection/* (database connection routes)');
+console.log('  - /api/query/* (query history and saved queries routes)');
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
@@ -46,3 +56,16 @@ https.createServer(sslOptions, app).listen(4000, '0.0.0.0', () => {
   console.log(`🔒 HTTPS server running at https://mongosnap.mp:4000`);
   console.log(`🚀 Frontend expected at https://mongosnap.mp:5173`);
 });
+
+// Start periodic connection cleanup (every 15 minutes)
+setInterval(async () => {
+  try {
+    await databaseManager.cleanupStaleConnections();
+    const stats = databaseManager.getConnectionStats();
+    console.log(`📊 Connection stats: ${stats.activeConnections} active, ${stats.staleConnections} stale`);
+  } catch (error) {
+    console.error('❌ Error during periodic cleanup:', error);
+  }
+}, 15 * 60 * 1000); // 15 minutes
+
+console.log('🧹 Connection cleanup scheduled (every 15 minutes)');

@@ -153,6 +153,60 @@ class DatabaseManager {
             return false;
         }
     }
+
+    // Cleanup stale connections (run periodically)
+    async cleanupStaleConnections() {
+        try {
+            console.log('Starting connection cleanup...');
+            const now = new Date();
+            const staleThreshold = 30 * 60 * 1000; // 30 minutes
+
+            for (const [userId, userConnections] of this.connections) {
+                for (const [connectionId, client] of userConnections) {
+                    const connectionInfo = this.getConnectionInfo(userId, connectionId);
+                    if (connectionInfo) {
+                        const timeSinceLastActivity = now - connectionInfo.connectedAt;
+                        
+                        // Disconnect if connection is older than threshold
+                        if (timeSinceLastActivity > staleThreshold) {
+                            console.log(`Disconnecting stale connection: user ${userId}, connection ${connectionId}`);
+                            await this.disconnect(userId, connectionId);
+                        } else {
+                            // Test if connection is still alive
+                            const isAlive = await this.testConnection(userId, connectionId);
+                            if (!isAlive) {
+                                console.log(`Disconnecting dead connection: user ${userId}, connection ${connectionId}`);
+                                await this.disconnect(userId, connectionId);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error during connection cleanup:', error.message);
+        }
+    }
+
+    // Get connection statistics
+    getConnectionStats() {
+        let totalConnections = 0;
+        let activeConnections = 0;
+
+        for (const [userId, userConnections] of this.connections) {
+            totalConnections += userConnections.size;
+            for (const [connectionId, client] of userConnections) {
+                if (client && client.topology && client.topology.isConnected()) {
+                    activeConnections++;
+                }
+            }
+        }
+
+        return {
+            totalConnections,
+            activeConnections,
+            staleConnections: totalConnections - activeConnections
+        };
+    }
 }
 
 // Create a singleton instance

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Clock, Play, Copy, Trash2, CheckCircle, XCircle, BookOpen, Save } from 'lucide-react';
+import { Clock, Play, Copy, Trash2, CheckCircle, XCircle, BookOpen, Save, Eye, EyeOff, Check } from 'lucide-react';
 
 function QueryHistory({ 
     queryHistory, 
@@ -8,51 +8,78 @@ function QueryHistory({
     copyToQueryInput, 
     deleteHistoryItem,
     deleteSavedQuery,
-    formatTimestamp 
+    formatTimestamp,
+    historyLoading = false,
+    savedQueriesLoading = false
 }) {
     const [activeHistoryTab, setActiveHistoryTab] = useState('history'); // 'history' or 'saved'
+    const [expandedResults, setExpandedResults] = useState(new Set()); // Track which results are expanded
+    const [copiedQueryId, setCopiedQueryId] = useState(null); // Track which query was just copied
 
-    // Mock query history data - this should be moved to the parent component
-    const mockQueryHistory = [
-        {
-            id: 1,
-            query: 'db.users.find({"status": "active"})',
-            result: '5 documents returned',
-            timestamp: '2024-01-15T10:30:00Z',
-            status: 'success'
-        },
-        {
-            id: 2,
-            query: 'db.products.insertOne({"name": "New Product", "price": 29.99})',
-            result: 'Document inserted successfully',
-            timestamp: '2024-01-15T10:25:00Z',
-            status: 'success'
-        },
-        {
-            id: 3,
-            query: 'db.users.updateOne({"_id": ObjectId("...")}, {"$set": {"lastLogin": new Date()}})',
-            result: '1 document modified',
-            timestamp: '2024-01-15T10:20:00Z',
-            status: 'success'
-        },
-        {
-            id: 4,
-            query: 'db.invalid_collection.find({})',
-            result: 'Collection not found',
-            timestamp: '2024-01-15T10:15:00Z',
-            status: 'error'
-        },
-        {
-            id: 5,
-            query: 'db.orders.aggregate([{"$match": {"status": "pending"}}, {"$group": {"_id": "$customerId", "total": {"$sum": "$amount"}}}])',
-            result: '3 documents returned',
-            timestamp: '2024-01-15T10:10:00Z',
-            status: 'success'
+    // Format result for display
+    const formatResult = (result, status, documentsAffected, operation) => {
+        if (status === 'error') {
+            return 'Query failed';
         }
-    ];
+        
+        if (Array.isArray(result)) {
+            return `${result.length} document(s) returned`;
+        }
+        
+        if (operation === 'insertOne' || operation === 'insertMany') {
+            return `Document(s) inserted successfully`;
+        }
+        
+        if (operation === 'updateOne' || operation === 'updateMany') {
+            return `${documentsAffected || 0} document(s) modified`;
+        }
+        
+        if (operation === 'deleteOne' || operation === 'deleteMany') {
+            return `${documentsAffected || 0} document(s) deleted`;
+        }
+        
+        if (operation === 'countDocuments' || operation === 'estimatedDocumentCount') {
+            return `Count: ${result}`;
+        }
+        
+        return 'Query executed successfully';
+    };
 
-    // Use provided queryHistory or fall back to mock data
-    const historyData = queryHistory || mockQueryHistory;
+    // Toggle result expansion
+    const toggleResultExpansion = (itemId) => {
+        const newExpanded = new Set(expandedResults);
+        if (newExpanded.has(itemId)) {
+            newExpanded.delete(itemId);
+        } else {
+            newExpanded.add(itemId);
+        }
+        setExpandedResults(newExpanded);
+    };
+
+    // Handle copy with feedback
+    const handleCopyQuery = (query, itemId) => {
+        // Copy query to clipboard
+        navigator.clipboard.writeText(query).then(() => {
+            // Show visual feedback
+            setCopiedQueryId(itemId);
+            setTimeout(() => {
+                setCopiedQueryId(null);
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy query to clipboard:', err);
+        });
+    };
+
+    // Format result for detailed view
+    const formatDetailedResult = (result) => {
+        if (!result) return 'No result data available';
+        
+        try {
+            return JSON.stringify(result, null, 2);
+        } catch (error) {
+            return String(result);
+        }
+    };
 
     return (
         <div className='w-full'>
@@ -85,7 +112,7 @@ function QueryHistory({
                         }`}
                     >
                         <Clock size={16} />
-                        Execution History ({historyData.length})
+                        Execution History ({queryHistory.length})
                     </button>
                     
                     <button
@@ -105,28 +132,40 @@ function QueryHistory({
             {/* Execution History Tab */}
             {activeHistoryTab === 'history' && (
                 <>
-                    {historyData.length > 0 ? (
+                    {historyLoading ? (
+                        <div className="text-center py-12 text-gray-400">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-quaternary mx-auto mb-4"></div>
+                            <p className="text-sm">Loading query history...</p>
+                        </div>
+                    ) : queryHistory.length > 0 ? (
                         <div className='space-y-4'>
-                            {historyData.map((item, index) => (
-                                <div key={item.id || index} className="border border-gray-700 rounded-lg bg-[#2d4c38] p-4">
+                            {queryHistory.map((item) => (
+                                <div key={item._id} className="border border-gray-700 rounded-lg bg-[#2d4c38] p-4">
                                     <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-2">
                                             <span className="text-gray-400 text-sm">
-                                                {formatTimestamp ? formatTimestamp(item.timestamp) : new Date(item.timestamp).toLocaleString()}
+                                                {formatTimestamp ? formatTimestamp(item.createdAt) : new Date(item.createdAt).toLocaleString()}
                                             </span>
                                             {item.status === 'success' ? (
                                                 <CheckCircle size={16} className="text-green-400" />
                                             ) : (
                                                 <XCircle size={16} className="text-red-400" />
                                             )}
+                                            {item.executionTime && (
+                                                <span className="text-xs text-gray-500">
+                                                    ({item.executionTime}ms)
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
-                                                onClick={() => copyToQueryInput && copyToQueryInput(item.query)}
-                                                className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                                                title="Copy to query input"
+                                                onClick={() => handleCopyQuery(item.query, item._id)}
+                                                className={`p-1 text-gray-400 hover:text-white transition-colors cursor-pointer rounded ${
+                                                    copiedQueryId === item._id ? 'bg-brand-quaternary text-white' : ''
+                                                }`}
+                                                title={copiedQueryId === item._id ? "Copied to clipboard!" : "Copy query to clipboard"}
                                             >
-                                                <Copy size={16} />
+                                                {copiedQueryId === item._id ? <Check size={16} /> : <Copy size={16} />}
                                             </button>
                                             <button
                                                 onClick={() => executeHistoryQuery && executeHistoryQuery(item.query)}
@@ -136,7 +175,7 @@ function QueryHistory({
                                                 <Play size={16} />
                                             </button>
                                             <button
-                                                onClick={() => deleteHistoryItem && deleteHistoryItem(index)}
+                                                onClick={() => deleteHistoryItem && deleteHistoryItem(item._id)}
                                                 className="p-1 text-gray-400 hover:text-red-400 transition-colors cursor-pointer"
                                                 title="Delete from history"
                                             >
@@ -145,21 +184,98 @@ function QueryHistory({
                                         </div>
                                     </div>
                                     
+                                    {/* Show natural language if available */}
+                                    {item.naturalLanguage && (
+                                        <div className="mb-3 p-2 bg-[#1a2f24] rounded border-l-2 border-brand-quaternary">
+                                            <span className="text-xs text-brand-quaternary font-medium">Natural Language:</span>
+                                            <p className="text-sm text-gray-300 mt-1">{item.naturalLanguage}</p>
+                                        </div>
+                                    )}
+                                    
                                     <div className="bg-[#243c2d] p-3 rounded mb-3">
                                         <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap break-words">
                                             {item.query}
                                         </pre>
                                     </div>
                                     
-                                    {item.status === 'success' && item.result && (
-                                        <div className="text-xs text-gray-400">
-                                            {item.result}
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            {item.status === 'success' && (
+                                                <div className="text-xs text-gray-400">
+                                                    {formatResult(item.result, item.status, item.documentsAffected, item.operation)}
+                                                </div>
+                                            )}
+                                            
+                                            {item.status === 'error' && item.errorMessage && (
+                                                <div className="text-xs text-red-400">
+                                                    Error: {item.errorMessage}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                    
-                                    {item.status === 'error' && item.result && (
-                                        <div className="text-xs text-red-400">
-                                            Error: {item.result}
+                                        
+                                        {/* Prominent View Results Button */}
+                                        {item.result && (
+                                            <button
+                                                onClick={() => toggleResultExpansion(item._id)}
+                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
+                                                    expandedResults.has(item._id)
+                                                        ? 'bg-brand-quaternary text-white'
+                                                        : 'bg-brand-tertiary text-gray-300 hover:bg-brand-quaternary hover:text-white'
+                                                }`}
+                                            >
+                                                {expandedResults.has(item._id) ? (
+                                                    <>
+                                                        <EyeOff size={14} />
+                                                        Hide Results
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Eye size={14} />
+                                                        View Results
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Expanded Results */}
+                                    {expandedResults.has(item._id) && item.result && (
+                                        <div className="mt-4 border-t border-gray-600 pt-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="text-md font-semibold text-white">Query Results</h4>
+                                                <span className="text-sm text-gray-400">
+                                                    {item.status === 'success' ? (
+                                                        <span className="text-green-400 flex items-center gap-1">
+                                                            <CheckCircle size={14} />
+                                                            Success
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-red-400 flex items-center gap-1">
+                                                            <XCircle size={14} />
+                                                            Error
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="bg-[#1a1a1a] border border-gray-700 rounded p-4 max-h-96 overflow-auto">
+                                                {item.status === 'error' ? (
+                                                    <div className="text-red-400">
+                                                        {item.errorMessage || 'Query execution failed'}
+                                                    </div>
+                                                ) : (
+                                                    <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
+                                                        {formatDetailedResult(item.result)}
+                                                    </pre>
+                                                )}
+                                            </div>
+                                            
+                                            {item.executionTime && item.documentsAffected !== null && item.documentsAffected !== undefined && (
+                                                <div className="flex items-center gap-4 text-sm text-gray-400 mt-3">
+                                                    <span>Execution Time: {item.executionTime}ms</span>
+                                                    <span>Documents Affected: {item.documentsAffected}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -180,22 +296,34 @@ function QueryHistory({
             {/* Saved Queries Tab */}
             {activeHistoryTab === 'saved' && (
                 <>
-                    {savedQueries.length > 0 ? (
+                    {savedQueriesLoading ? (
+                        <div className="text-center py-12 text-gray-400">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-quaternary mx-auto mb-4"></div>
+                            <p className="text-sm">Loading saved queries...</p>
+                        </div>
+                    ) : savedQueries.length > 0 ? (
                         <div className='space-y-4'>
-                            {savedQueries.map((item, index) => (
-                                <div key={item.id || index} className="border border-gray-700 rounded-lg bg-[#2d4c38] p-4">
+                            {savedQueries.map((item) => (
+                                <div key={item._id} className="border border-gray-700 rounded-lg bg-[#2d4c38] p-4">
                                     <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-2 text-gray-400 text-sm">
                                             <Save size={14} className="text-brand-quaternary" />
-                                            <span>Saved: {formatTimestamp ? formatTimestamp(item.timestamp) : new Date(item.timestamp).toLocaleDateString()}</span>
+                                            <span>Saved: {formatTimestamp ? formatTimestamp(item.createdAt) : new Date(item.createdAt).toLocaleDateString()}</span>
+                                            {item.usageCount > 0 && (
+                                                <span className="text-xs text-gray-500">
+                                                    (Used {item.usageCount} times)
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
-                                                onClick={() => copyToQueryInput && copyToQueryInput(item.query)}
-                                                className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                                                title="Copy to query input"
+                                                onClick={() => handleCopyQuery(item.query, item._id)}
+                                                className={`p-1 text-gray-400 hover:text-white transition-colors cursor-pointer rounded ${
+                                                    copiedQueryId === item._id ? 'bg-brand-quaternary text-white' : ''
+                                                }`}
+                                                title={copiedQueryId === item._id ? "Copied to clipboard!" : "Copy query to clipboard"}
                                             >
-                                                <Copy size={16} />
+                                                {copiedQueryId === item._id ? <Check size={16} /> : <Copy size={16} />}
                                             </button>
                                             <button
                                                 onClick={() => executeHistoryQuery && executeHistoryQuery(item.query)}
@@ -205,7 +333,7 @@ function QueryHistory({
                                                 <Play size={16} />
                                             </button>
                                             <button
-                                                onClick={() => deleteSavedQuery && deleteSavedQuery(index)}
+                                                onClick={() => deleteSavedQuery && deleteSavedQuery(item._id)}
                                                 className="p-1 text-gray-400 hover:text-red-400 transition-colors cursor-pointer"
                                                 title="Delete saved query"
                                             >
@@ -214,11 +342,91 @@ function QueryHistory({
                                         </div>
                                     </div>
                                     
-                                    <div className="bg-[#243c2d] p-3 rounded">
+                                    {/* Show name and description if available */}
+                                    {item.name && (
+                                        <div className="mb-3">
+                                            <span className="text-sm font-medium text-white">{item.name}</span>
+                                            {item.description && (
+                                                <p className="text-xs text-gray-400 mt-1">{item.description}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Show natural language if available */}
+                                    {item.naturalLanguage && (
+                                        <div className="mb-3 p-2 bg-[#1a2f24] rounded border-l-2 border-brand-quaternary">
+                                            <span className="text-xs text-brand-quaternary font-medium">Natural Language:</span>
+                                            <p className="text-sm text-gray-300 mt-1">{item.naturalLanguage}</p>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="bg-[#243c2d] p-3 rounded mb-3">
                                         <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap break-words">
                                             {item.query}
                                         </pre>
                                     </div>
+
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            {/* Show result summary if available */}
+                                            {item.result && (
+                                                <div className="text-xs text-gray-400">
+                                                    Result saved: {formatResult(item.result, 'success', item.documentsAffected, item.operation)}
+                                                </div>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Prominent View Results Button */}
+                                        {item.result && (
+                                            <button
+                                                onClick={() => toggleResultExpansion(item._id)}
+                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
+                                                    expandedResults.has(item._id)
+                                                        ? 'bg-brand-quaternary text-white'
+                                                        : 'bg-brand-tertiary text-gray-300 hover:bg-brand-quaternary hover:text-white'
+                                                }`}
+                                            >
+                                                {expandedResults.has(item._id) ? (
+                                                    <>
+                                                        <EyeOff size={14} />
+                                                        Hide Results
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Eye size={14} />
+                                                        View Results
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Expanded Results */}
+                                    {expandedResults.has(item._id) && item.result && (
+                                        <div className="mt-4 border-t border-gray-600 pt-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="text-md font-semibold text-white">Saved Results</h4>
+                                                <span className="text-sm text-gray-400">
+                                                    <span className="text-green-400 flex items-center gap-1">
+                                                        <CheckCircle size={14} />
+                                                        Success
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="bg-[#1a1a1a] border border-gray-700 rounded p-4 max-h-96 overflow-auto">
+                                                <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
+                                                    {formatDetailedResult(item.result)}
+                                                </pre>
+                                            </div>
+                                            
+                                            {item.documentsAffected !== null && item.documentsAffected !== undefined && (
+                                                <div className="flex items-center gap-4 text-sm text-gray-400 mt-3">
+                                                    <span>Documents Affected: {item.documentsAffected}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
