@@ -4,8 +4,10 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
-const { sendVerificationEmail } = require('../utils/mailer');
+const crypto = require('crypto');
+const { sendVerificationEmail, sendResetPasswordEmail } = require('../utils/mailer');
 const databaseManager = require('../utils/databaseManager');
+const { verifyToken } = require('./middleware');
 dotenv.config();
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET ;
 
@@ -130,6 +132,45 @@ router.post('/logout', async (req, res) => {
       sameSite: 'lax',
     });
     res.status(200).json({ message: 'Logged out successfully' });
+  }
+});
+
+// POST /request-password-change - Send password change link to authenticated user
+router.post('/request-password-change', verifyToken, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if user has password (OAuth users might not have password)
+    if (!user.password) {
+      return res.status(400).json({ message: 'Password change not available for OAuth accounts' });
+    }
+
+    // Generate password change token
+    const changeToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(changeToken).digest('hex');
+    
+    // Store token hash in user document (reuse resetPasswordToken field)
+    user.resetPasswordToken = tokenHash;
+    await user.save();
+
+    // Send email with password change link
+    const changeLink = `${process.env.FRONTEND_URL || 'https://mongosnap.mp:5173'}/change-password/${changeToken}`;
+    await sendResetPasswordEmail(user.email, changeLink);
+
+    console.log(`Password change link sent to user: ${user.email}`);
+    
+    res.status(200).json({ 
+      message: 'Password change link has been sent to your email address' 
+    });
+
+  } catch (err) {
+    console.error('Request password change error:', err);
+    res.status(500).json({ message: 'Server error during password change request' });
   }
 });
 

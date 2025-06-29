@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import Logo from '../components/Logo';
 
@@ -15,6 +15,7 @@ const passwordChecks = [
 function ResetPassword() {
     const { token } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [form, setForm] = useState({ password: '', confirmPassword: '' });
@@ -23,9 +24,13 @@ function ResetPassword() {
     const [success, setSuccess] = useState('');
     const [showPasswordStrength, setShowPasswordStrength] = useState(false);
 
+    // Detect if this is a change password scenario
+    const isChangePassword = location.pathname.includes('/change-password/');
+    const isLoggedIn = localStorage.getItem('token');
+
     useEffect(() => {
-        document.title = "MongoSnap - Reset Password";
-    }, []);
+        document.title = isChangePassword ? "MongoSnap - Change Password" : "MongoSnap - Reset Password";
+    }, [isChangePassword]);
 
     const handleInput = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -54,13 +59,20 @@ function ResetPassword() {
             const data = await res.json();
             
             if (!res.ok) {
-                throw new Error(data.message || 'Failed to reset password');
+                throw new Error(data.message || `Failed to ${isChangePassword ? 'change' : 'reset'} password`);
             }
             
-            setSuccess('Password reset successfully! Redirecting to login...');
-            setTimeout(() => {
-                navigate('/login');
-            }, 2000);
+            if (isChangePassword && isLoggedIn) {
+                setSuccess('Password changed successfully! Redirecting to dashboard...');
+                setTimeout(() => {
+                    navigate('/connect');
+                }, 2000);
+            } else {
+                setSuccess('Password reset successfully! Redirecting to login...');
+                setTimeout(() => {
+                    navigate('/login');
+                }, 2000);
+            }
         } catch (err) {
             setError(err.message);
         } finally {
@@ -80,8 +92,12 @@ function ResetPassword() {
                         <Logo size="large" />
                         <h1 className="text-5xl font-bold text-white tracking-wide">Mongo<span className="text-[#3CBC6B]">Snap</span></h1>
                     </div>
-                    <h1 className="text-4xl font-bold text-white mb-2 mt-4">Reset Password</h1>
-                    <p className="text-gray-400">Enter your new password below</p>
+                    <h1 className="text-4xl font-bold text-white mb-2 mt-4">
+                        {isChangePassword ? 'Change Password' : 'Reset Password'}
+                    </h1>
+                    <p className="text-gray-400">
+                        {isChangePassword ? 'Enter your new password below' : 'Enter your new password to reset your account'}
+                    </p>
                 </div>
 
                 <form onSubmit={handleResetPassword} className="space-y-6">
@@ -194,7 +210,10 @@ function ResetPassword() {
                                 : ''
                         }`}
                     >
-                        {loading ? 'Resetting...' : 'Reset Password'}
+                        {loading 
+                            ? (isChangePassword ? 'Changing...' : 'Resetting...') 
+                            : (isChangePassword ? 'Change Password' : 'Reset Password')
+                        }
                     </button>
                 </form>
 

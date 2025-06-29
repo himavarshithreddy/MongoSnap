@@ -73,15 +73,20 @@ class DatabaseManager {
             const userConnections = this.connections.get(userId);
             if (userConnections && userConnections.has(connectionId)) {
                 const client = userConnections.get(connectionId);
+                console.log(`Found client for user ${userId}, connection ${connectionId}, closing...`);
                 await client.close();
                 userConnections.delete(connectionId);
+                console.log(`Removed client from connections map for user ${userId}, connection ${connectionId}`);
                 
                 const userInfo = this.connectionInfo.get(userId);
                 if (userInfo && userInfo.has(connectionId)) {
                     userInfo.delete(connectionId);
+                    console.log(`Removed connection info for user ${userId}, connection ${connectionId}`);
                 }
                 
                 console.log(`Successfully disconnected from database for user ${userId}, connection ${connectionId}`);
+            } else {
+                console.log(`No active connection found for user ${userId}, connection ${connectionId}`);
             }
         } catch (error) {
             console.error(`Error disconnecting from database for user ${userId}, connection ${connectionId}:`, error.message);

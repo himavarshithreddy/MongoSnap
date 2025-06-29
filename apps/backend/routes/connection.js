@@ -277,6 +277,9 @@ router.post('/:id/test', verifyToken, async (req, res) => {
             
             // Update connection status on successful test
             connection.isActive = true;
+            connection.isConnected = true;
+            connection.isAlive = true;
+            connection.disconnectedAt = null;
             connection.lastUsed = new Date();
             await connection.save();
             
@@ -288,6 +291,9 @@ router.post('/:id/test', verifyToken, async (req, res) => {
         } catch (testError) {
             // Update connection status on failed test
             connection.isActive = false;
+            connection.isConnected = false;
+            connection.isAlive = false;
+            connection.disconnectedAt = new Date();
             connection.lastUsed = new Date();
             await connection.save();
             
@@ -372,6 +378,9 @@ router.post('/connect', verifyToken, async (req, res) => {
         
         // Update connection status in database
         connection.isActive = true;
+        connection.isConnected = true;
+        connection.isAlive = true;
+        connection.disconnectedAt = null;
         connection.lastUsed = new Date();
         await connection.save();
         
@@ -427,6 +436,9 @@ router.post('/:id/disconnect', verifyToken, async (req, res) => {
         
         // Update connection status in database
         connection.isActive = false;
+        connection.isConnected = false;
+        connection.isAlive = false;
+        connection.disconnectedAt = new Date();
         connection.lastUsed = new Date();
         await connection.save();
         
@@ -437,6 +449,9 @@ router.post('/:id/disconnect', verifyToken, async (req, res) => {
                 _id: connection._id,
                 nickname: connection.nickname,
                 isActive: connection.isActive,
+                isConnected: connection.isConnected,
+                isAlive: connection.isAlive,
+                disconnectedAt: connection.disconnectedAt,
                 lastUsed: connection.lastUsed
             }
         });
@@ -531,6 +546,9 @@ router.post('/:id/reconnect', verifyToken, async (req, res) => {
         
         // Update connection status in database
         connection.isActive = true;
+        connection.isConnected = true;
+        connection.isAlive = true;
+        connection.disconnectedAt = null;
         connection.lastUsed = new Date();
         await connection.save();
         
@@ -764,6 +782,20 @@ router.post('/:id/execute-raw', verifyToken, async (req, res) => {
             const executionContext = {
                 db: new Proxy({}, {
                     get: function(target, collectionName) {
+                        // Handle database-level operations
+                        if (collectionName === 'dropDatabase') {
+                            return () => db.dropDatabase();
+                        }
+                        if (collectionName === 'createCollection') {
+                            return (name, options = {}) => db.createCollection(name, options);
+                        }
+                        if (collectionName === 'runCommand') {
+                            return (command) => db.command(command);
+                        }
+                        if (collectionName === 'listCollections') {
+                            return () => db.listCollections().toArray();
+                        }
+                        
                         // Return collection operations for any collection name
                         return {
                             find: (query = {}, options = {}) => db.collection(collectionName).find(query, options).toArray(),
@@ -779,7 +811,13 @@ router.post('/:id/execute-raw', verifyToken, async (req, res) => {
                             aggregate: (pipeline) => db.collection(collectionName).aggregate(pipeline).toArray(),
                             distinct: (field, query = {}) => db.collection(collectionName).distinct(field, query),
                             createIndex: (keys, options = {}) => db.collection(collectionName).createIndex(keys, options),
-                            listIndexes: () => db.collection(collectionName).listIndexes().toArray()
+                            listIndexes: () => db.collection(collectionName).listIndexes().toArray(),
+                            dropIndex: (indexSpec) => db.collection(collectionName).dropIndex(indexSpec),
+                            dropIndexes: () => db.collection(collectionName).dropIndexes(),
+                            drop: () => db.collection(collectionName).drop(),
+                            renameCollection: (newName, options = {}) => db.collection(collectionName).rename(newName, options),
+                            replaceOne: (filter, replacement, options = {}) => db.collection(collectionName).replaceOne(filter, replacement, options),
+                            collMod: (options) => db.command({ collMod: collectionName, ...options })
                         };
                     }
                 }),
@@ -790,38 +828,7 @@ router.post('/:id/execute-raw', verifyToken, async (req, res) => {
             // Prepare the query for execution
             let executableQuery = queryString.trim();
             
-            // Handle complex nested queries by converting them to aggregation pipelines
-            if (executableQuery.includes('db.') && executableQuery.includes('.map(')) {
-                // This is a complex query with nested operations, convert to aggregation
-                console.log('Converting complex nested query to aggregation pipeline');
-                
-                // For the specific case: find savedqueries for users without oauth
-                if (executableQuery.includes('savedqueries') && executableQuery.includes('oauthProvider')) {
-                    executableQuery = `db.savedqueries.aggregate([
-                        {
-                            "$lookup": {
-                                "from": "users",
-                                "localField": "userId",
-                                "foreignField": "_id",
-                                "as": "user"
-                            }
-                        },
-                        {
-                            "$match": {
-                                "user.oauthProvider": null
-                            }
-                        },
-                        {
-                            "$project": {
-                                "name": "$user.name",
-                                "email": "$user.email",
-                                "query": 1,
-                                "description": 1
-                            }
-                        }
-                    ])`;
-                }
-            }
+
             
             // Execute the query in the safe context
             const executeQuery = new Function('db', 'ObjectId', 'Date', `
@@ -1241,38 +1248,119 @@ router.get('/:id/schema/:collection', verifyToken, async (req, res) => {
     }
 });
 
+// Debug endpoint to check connection status
+router.get('/debug/connections', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        
+        // Get all connections for the user
+        const connections = await Connection.find({ userId });
+        
+        // Get active connections from database manager
+        const activeConnections = databaseManager.connections.get(userId) || new Map();
+        const connectionInfo = databaseManager.connectionInfo.get(userId) || new Map();
+        
+        const debugInfo = {
+            userId,
+            totalConnections: connections.length,
+            activeConnectionsInDB: connections.filter(c => c.isActive).length,
+            activeConnectionsInManager: activeConnections.size,
+            connections: connections.map(conn => ({
+                _id: conn._id,
+                nickname: conn.nickname,
+                isActive: conn.isActive,
+                isConnected: conn.isConnected,
+                isAlive: conn.isAlive,
+                lastUsed: conn.lastUsed,
+                disconnectedAt: conn.disconnectedAt,
+                inManager: activeConnections.has(conn._id.toString()),
+                managerInfo: connectionInfo.get(conn._id.toString())
+            }))
+        };
+        
+        console.log('Debug connection info:', debugInfo);
+        res.json(debugInfo);
+        
+    } catch (error) {
+        console.error('Error getting debug connection info:', error);
+        res.status(500).json({ message: 'Failed to get debug info', error: error.message });
+    }
+});
+
 // Disconnect on page close (for sendBeacon)
 router.post('/disconnect-on-close', async (req, res) => {
     try {
+        console.log('Disconnect-on-close request received:', {
+            method: req.method,
+            contentType: req.headers['content-type'],
+            body: req.body,
+            bodyType: typeof req.body
+        });
+
         // Extract connection ID from request body
-        const { connectionId } = req.body;
+        let connectionId;
+        
+        // Handle different content types
+        if (req.headers['content-type']?.includes('application/json')) {
+            // JSON data from sendBeacon with Blob
+            connectionId = req.body.connectionId;
+        } else if (typeof req.body === 'string') {
+            // String data from sendBeacon
+            try {
+                const parsed = JSON.parse(req.body);
+                connectionId = parsed.connectionId;
+            } catch (parseError) {
+                console.error('Failed to parse request body as JSON:', parseError);
+                return res.status(400).json({ message: 'Invalid JSON in request body.' });
+            }
+        } else {
+            // Try to extract from body object
+            connectionId = req.body.connectionId;
+        }
         
         if (!connectionId) {
+            console.error('No connection ID found in request:', req.body);
             return res.status(400).json({ message: 'Connection ID is required.' });
         }
+
+        console.log('Attempting to disconnect connection:', connectionId);
 
         // Get the connection info from DB (no user verification for cleanup)
         const dbConn = await Connection.findOne({ _id: connectionId });
         if (!dbConn) {
+            console.error('Connection not found in database:', connectionId);
             return res.status(404).json({ message: 'Connection not found.' });
         }
+
+        console.log('Found connection in database:', {
+            connectionId: dbConn._id,
+            userId: dbConn.userId,
+            nickname: dbConn.nickname
+        });
 
         // Disconnect from database using the correct method signature
         await databaseManager.disconnect(dbConn.userId, connectionId);
         
         // Update connection status in database
-        await Connection.findByIdAndUpdate(connectionId, {
+        const updatedConnection = await Connection.findByIdAndUpdate(connectionId, {
             isActive: false,
             isConnected: false,
             isAlive: false,
             disconnectedAt: new Date()
+        }, { new: true });
+        
+        console.log(`Connection ${connectionId} successfully disconnected on page close`);
+        console.log('Updated connection status:', {
+            isActive: updatedConnection.isActive,
+            isConnected: updatedConnection.isConnected,
+            isAlive: updatedConnection.isAlive,
+            disconnectedAt: updatedConnection.disconnectedAt
         });
         
-        console.log(`Connection ${connectionId} disconnected on page close`);
         res.status(200).json({ message: 'Disconnected successfully' });
     } catch (error) {
         console.error('Error disconnecting on page close:', error);
-        res.status(500).json({ message: 'Failed to disconnect' });
+        res.status(500).json({ message: 'Failed to disconnect', error: error.message });
     }
 });
 

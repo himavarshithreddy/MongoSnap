@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Clock, Play, Copy, Trash2, CheckCircle, XCircle, BookOpen, Save, Eye, EyeOff, Check } from 'lucide-react';
+import InlineConfirmation from './InlineConfirmation';
+import { analyzeDangerousOperation } from '../utils/dangerousOperations';
 
 function QueryHistory({ 
     queryHistory, 
@@ -15,6 +17,11 @@ function QueryHistory({
     const [activeHistoryTab, setActiveHistoryTab] = useState('history'); // 'history' or 'saved'
     const [expandedResults, setExpandedResults] = useState(new Set()); // Track which results are expanded
     const [copiedQueryId, setCopiedQueryId] = useState(null); // Track which query was just copied
+    const [copiedResultId, setCopiedResultId] = useState(null); // Track which result was just copied
+    // State for inline confirmation - track which item is showing confirmation
+    const [confirmingItemId, setConfirmingItemId] = useState(null);
+    const [pendingQuery, setPendingQuery] = useState(null);
+    const [dangerousOperation, setDangerousOperation] = useState(null);
 
     // Format result for display
     const formatResult = (result, status, documentsAffected, operation) => {
@@ -70,6 +77,20 @@ function QueryHistory({
         });
     };
 
+    // Handle copying result with feedback
+    const handleCopyResult = (result, itemId) => {
+        const resultText = formatDetailedResult(result);
+        navigator.clipboard.writeText(resultText).then(() => {
+            // Show visual feedback
+            setCopiedResultId(itemId);
+            setTimeout(() => {
+                setCopiedResultId(null);
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy result to clipboard:', err);
+        });
+    };
+
     // Format result for detailed view
     const formatDetailedResult = (result) => {
         if (!result) return 'No result data available';
@@ -79,6 +100,37 @@ function QueryHistory({
         } catch (error) {
             return String(result);
         }
+    };
+
+    // Handle executing query with confirmation check
+    const handleExecuteWithConfirmation = (query, itemId) => {
+        const dangerousOp = analyzeDangerousOperation(query);
+        
+        if (dangerousOp) {
+            setDangerousOperation(dangerousOp);
+            setPendingQuery(query);
+            setConfirmingItemId(itemId);
+            return;
+        }
+        
+        // If not dangerous, execute directly
+        executeHistoryQuery && executeHistoryQuery(query);
+    };
+
+    // Handle confirmation dialog
+    const handleConfirmExecution = () => {
+        setConfirmingItemId(null);
+        if (pendingQuery && executeHistoryQuery) {
+            executeHistoryQuery(pendingQuery);
+        }
+        setPendingQuery(null);
+        setDangerousOperation(null);
+    };
+
+    const handleCancelExecution = () => {
+        setConfirmingItemId(null);
+        setPendingQuery(null);
+        setDangerousOperation(null);
     };
 
     return (
@@ -168,7 +220,7 @@ function QueryHistory({
                                                 {copiedQueryId === item._id ? <Check size={16} /> : <Copy size={16} />}
                                             </button>
                                             <button
-                                                onClick={() => executeHistoryQuery && executeHistoryQuery(item.query)}
+                                                onClick={() => handleExecuteWithConfirmation(item.query, item._id)}
                                                 className="p-1 text-gray-400 hover:text-green-400 transition-colors cursor-pointer"
                                                 title="Execute query"
                                             >
@@ -197,6 +249,20 @@ function QueryHistory({
                                             {item.query}
                                         </pre>
                                     </div>
+                                    
+                                    {/* Inline Confirmation for this item */}
+                                    {confirmingItemId === item._id && (
+                                        <InlineConfirmation
+                                            isVisible={true}
+                                            onConfirm={handleConfirmExecution}
+                                            onCancel={handleCancelExecution}
+                                            title={dangerousOperation?.title || 'Dangerous Operation'}
+                                            message={dangerousOperation?.message || 'This operation may be dangerous.'}
+                                            operation={dangerousOperation?.operation}
+                                            query={pendingQuery}
+                                            dangerLevel={dangerousOperation?.level || 'medium'}
+                                        />
+                                    )}
                                     
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -243,19 +309,42 @@ function QueryHistory({
                                         <div className="mt-4 border-t border-gray-600 pt-4">
                                             <div className="flex items-center justify-between mb-3">
                                                 <h4 className="text-md font-semibold text-white">Query Results</h4>
-                                                <span className="text-sm text-gray-400">
-                                                    {item.status === 'success' ? (
-                                                        <span className="text-green-400 flex items-center gap-1">
-                                                            <CheckCircle size={14} />
-                                                            Success
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-red-400 flex items-center gap-1">
-                                                            <XCircle size={14} />
-                                                            Error
-                                                        </span>
-                                                    )}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleCopyResult(item.result, item._id)}
+                                                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200 cursor-pointer ${
+                                                            copiedResultId === item._id 
+                                                                ? 'bg-green-600 text-white' 
+                                                                : 'bg-brand-quaternary text-white hover:bg-opacity-80'
+                                                        }`}
+                                                        title="Copy result to clipboard"
+                                                    >
+                                                        {copiedResultId === item._id ? (
+                                                            <>
+                                                                <Check size={12} />
+                                                                Copied!
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Copy size={12} />
+                                                                Copy Result
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                    <span className="text-sm text-gray-400">
+                                                        {item.status === 'success' ? (
+                                                            <span className="text-green-400 flex items-center gap-1">
+                                                                <CheckCircle size={14} />
+                                                                Success
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-red-400 flex items-center gap-1">
+                                                                <XCircle size={14} />
+                                                                Error
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </div>
                                             </div>
                                             
                                             <div className="bg-[#1a1a1a] border border-gray-700 rounded p-4 max-h-96 overflow-auto">
@@ -326,7 +415,7 @@ function QueryHistory({
                                                 {copiedQueryId === item._id ? <Check size={16} /> : <Copy size={16} />}
                                             </button>
                                             <button
-                                                onClick={() => executeHistoryQuery && executeHistoryQuery(item.query)}
+                                                onClick={() => handleExecuteWithConfirmation(item.query, item._id)}
                                                 className="p-1 text-gray-400 hover:text-green-400 transition-colors cursor-pointer"
                                                 title="Execute query"
                                             >
@@ -365,6 +454,20 @@ function QueryHistory({
                                             {item.query}
                                         </pre>
                                     </div>
+
+                                    {/* Inline Confirmation for this item */}
+                                    {confirmingItemId === item._id && (
+                                        <InlineConfirmation
+                                            isVisible={true}
+                                            onConfirm={handleConfirmExecution}
+                                            onCancel={handleCancelExecution}
+                                            title={dangerousOperation?.title || 'Dangerous Operation'}
+                                            message={dangerousOperation?.message || 'This operation may be dangerous.'}
+                                            operation={dangerousOperation?.operation}
+                                            query={pendingQuery}
+                                            dangerLevel={dangerousOperation?.level || 'medium'}
+                                        />
+                                    )}
 
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -406,12 +509,35 @@ function QueryHistory({
                                         <div className="mt-4 border-t border-gray-600 pt-4">
                                             <div className="flex items-center justify-between mb-3">
                                                 <h4 className="text-md font-semibold text-white">Saved Results</h4>
-                                                <span className="text-sm text-gray-400">
-                                                    <span className="text-green-400 flex items-center gap-1">
-                                                        <CheckCircle size={14} />
-                                                        Success
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleCopyResult(item.result, item._id)}
+                                                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200 cursor-pointer ${
+                                                            copiedResultId === item._id 
+                                                                ? 'bg-green-600 text-white' 
+                                                                : 'bg-brand-quaternary text-white hover:bg-opacity-80'
+                                                        }`}
+                                                        title="Copy result to clipboard"
+                                                    >
+                                                        {copiedResultId === item._id ? (
+                                                            <>
+                                                                <Check size={12} />
+                                                                Copied!
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Copy size={12} />
+                                                                Copy Result
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                    <span className="text-sm text-gray-400">
+                                                        <span className="text-green-400 flex items-center gap-1">
+                                                            <CheckCircle size={14} />
+                                                            Success
+                                                        </span>
                                                     </span>
-                                                </span>
+                                                </div>
                                             </div>
                                             
                                             <div className="bg-[#1a1a1a] border border-gray-700 rounded p-4 max-h-96 overflow-auto">

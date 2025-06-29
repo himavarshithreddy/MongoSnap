@@ -23,6 +23,18 @@ const connectionSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    isConnected: {
+        type: Boolean,
+        default: false,
+    },
+    isAlive: {
+        type: Boolean,
+        default: false,
+    },
+    disconnectedAt: {
+        type: Date,
+        default: null,
+    },
     createdAt: {
         type: Date,
         default: Date.now,

@@ -82,3 +82,33 @@ body {
     background: linear-gradient(135deg, #1a2f24 0%, #243c2d 100%);
     border: 1px solid #2d4c38;
 }
+
+/* Add styles for copy buttons */
+.copy-button {
+  transition: all 0.2s ease-in-out;
+}
+
+.copy-button:hover {
+  transform: scale(1.05);
+}
+
+.copy-button:active {
+  transform: scale(0.95);
+}
+
+/* Ensure copy buttons are accessible */
+.copy-button:focus {
+  outline: 2px solid #35c56a;
+  outline-offset: 2px;
+}
+
+/* Animation for copy feedback */
+@keyframes copySuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.copy-success {
+  animation: copySuccess 0.3s ease-in-out;
+}

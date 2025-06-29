@@ -92,7 +92,8 @@ Requirements:
 7. Use proper data types (strings, numbers, dates, ObjectIds)
 8. Format the output exactly as shown in examples below
 9. NEVER use MongoDB shell-specific functions like getCollectionNames(), listCollections(), or similar
-10. For multi-collection operations, use aggregation pipelines with $lookup or separate queries
+10. For multi-collection operations, ALWAYS use aggregation pipelines with $lookup - NEVER use nested find().map()
+11. CRITICAL: db.collection.find().map() does NOT work in Node.js MongoDB driver - use aggregation instead
 
 OUTPUT FORMAT:
 Return ONLY the MongoDB query, no explanations, no markdown, no code blocks.
@@ -121,11 +122,19 @@ AGGREGATION PIPELINES:
 - "Find products by price range" → db.products.aggregate([{"$bucket": {"groupBy": "$price", "boundaries": [0, 50, 100, 200, 500], "default": "500+", "output": {"count": {"$sum": 1}, "products": {"$push": "$name"}}}}])
 - "Get customer purchase history" → db.orders.aggregate([{"$match": {"customerId": ObjectId("...")}}, {"$lookup": {"from": "products", "localField": "productId", "foreignField": "_id", "as": "product"}}, {"$unwind": "$product"}, {"$project": {"date": 1, "productName": "$product.name", "amount": 1}}])
 
-MULTI-COLLECTION OPERATIONS:
-- "Count documents in all collections" → db.users.countDocuments({})
-- "Total documents across collections" → db.users.countDocuments({})
-- "Get collection statistics" → db.users.aggregate([{"$group": {"_id": null, "totalDocuments": {"$sum": 1}}}])
-- "Compare data between collections" → db.users.aggregate([{"$lookup": {"from": "orders", "localField": "_id", "foreignField": "userId", "as": "userOrders"}}, {"$project": {"name": 1, "orderCount": {"$size": "$userOrders"}}}])
+MULTI-COLLECTION OPERATIONS (USE AGGREGATION WITH $LOOKUP):
+- "Find orders with customer names" → db.orders.aggregate([{"$lookup": {"from": "users", "localField": "userId", "foreignField": "_id", "as": "user"}}, {"$unwind": "$user"}, {"$project": {"orderDate": 1, "amount": 1, "customerName": "$user.name"}}])
+- "Find saved queries of users without oauth" → db.savedqueries.aggregate([{"$lookup": {"from": "users", "localField": "userId", "foreignField": "_id", "as": "user"}}, {"$match": {"user.oauthProvider": null}}, {"$project": {"query": 1, "description": 1, "userName": "$user.name", "userEmail": "$user.email"}}])
+- "Find products with their category details" → db.products.aggregate([{"$lookup": {"from": "categories", "localField": "categoryId", "foreignField": "_id", "as": "category"}}, {"$unwind": "$category"}, {"$project": {"name": 1, "price": 1, "categoryName": "$category.name"}}])
+- "Find users with their order count" → db.users.aggregate([{"$lookup": {"from": "orders", "localField": "_id", "foreignField": "userId", "as": "userOrders"}}, {"$project": {"name": 1, "email": 1, "orderCount": {"$size": "$userOrders"}}}])
+- "Find posts with author information" → db.posts.aggregate([{"$lookup": {"from": "users", "localField": "authorId", "foreignField": "_id", "as": "author"}}, {"$unwind": "$author"}, {"$project": {"title": 1, "content": 1, "authorName": "$author.name", "publishDate": 1}}])
+
+IMPORTANT FOR MULTI-COLLECTION QUERIES:
+- NEVER use nested db.collection.find().map() syntax - this will NOT work
+- ALWAYS use aggregation pipelines with $lookup for cross-collection queries
+- Use $unwind after $lookup if you expect single matching documents
+- Use $match after $lookup to filter based on joined collection fields
+- Use $project to shape the final output and include fields from both collections
 
 INDEX OPERATIONS:
 - "Create index on email field" → db.users.createIndex({"email": 1})

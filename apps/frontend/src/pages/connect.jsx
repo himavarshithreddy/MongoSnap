@@ -1,8 +1,9 @@
 import {React, useEffect, useState} from 'react'
-import { Eye, EyeOff, Plus, Trash2, Database, Clock, Info, LogOut } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2, Database, Clock, Info, LogOut, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
+import SettingsModal from '../components/Settings';
 
 function Connect() {
     useEffect(() => {
@@ -23,6 +24,7 @@ function Connect() {
     const [success, setSuccess] = useState('');
     const [loadedConnection, setLoadedConnection] = useState(null);
     const [testingConnection, setTestingConnection] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
     
     // Auto-dismiss instructions timer
     const [instructionsTimer, setInstructionsTimer] = useState(null);
@@ -571,7 +573,16 @@ function Connect() {
                                             <p className="text-gray-400 text-xs">{user.email}</p>
                                         </div>
                                     </div>
-                                    
+                                    <button
+                                        onClick={() => {
+                                            setShowSettingsModal(true);
+                                            setShowProfileModal(false);
+                                        }}
+                                        className="w-full flex items-center gap-2 text-gray-300 cursor-pointer transition-colors p-2 rounded-md hover:bg-brand-tertiary"
+                                    >
+                                        <Settings size={16} />
+                                        <span className="text-sm">Settings</span>
+                                    </button>
                                     <button
                                         onClick={handleLogout}
                                         className="w-full flex items-center gap-2 text-gray-300 hover:text-red-400 cursor-pointer transition-colors p-2 rounded-md hover:bg-brand-tertiary"
@@ -738,6 +749,12 @@ function Connect() {
             </form>
         </div>
         </div>
+        
+        {/* Settings Modal */}
+        <SettingsModal 
+            isOpen={showSettingsModal} 
+            onClose={() => setShowSettingsModal(false)} 
+        />
         </div>
     )
 }

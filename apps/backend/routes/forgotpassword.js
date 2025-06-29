@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { sendResetPasswordEmail } = require('../utils/mailer');
 
+
 router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
 
@@ -32,6 +33,7 @@ router.post('/forgot-password', async (req, res) => {
         res.status(500).json({ message: 'Something went wrong. Please try again.' });
     }
 });
+
 router.post('/reset-password', async (req, res) => {
     const { token, password } = req.body;
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -46,4 +48,5 @@ router.post('/reset-password', async (req, res) => {
     await user.save();
     res.status(200).json({ message: 'Password reset successfully' });
 });
+
 module.exports = router;

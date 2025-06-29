@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Database, CheckCircle, Clock, Calendar, Server, Home, ArrowLeft, Wifi, WifiOff, Power, RefreshCw, WifiIcon, ChevronDown, ChevronRight, FileText, Hash, LogOut } from 'lucide-react';
+import { Database, CheckCircle, Clock, Calendar, Server, Home, ArrowLeft, Wifi, WifiOff, Power, RefreshCw, WifiIcon, ChevronDown, ChevronRight, FileText, Hash, LogOut, Settings } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 import QueryInterface from '../components/QueryInterface';
 import SchemaExplorer from '../components/SchemaExplorer';
 import QueryHistory from '../components/QueryHistory';
+import SettingsModal from '../components/Settings';
 
 function Playground() {
     useEffect(() => {
@@ -38,6 +39,7 @@ function Playground() {
     const [queryMode, setQueryMode] = useState('natural'); // 'natural' or 'query'
     const [historyLoading, setHistoryLoading] = useState(false);
     const [savedQueriesLoading, setSavedQueriesLoading] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
 
     // Fetch query history from backend
     const fetchQueryHistory = async () => {
@@ -108,10 +110,49 @@ function Playground() {
         };
     }, [location.search]);
 
+    // Add periodic connection health check
+    useEffect(() => {
+        if (!connectionIdRef.current) return;
+
+        const healthCheckInterval = setInterval(async () => {
+            try {
+                const response = await fetchWithAuth(`/api/connection/${connectionIdRef.current}/status`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const connection = data.connection;
+                    
+                    // Update connection status based on health check
+                    setConnectionStatus(prev => ({
+                        ...prev,
+                        isConnected: connection.isConnected,
+                        isAlive: connection.isAlive
+                    }));
+                    
+                    // If connection is not alive, try to reconnect
+                    if (!connection.isAlive && connection.isConnected) {
+                        console.log('Connection health check failed, attempting reconnect...');
+                        await handleReconnect();
+                    }
+                }
+            } catch (error) {
+                console.error('Connection health check failed:', error);
+            }
+        }, 30000); // Check every 30 seconds
+
+        return () => {
+            clearInterval(healthCheckInterval);
+        };
+    }, [connectionIdRef.current, fetchWithAuth]);
+
     // Add beforeunload event listener for page close only
     useEffect(() => {
+        let isPageClosing = false;
+        
         const handleBeforeUnload = () => {
-            if (connectionIdRef.current) {
+            if (connectionIdRef.current && !isPageClosing) {
+                isPageClosing = true;
+                console.log('Page closing, attempting to disconnect connection:', connectionIdRef.current);
+                
                 // Use sendBeacon for more reliable cleanup on page close
                 const disconnectData = JSON.stringify({
                     connectionId: connectionIdRef.current,
@@ -120,7 +161,10 @@ function Playground() {
                 
                 // Try to send disconnect request using sendBeacon (more reliable than fetch)
                 if (navigator.sendBeacon) {
-                    navigator.sendBeacon('/api/connection/disconnect-on-close', disconnectData);
+                    // Create a Blob with proper Content-Type for JSON
+                    const blob = new Blob([disconnectData], { type: 'application/json' });
+                    const success = navigator.sendBeacon('/api/connection/disconnect-on-close', blob);
+                    console.log('sendBeacon result:', success);
                 }
                 
                 // Also try the regular disconnect as fallback
@@ -131,17 +175,32 @@ function Playground() {
                     xhr.setRequestHeader('Content-Type', 'application/json');
                     xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token')}`);
                     xhr.send();
+                    console.log('XMLHttpRequest disconnect sent');
                 } catch (error) {
                     console.error('Error during page unload disconnect:', error);
                 }
             }
         };
 
+        const handleVisibilityChange = () => {
+            // Only disconnect when the page becomes hidden AND the user is actually leaving
+            // This helps distinguish between tab switching and actual page close
+            if (document.visibilityState === 'hidden') {
+                // Set a flag to indicate the page might be closing
+                isPageClosing = true;
+            } else {
+                // Page became visible again, reset the flag
+                isPageClosing = false;
+            }
+        };
+
         // Only disconnect on actual page close, not tab switches
         window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
         
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
 
@@ -603,6 +662,18 @@ function Playground() {
         }
     };
 
+    // Cleanup on component unmount
+    useEffect(() => {
+        return () => {
+            // Cleanup function - disconnect when component unmounts
+            if (connectionIdRef.current) {
+                console.log('Component unmounting, cleaning up connection:', connectionIdRef.current);
+                // Use the auto-disconnect function
+                handleAutoDisconnect(connectionIdRef.current);
+            }
+        };
+    }, []);
+
     if (userLoading) {
         return (
             <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -887,7 +958,16 @@ function Playground() {
                                             <p className="text-gray-400 text-xs">{user.email}</p>
                                         </div>
                                     </div>
-                                    
+                                    <button
+                                        onClick={() => {
+                                            setShowSettingsModal(true);
+                                            setShowProfileModal(false);
+                                        }}
+                                        className="w-full flex items-center gap-2 text-gray-300 cursor-pointer transition-colors p-2 rounded-md hover:bg-brand-tertiary"
+                                    >
+                                        <Settings size={16} />
+                                        <span className="text-sm">Settings</span>
+                                    </button>
                                     <button
                                         onClick={handleLogout}
                                         className="w-full flex items-center gap-2 text-gray-300 hover:text-red-400 cursor-pointer transition-colors p-2 rounded-md hover:bg-brand-tertiary"
@@ -1004,6 +1084,12 @@ function Playground() {
             </div>
         </div>
             </div>
+        
+        {/* Settings Modal */}
+        <SettingsModal 
+            isOpen={showSettingsModal} 
+            onClose={() => setShowSettingsModal(false)} 
+        />
         </div>
     );
 }

@@ -20,6 +20,7 @@ function App() {
         <Route path="/playground" element={<ProtectedRoute><Playground /></ProtectedRoute>} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/change-password/:token" element={<ResetPassword />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />
         <Route path="/oauth-popup" element={<OAuthPopup />} />
       </Routes>
