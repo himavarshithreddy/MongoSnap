@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Base email template with consistent styling
+// Simple base template
 const createBaseTemplate = (content, title) => {
   return `
     <!DOCTYPE html>
@@ -23,54 +23,33 @@ const createBaseTemplate = (content, title) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${title}</title>
         <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            
             body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                background: linear-gradient(135deg, #101813 0%, #1a2f24 100%);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background-color: #101813;
                 color: #ffffff;
                 line-height: 1.6;
+                margin: 0;
                 padding: 20px;
             }
             
-            .email-container {
-                max-width: 600px;
+            .container {
+                max-width: 500px;
                 margin: 0 auto;
-                background: linear-gradient(135deg, #17211b 0%, #203127 100%);
-                border-radius: 16px;
-                overflow: hidden;
-                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+                background-color: #17211b;
+                border-radius: 12px;
+                padding: 30px;
                 border: 1px solid #2d4c38;
             }
             
             .header {
-                background: linear-gradient(135deg, #235337 0%, #3CBC6B 100%);
-                padding: 30px;
                 text-align: center;
-                position: relative;
-            }
-            
-            .header::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.05)"/><circle cx="10" cy="60" r="0.5" fill="rgba(255,255,255,0.05)"/><circle cx="90" cy="40" r="0.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-                opacity: 0.3;
+                margin-bottom: 30px;
             }
             
             .logo {
-                width: 60px;
-                height: 60px;
-                margin: 0 auto 20px;
-                position: relative;
-                z-index: 1;
+                width: 48px;
+                height: 48px;
+                margin: 0 auto 16px;
             }
             
             .logo svg {
@@ -78,148 +57,75 @@ const createBaseTemplate = (content, title) => {
                 height: 100%;
             }
             
-            .header h1 {
-                font-size: 28px;
-                font-weight: 700;
-                color: #ffffff;
+            .title {
+                font-size: 24px;
+                font-weight: 600;
+                color: #3CBC6B;
                 margin-bottom: 8px;
-                position: relative;
-                z-index: 1;
             }
             
-            .header p {
-                font-size: 16px;
-                color: rgba(255, 255, 255, 0.9);
-                position: relative;
-                z-index: 1;
+            .subtitle {
+                color: #a0a0a0;
+                font-size: 14px;
             }
             
             .content {
-                padding: 40px 30px;
-                background: linear-gradient(135deg, #17211b 0%, #203127 100%);
+                margin-bottom: 30px;
             }
             
             .message {
-                font-size: 16px;
                 color: #e0e0e0;
-                margin-bottom: 30px;
-                line-height: 1.7;
+                font-size: 16px;
+                margin-bottom: 20px;
             }
             
             .button {
                 display: inline-block;
-                background: linear-gradient(135deg, #3CBC6B 0%, #35c56a 100%);
+                background-color: #3CBC6B;
                 color: #ffffff;
                 text-decoration: none;
-                padding: 16px 32px;
-                border-radius: 12px;
-                font-weight: 600;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: 500;
                 font-size: 16px;
                 text-align: center;
-                transition: all 0.3s ease;
-                box-shadow: 0 8px 20px rgba(60, 188, 107, 0.3);
-                border: none;
-                cursor: pointer;
-                margin: 20px 0;
-            }
-            
-            .button:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 12px 25px rgba(60, 188, 107, 0.4);
-                background: linear-gradient(135deg, #35c56a 0%, #2fb55a 100%);
-            }
-            
-            .otp-container {
-                background: linear-gradient(135deg, #1a2f24 0%, #243c2d 100%);
-                border: 2px solid #3CBC6B;
-                border-radius: 12px;
-                padding: 24px;
-                text-align: center;
-                margin: 30px 0;
-                box-shadow: 0 8px 20px rgba(60, 188, 107, 0.2);
             }
             
             .otp-code {
-                font-size: 32px;
+                background-color: #1a2f24;
+                border: 2px solid #3CBC6B;
+                border-radius: 8px;
+                padding: 20px;
+                text-align: center;
+                margin: 20px 0;
+                font-size: 28px;
                 font-weight: 700;
                 color: #3CBC6B;
-                letter-spacing: 8px;
-                font-family: 'Courier New', monospace;
-                text-shadow: 0 0 10px rgba(60, 188, 107, 0.3);
+                font-family: monospace;
+                letter-spacing: 4px;
             }
             
             .footer {
-                background: linear-gradient(135deg, #1a2f24 0%, #243c2d 100%);
-                padding: 30px;
                 text-align: center;
+                color: #808080;
+                font-size: 12px;
                 border-top: 1px solid #2d4c38;
-            }
-            
-            .footer p {
-                color: #a0a0a0;
-                font-size: 14px;
-                margin-bottom: 10px;
-            }
-            
-            .footer a {
-                color: #3CBC6B;
-                text-decoration: none;
-            }
-            
-            .footer a:hover {
-                text-decoration: underline;
+                padding-top: 20px;
             }
             
             .warning {
-                background: linear-gradient(135deg, #2d1a1a 0%, #3d2a2a 100%);
+                background-color: #2d1a1a;
                 border: 1px solid #4a2a2a;
-                border-radius: 8px;
-                padding: 16px;
+                border-radius: 6px;
+                padding: 12px;
                 margin: 20px 0;
                 color: #ffb3b3;
                 font-size: 14px;
             }
-            
-            .info {
-                background: linear-gradient(135deg, #1a2a2d 0%, #243a3d 100%);
-                border: 1px solid #2d4c4f;
-                border-radius: 8px;
-                padding: 16px;
-                margin: 20px 0;
-                color: #b3d9ff;
-                font-size: 14px;
-            }
-            
-            @media (max-width: 600px) {
-                body {
-                    padding: 10px;
-                }
-                
-                .email-container {
-                    border-radius: 12px;
-                }
-                
-                .header {
-                    padding: 20px;
-                }
-                
-                .content {
-                    padding: 30px 20px;
-                }
-                
-                .footer {
-                    padding: 20px;
-                }
-                
-                .otp-code {
-                    font-size: 24px;
-                    letter-spacing: 4px;
-                }
-            }
         </style>
     </head>
     <body>
-        <div class="email-container">
+        <div class="container">
             <div class="header">
                 <div class="logo">
                     <svg viewBox="280 100 450 800" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -228,8 +134,8 @@ const createBaseTemplate = (content, title) => {
                         <path d="M508.421 285.007H512.05V463.854H606.426L608.241 470.733L586.462 517.164L548.349 601.429L508.421 689.133L504.791 696.012H499.346L497.531 611.747V525.763H399.525L401.34 517.164L428.564 456.975L493.901 315.961L506.606 286.726L508.421 285.007Z" fill="#161A1C"/>
                     </svg>
                 </div>
-                <h1>MongoSnap</h1>
-                <p>Your MongoDB Query Generator</p>
+                <div class="title">MongoSnap</div>
+                <div class="subtitle">MongoDB Query Generator</div>
             </div>
             
             <div class="content">
@@ -238,8 +144,7 @@ const createBaseTemplate = (content, title) => {
             
             <div class="footer">
                 <p>© 2024 MongoSnap. All rights reserved.</p>
-                <p>If you didn't request this email, please ignore it.</p>
-                <p>Need help? Contact us at <a href="mailto:support@mongosnap.live">support@mongosnap.live</a></p>
+                <p>Need help? Contact support@mongosnap.live</p>
             </div>
         </div>
     </body>
@@ -252,134 +157,90 @@ const createVerificationTemplate = (token) => {
   const verificationLink = `https://mongosnap.mp:5173/api/verify-email/${token}`;
   const content = `
     <div class="message">
-      <h2 style="color: #3CBC6B; margin-bottom: 20px; font-size: 24px;">Welcome to MongoSnap! 🎉</h2>
-      <p>Thank you for signing up! To complete your registration and start using MongoSnap, please verify your email address by clicking the button below.</p>
+      <h2 style="color: #3CBC6B; margin-bottom: 16px;">Welcome to MongoSnap!</h2>
+      <p>Please verify your email address to complete your registration.</p>
     </div>
     
     <div style="text-align: center;">
-      <a href="${verificationLink}" class="button">Verify Email Address</a>
-    </div>
-    
-    <div class="info">
-      <strong>What happens next?</strong><br>
-      After verifying your email, you'll be able to connect to your MongoDB databases and start generating queries with AI assistance.
+      <a href="${verificationLink}" class="button">Verify Email</a>
     </div>
     
     <div class="warning">
-      <strong>Security Notice:</strong><br>
-      This verification link will expire in 24 hours. If you don't verify your email within this time, you'll need to request a new verification link.
+      This link expires in 24 hours.
     </div>
   `;
   
-  return createBaseTemplate(content, 'Verify Your MongoSnap Account');
+  return createBaseTemplate(content, 'Verify Your Account');
 };
 
 // Password reset template
 const createPasswordResetTemplate = (link) => {
   const content = `
     <div class="message">
-      <h2 style="color: #3CBC6B; margin-bottom: 20px; font-size: 24px;">Reset Your Password 🔐</h2>
-      <p>We received a request to reset your MongoSnap password. Click the button below to create a new password.</p>
+      <h2 style="color: #3CBC6B; margin-bottom: 16px;">Reset Your Password</h2>
+      <p>Click the button below to create a new password.</p>
     </div>
     
     <div style="text-align: center;">
       <a href="${link}" class="button">Reset Password</a>
     </div>
     
-    <div class="info">
-      <strong>Need help?</strong><br>
-      If you didn't request this password reset, you can safely ignore this email. Your password will remain unchanged.
-    </div>
-    
     <div class="warning">
-      <strong>Security Notice:</strong><br>
-      This password reset link will expire in 1 hour for your security. If you don't reset your password within this time, you'll need to request a new link.
+      This link expires in 1 hour. If you didn't request this, please ignore this email.
     </div>
   `;
   
-  return createBaseTemplate(content, 'Reset Your MongoSnap Password');
+  return createBaseTemplate(content, 'Reset Password');
 };
 
 // 2FA OTP template
 const createTwoFactorOTPTemplate = (token) => {
   const content = `
     <div class="message">
-      <h2 style="color: #3CBC6B; margin-bottom: 20px; font-size: 24px;">Two-Factor Authentication 🔒</h2>
-      <p>You've requested to log in to your MongoSnap account. Please enter the verification code below to complete your login.</p>
+      <h2 style="color: #3CBC6B; margin-bottom: 16px;">Two-Factor Authentication</h2>
+      <p>Enter this code to complete your login:</p>
     </div>
     
-    <div class="otp-container">
-      <div style="margin-bottom: 16px; color: #e0e0e0; font-size: 16px;">Your verification code:</div>
-      <div class="otp-code">${token.toUpperCase()}</div>
-      <div style="margin-top: 16px; color: #a0a0a0; font-size: 14px;">This code expires in 10 minutes</div>
-    </div>
-    
-    <div class="info">
-      <strong>Security Tip:</strong><br>
-      Never share this code with anyone. MongoSnap will never ask for this code via email, phone, or text message.
-    </div>
+    <div class="otp-code">${token.toUpperCase()}</div>
     
     <div class="warning">
-      <strong>Didn't request this?</strong><br>
-      If you didn't try to log in to your account, please change your password immediately and contact our support team.
+      This code expires in 10 minutes. Never share this code with anyone.
     </div>
   `;
   
-  return createBaseTemplate(content, 'MongoSnap - Two-Factor Authentication');
+  return createBaseTemplate(content, '2FA Code');
 };
 
-// 2FA enabled confirmation template
+// 2FA enabled template
 const createTwoFactorEnabledTemplate = () => {
   const content = `
     <div class="message">
-      <h2 style="color: #3CBC6B; margin-bottom: 20px; font-size: 24px;">Two-Factor Authentication Enabled ✅</h2>
-      <p>Great news! Your two-factor authentication has been successfully enabled for your MongoSnap account.</p>
+      <h2 style="color: #3CBC6B; margin-bottom: 16px;">Two-Factor Authentication Enabled</h2>
+      <p>Your account is now protected with an additional layer of security.</p>
     </div>
     
-    <div class="info">
-      <strong>What this means:</strong><br>
-      • Your account is now protected with an additional layer of security<br>
-      • You'll receive a verification code via email each time you log in<br>
-      • This helps prevent unauthorized access to your account
-    </div>
-    
-    <div style="text-align: center; margin: 30px 0;">
+    <div style="text-align: center;">
       <a href="https://mongosnap.mp:5173" class="button">Go to MongoSnap</a>
-    </div>
-    
-    <div class="warning">
-      <strong>Keep your email secure:</strong><br>
-      Since your 2FA codes are sent to your email, make sure your email account is also protected with a strong password and 2FA if possible.
     </div>
   `;
   
-  return createBaseTemplate(content, 'Two-Factor Authentication Enabled');
+  return createBaseTemplate(content, '2FA Enabled');
 };
 
-// 2FA disabled confirmation template
+// 2FA disabled template
 const createTwoFactorDisabledTemplate = () => {
   const content = `
     <div class="message">
-      <h2 style="color: #ff6b6b; margin-bottom: 20px; font-size: 24px;">Two-Factor Authentication Disabled ⚠️</h2>
-      <p>Your two-factor authentication has been disabled for your MongoSnap account.</p>
+      <h2 style="color: #ff6b6b; margin-bottom: 16px;">Two-Factor Authentication Disabled</h2>
+      <p>Your account security has been reduced. We recommend re-enabling 2FA.</p>
     </div>
     
-    <div class="warning">
-      <strong>Security Notice:</strong><br>
-      Your account is now less secure. We recommend re-enabling two-factor authentication as soon as possible to protect your account.
-    </div>
-    
-    <div style="text-align: center; margin: 30px 0;">
+    <div style="text-align: center;">
       <a href="https://mongosnap.mp:5173/settings" class="button">Re-enable 2FA</a>
-    </div>
-    
-    <div class="info">
-      <strong>Need help?</strong><br>
-      If you didn't disable 2FA yourself, please contact our support team immediately and change your password.
     </div>
   `;
   
-  return createBaseTemplate(content, 'Two-Factor Authentication Disabled');
+  return createBaseTemplate(content, '2FA Disabled');
 };
 
 // Email sending functions
@@ -408,7 +269,7 @@ const sendTwoFactorEmailOTP = async (email, token) => {
   await transporter.sendMail({
     from: `"MongoSnap" <noreply@mongosnap.live>`,
     to: email,
-    subject: "MongoSnap - Two-Factor Authentication Code",
+    subject: "MongoSnap - 2FA Code",
     html: html
   });
 };
@@ -418,7 +279,7 @@ const sendTwoFactorConfirmationEmail = async (email) => {
   await transporter.sendMail({
     from: `"MongoSnap" <noreply@mongosnap.live>`,
     to: email,
-    subject: "Two-Factor Authentication Enabled - MongoSnap",
+    subject: "2FA Enabled - MongoSnap",
     html: html
   });
 };
@@ -428,7 +289,7 @@ const sendTwoFactorDisableConfirmationEmail = async (email) => {
   await transporter.sendMail({
     from: `"MongoSnap" <noreply@mongosnap.live>`,
     to: email,
-    subject: "Two-Factor Authentication Disabled - MongoSnap",
+    subject: "2FA Disabled - MongoSnap",
     html: html
   });
 };
