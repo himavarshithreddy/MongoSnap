@@ -55,26 +55,39 @@ router.post('/login', async (req, res) => {
     }
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid email or password' });
-    if(user.twoFactorEnabled && user.twoFactormethod==='email'){
     
-      const token=crypto.randomBytes(2).toString('hex');
-      const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
-      user.twoFactorToken=tokenHash;
-      user.twoFactorExpiresAt=Date.now()+10*60*1000;
-      await user.save();
-      await sendTwoFactorEmailOTP(user.email,token);
-      
-       return res.status(200).json({ 
-        message: '2FA required', 
-        requires2FA: true,
-        user: {id: user._id, name: user.name, email: user.email }
+    // Handle 2FA if enabled
+    if (user.twoFactorEnabled) {
+      if (user.twoFactormethod === 'email') {
+        // Generate and send email OTP
+        const token = crypto.randomBytes(2).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        user.twoFactorToken = tokenHash;
+        user.twoFactorExpiresAt = Date.now() + 10 * 60 * 1000;
+        await user.save();
+        await sendTwoFactorEmailOTP(user.email, token);
+        
+        return res.status(200).json({ 
+          message: '2FA required', 
+          requires2FA: true,
+          twoFactorMethod: 'email',
+          user: {id: user._id, name: user.name, email: user.email }
+        });
+      } else if (user.twoFactormethod === 'totp') {
+        // Return TOTP verification required
+        return res.status(200).json({ 
+          message: '2FA required', 
+          requires2FA: true,
+          twoFactorMethod: 'totp',
+          user: {id: user._id, name: user.name, email: user.email }
+        });
+      }
+    }
 
-    });
-
-  }
+    // No 2FA or 2FA not enabled - proceed with normal login
     const accessToken = generateAccessToken(user);
-const refreshToken = generateRefreshToken(user);
-sendRefreshToken(res, refreshToken);
+    const refreshToken = generateRefreshToken(user);
+    sendRefreshToken(res, refreshToken);
 
     res.status(200).json({ message: 'Login successful', token: accessToken, user: {id: user._id, name: user.name, email: user.email } });
   } catch (err) {

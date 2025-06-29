@@ -26,7 +26,9 @@
     "mongodb": "^6.17.0",
     "mongoose": "^8.16.0",
     "nodemailer": "^7.0.3",
-    "qs": "^6.14.0"
+    "qrcode": "^1.5.4",
+    "qs": "^6.14.0",
+    "speakeasy": "^2.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

@@ -6,6 +6,8 @@ const crypto=require('crypto');
 const {verifyToken} = require('./middleware');
 const {generateAccessToken,generateRefreshToken,sendRefreshToken} = require('../utils/tokengeneration');
 const rateLimit = require('express-rate-limit');
+const {generateTOTPSecret, verifyTOTPToken} = require('../utils/totpgenerator');
+const speakeasy = require('speakeasy');
 
 const twoFactorLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -166,6 +168,161 @@ router.post('/resend-two-factor', twoFactorLimiter, async(req,res)=>{
     } catch (error) {
         console.error('Resend two-factor error:', error);
         res.status(500).json({message:'Something went wrong. Please try again.'});
+    }
+});
+
+router.post('/enable-totp-verification',verifyToken,async(req,res)=>{
+    const userId=req.userId;
+    try {
+        const user=await User.findById(userId);
+        if(!user){
+            return res.status(400).json({message:'User not found'});
+        }
+        if(user.twoFactorEnabled){
+            return res.status(400).json({message:'Two-factor authentication already enabled'});
+        }
+        
+        // Generate TOTP secret and QR code
+        const { ascii, base32, qrCodeDataURL } = await generateTOTPSecret(user.email);
+        
+        // Store secret temporarily for verification (don't enable 2FA yet)
+        user.twoFactorSecret = ascii;
+        user.twoFactorSetupPending = true; // Add this flag to track setup state
+        await user.save();
+        
+        res.status(200).json({message:'TOTP setup initiated', qrCodeDataURL, secretKey: base32});
+    } catch (error) {
+        console.error('Enable TOTP two-factor error:',error);
+        res.status(500).json({message:'Something went wrong. Please try again.'});
+    }
+});
+
+router.post('/verify-totp-verification',verifyToken,async(req,res)=>{
+    const userId=req.userId;
+    const {token}=req.body;
+    
+    // Validate token input
+    if (!token || token.length !== 6 || !/^\d{6}$/.test(token)) {
+        return res.status(400).json({message:'Invalid TOTP token format. Please enter a 6-digit code.'});
+    }
+    
+    try {
+        const user=await User.findById(userId);
+        if(!user){
+            return res.status(400).json({message:'User not found'});
+        }
+        if(!user.twoFactorSecret){
+            return res.status(400).json({message:'TOTP setup not initiated. Please start TOTP setup first.'});
+        }
+        if(!user.twoFactorSetupPending){
+            return res.status(400).json({message:'TOTP setup not in progress. Please start TOTP setup first.'});
+        }
+        
+        const verified = verifyTOTPToken(user.twoFactorSecret, token);
+        
+        if(!verified){
+            return res.status(400).json({message:'Invalid TOTP token. Please check your authenticator app and try again.'});
+        }
+        
+        // Only now enable 2FA after successful verification
+        user.twoFactorEnabled = true;
+        user.twoFactormethod = 'totp';
+        user.twoFactorSetupPending = false; // Clear setup flag
+        await user.save();
+        
+        res.status(200).json({message:'TOTP two-factor authentication verified and enabled'});
+    } catch (error) {
+        console.error('Verify TOTP two-factor error:',error);
+        res.status(500).json({message:'Something went wrong. Please try again.'});
+    }
+});
+
+router.post('/cancel-totp-setup',verifyToken,async(req,res)=>{
+    const userId=req.userId;
+    try {
+        const user=await User.findById(userId);
+        if(!user){
+            return res.status(400).json({message:'User not found'});
+        }
+        
+        // Clear setup state and secret
+        user.twoFactorSecret = null;
+        user.twoFactorSetupPending = false;
+        await user.save();
+        
+        res.status(200).json({message:'TOTP setup cancelled'});
+    } catch (error) {
+        console.error('Cancel TOTP setup error:',error);
+        res.status(500).json({message:'Something went wrong. Please try again.'});
+    }
+});
+
+router.post('/disable-totp-verification',verifyToken,async(req,res)=>{
+    const userId=req.userId;
+    try {
+        const user=await User.findById(userId);
+        if(!user){
+            return res.status(400).json({message:'User not found'});
+        }
+        if(!user.twoFactorEnabled){
+            return res.status(400).json({message:'Two-factor authentication not enabled'});
+        }
+        user.twoFactorEnabled=false;
+        user.twoFactormethod=null;
+        await user.save();
+        res.status(200).json({message:'TOTP two-factor authentication disabled'});
+    } catch (error) {
+        console.error('Disable TOTP two-factor error:',error);
+        res.status(500).json({message:'Something went wrong. Please try again.'});
+    }
+});
+
+router.post('/verify-totp-login', async (req, res) => {
+    const { email, token } = req.body;
+
+    if (!email || !token) {
+        return res.status(400).json({ message: 'Email and token are required' });
+    }
+
+    // Validate token input
+    if (!token || token.length !== 6 || !/^\d{6}$/.test(token)) {
+        return res.status(400).json({ message: 'Invalid TOTP token format. Please enter a 6-digit code.' });
+    }
+
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'User not found' });
+        }
+
+        if (!user.twoFactorEnabled || user.twoFactormethod !== 'totp') {
+            return res.status(400).json({ message: 'TOTP two-factor authentication is not enabled for this user' });
+        }
+
+        if (!user.twoFactorSecret) {
+            return res.status(400).json({ message: 'TOTP secret not found' });
+        }
+
+        const verified = verifyTOTPToken(user.twoFactorSecret, token);
+        
+        if (!verified) {
+            return res.status(400).json({ message: 'Invalid TOTP token' });
+        }
+
+        // Generate JWT tokens
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken(user);
+        sendRefreshToken(res, refreshToken);
+
+        res.status(200).json({ 
+            message: 'TOTP two-factor authentication successful', 
+            token: accessToken, 
+            user: {id: user._id, name: user.name, email: user.email } 
+        });
+
+    } catch (err) {
+        console.error('TOTP verification error:', err);
+        res.status(500).json({ message: 'Server error during verification' });
     }
 });
 

@@ -14,8 +14,9 @@ function Settings({ isOpen, onClose }) {
     const [email2FALoading, setEmail2FALoading] = useState(false);
     const [totp2FALoading, setTotp2FALoading] = useState(false);
     const [showTotpSetup, setShowTotpSetup] = useState(false);
-    const [totpSecret, setTotpSecret] = useState('');
     const [totpQrCode, setTotpQrCode] = useState('');
+    const [totpSecretKey, setTotpSecretKey] = useState('');
+    const [showSecretKey, setShowSecretKey] = useState(false);
     const [totpVerificationCode, setTotpVerificationCode] = useState('');
     const [totpVerificationError, setTotpVerificationError] = useState('');
     const [twoFactorSuccess, setTwoFactorSuccess] = useState('');
@@ -143,66 +144,130 @@ function Settings({ isOpen, onClose }) {
         }
     };
 
-    const generateTOTPSecret = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-        let secret = '';
-        for (let i = 0; i < 32; i++) {
-            secret += chars.charAt(Math.floor(Math.random() * chars.length));
+    const handleEnableTOTP2FA = async () => {
+        setTotp2FALoading(true);
+        setTwoFactorError('');
+        setTwoFactorSuccess('');
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/twofactor/enable-totp-verification', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to enable TOTP 2FA');
+            }
+            
+            setTotpQrCode(data.qrCodeDataURL);
+            setTotpSecretKey(data.secretKey || '');
+            setShowTotpSetup(true);
+            setTotpVerificationError('');
+        } catch (err) {
+            setTwoFactorError(err.message);
+        } finally {
+            setTotp2FALoading(false);
         }
-        return secret;
     };
 
-    const generateQRCode = (secret, email) => {
-        const otpauth = `otpauth://totp/MongoSnap:${encodeURIComponent(email)}?secret=${secret}&issuer=MongoSnap&algorithm=SHA1&digits=6&period=30`;
-        return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauth)}`;
-    };
-
-    const handleEnableTOTP2FA = () => {
-        const secret = generateTOTPSecret();
-        setTotpSecret(secret);
-        setTotpQrCode(generateQRCode(secret, user.email));
-        setShowTotpSetup(true);
-        setTotpVerificationError('');
-    };
-
-    const handleVerifyTOTP = () => {
+    const handleVerifyTOTP = async () => {
         if (!totpVerificationCode || totpVerificationCode.length !== 6) {
             setTotpVerificationError('Please enter a valid 6-digit code');
             return;
         }
 
-        // For demo purposes, we'll simulate verification
-        // In a real implementation, you'd verify against the TOTP algorithm
         setTotp2FALoading(true);
-        
-        setTimeout(() => {
-            setTotp2FALoading(false);
+        setTotpVerificationError('');
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/twofactor/verify-totp-verification', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ token: totpVerificationCode })
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Invalid verification code');
+            }
+            
             setTwoFactorSuccess('TOTP two-factor authentication has been enabled successfully!');
             setTwoFactorEnabled(true);
             setTwoFactorMethod('totp');
             setShowTotpSetup(false);
             setTotpVerificationCode('');
-            setTotpSecret('');
             setTotpQrCode('');
-        }, 1000);
+        } catch (err) {
+            setTotpVerificationError(err.message);
+        } finally {
+            setTotp2FALoading(false);
+        }
     };
 
-    const handleDisableTOTP2FA = () => {
+    const handleDisableTOTP2FA = async () => {
         setTotp2FALoading(true);
-        
-        setTimeout(() => {
-            setTotp2FALoading(false);
+        setTwoFactorError('');
+        setTwoFactorSuccess('');
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/twofactor/disable-totp-verification', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to disable TOTP 2FA');
+            }
+            
             setTwoFactorSuccess('TOTP two-factor authentication has been disabled successfully!');
             setTwoFactorEnabled(false);
             setTwoFactorMethod(null);
-        }, 1000);
+        } catch (err) {
+            setTwoFactorError(err.message);
+        } finally {
+            setTotp2FALoading(false);
+        }
     };
 
-    const closeTotpSetup = () => {
+    const closeTotpSetup = async () => {
+        // If setup was initiated, cancel it on the backend
+        if (totpQrCode) {
+            try {
+                const token = localStorage.getItem('token');
+                await fetch('/api/twofactor/cancel-totp-setup', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to cancel TOTP setup:', error);
+            }
+        }
+        
         setShowTotpSetup(false);
         setTotpVerificationCode('');
-        setTotpSecret('');
         setTotpQrCode('');
+        setTotpSecretKey('');
+        setShowSecretKey(false);
         setTotpVerificationError('');
     };
 
@@ -236,7 +301,7 @@ function Settings({ isOpen, onClose }) {
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 p-6 overflow-y-auto">
+                    <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
                         {isOAuthUser ? (
                             /* OAuth User Message */
                             <div className="bg-[#1a2520] rounded-lg p-8 text-center">
@@ -483,28 +548,46 @@ function Settings({ isOpen, onClose }) {
                                 </p>
                             </div>
 
-                            {/* Step 2: Manual Entry */}
-                            <div>
-                                <h4 className="text-white font-medium mb-3">Step 2: Manual Entry (Optional)</h4>
-                                <div className="bg-[#0f1611] rounded-lg p-3 border border-gray-700">
-                                    <p className="text-gray-400 text-xs mb-2">If you can't scan the QR code, enter this code manually:</p>
-                                    <div className="flex items-center gap-2">
-                                        <code className="bg-gray-800 px-3 py-2 rounded text-white text-sm font-mono flex-1 break-all">
-                                            {totpSecret}
-                                        </code>
-                                        <button
-                                            onClick={() => navigator.clipboard.writeText(totpSecret)}
-                                            className="px-3 py-2 bg-[#35c56a69] text-white rounded text-sm hover:bg-[#35c56a] transition-colors cursor-pointer"
-                                        >
-                                            Copy
-                                        </button>
-                                    </div>
+                            {/* Manual Setup Key */}
+                            <div className="bg-[#0f1611] rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h4 className="text-white font-medium">Manual Setup Key</h4>
+                                    <button
+                                        onClick={() => setShowSecretKey(!showSecretKey)}
+                                        className="text-[#35c56a] hover:text-[#4dd47b] text-sm font-medium transition-colors cursor-pointer"
+                                    >
+                                        {showSecretKey ? 'Hide Key' : 'Show Key'}
+                                    </button>
                                 </div>
+                                {showSecretKey && totpSecretKey && (
+                                    <div className="space-y-3">
+                                        <p className="text-gray-400 text-sm">
+                                            If you can't scan the QR code, you can manually enter this key in your authenticator app:
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <code className="flex-1 bg-[#1a2520] border border-gray-700 rounded px-3 py-2 text-[#35c56a] font-mono text-sm break-all">
+                                                {totpSecretKey}
+                                            </code>
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(totpSecretKey);
+                                                    // You could add a toast notification here
+                                                }}
+                                                className="px-3 py-2 bg-[#35c56a69] hover:bg-[#35c56a] text-white rounded text-sm font-medium transition-colors cursor-pointer"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
+                                        <p className="text-gray-500 text-xs">
+                                            Make sure to select "Time-based" when adding the key to your authenticator app.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Step 3: Verification */}
+                            {/* Step 2: Verification */}
                             <div>
-                                <h4 className="text-white font-medium mb-3">Step 3: Verify Setup</h4>
+                                <h4 className="text-white font-medium mb-3">Step 2: Verify Setup</h4>
                                 <p className="text-gray-400 text-sm mb-3">
                                     Enter the 6-digit code from your authenticator app to verify the setup:
                                 </p>
@@ -556,4 +639,4 @@ function Settings({ isOpen, onClose }) {
     );
 }
 
-export default Settings; 
+export default Settings;

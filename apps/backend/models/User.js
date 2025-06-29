@@ -28,5 +28,7 @@ const userSchema = new mongoose.Schema({
     twoFactormethod: { type: String, default: null },
     twoFactorToken: { type: String, default: null },
     twoFactorExpiresAt: { type: Date, default: null },
+    twoFactorSecret: { type: String, default: null },
+    twoFactorSetupPending: { type: Boolean, default: false },
 });
 module.exports = mongoose.model('User', userSchema);

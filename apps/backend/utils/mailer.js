@@ -236,7 +236,7 @@ const createTwoFactorDisabledTemplate = () => {
     </div>
     
     <div style="text-align: center;">
-      <a href="https://mongosnap.mp:5173/settings" class="button">Re-enable 2FA</a>
+      <a href="https://mongosnap.mp:5173/" class="button">Re-enable 2FA</a>
     </div>
   `;
   

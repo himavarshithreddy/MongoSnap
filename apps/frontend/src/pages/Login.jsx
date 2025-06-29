@@ -50,12 +50,14 @@ function Login() {
     const [show2FA, setShow2FA] = useState(false);
     const [twoFactorEmail, setTwoFactorEmail] = useState('');
     const [twoFactorToken, setTwoFactorToken] = useState(['', '', '', '']);
+    const [twoFactorMethod, setTwoFactorMethod] = useState('email'); // 'email' or 'totp'
+    const [totpToken, setTotpToken] = useState(''); // For 6-digit TOTP
     const otpRefs = [useRef(), useRef(), useRef(), useRef()];
     const [twoFactorLoading, setTwoFactorLoading] = useState(false);
     const [twoFactorError, setTwoFactorError] = useState('');
     const [resendLoading, setResendLoading] = useState(false);
-    const [resendSuccess, setResendSuccess] = useState('');
     const [resendError, setResendError] = useState('');
+    const [resendSuccess, setResendSuccess] = useState('');
 
     // Popup window reference
     const [popupWindow, setPopupWindow] = useState(null);
@@ -142,8 +144,14 @@ function Login() {
                 // Check if 2FA is required
                 if (data.requires2FA) {
                     setTwoFactorEmail(form.email);
+                    setTwoFactorMethod(data.twoFactorMethod || 'email');
                     setShow2FA(true);
-                    setSuccess('Please check your email for the verification code.');
+                    
+                    if (data.twoFactorMethod === 'email') {
+                        setSuccess('Please check your email for the verification code.');
+                    } else if (data.twoFactorMethod === 'totp') {
+                        setSuccess('Please enter the 6-digit code from your authenticator app.');
+                    }
                 } else {
                     // Use UserContext login function
                     login(data.token, data.user);
@@ -245,16 +253,29 @@ function Login() {
         e.preventDefault();
         setTwoFactorLoading(true);
         setTwoFactorError('');
-        const otp = twoFactorToken.join('').toLowerCase();
         
         try {
-            const res = await fetch('/api/twofactor/verify-two-factor', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            let endpoint, payload;
+            
+            if (twoFactorMethod === 'email') {
+                const otp = twoFactorToken.join('').toLowerCase();
+                endpoint = '/api/twofactor/verify-two-factor';
+                payload = {
                     email: twoFactorEmail,
                     token: otp
-                }),
+                };
+            } else if (twoFactorMethod === 'totp') {
+                endpoint = '/api/twofactor/verify-totp-login';
+                payload = {
+                    email: twoFactorEmail,
+                    token: totpToken
+                };
+            }
+            
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
             
             const data = await res.json();
@@ -342,10 +363,21 @@ function Login() {
         }
     };
 
+    const handleTOTPInput = (e) => {
+        let val = e.target.value;
+        // Only allow digits
+        val = val.replace(/[^0-9]/g, '');
+        // Limit to 6 digits
+        if (val.length > 6) val = val.slice(0, 6);
+        setTotpToken(val);
+    };
+
     const reset2FA = () => {
         setShow2FA(false);
         setTwoFactorEmail('');
         setTwoFactorToken(['', '', '', '']);
+        setTotpToken('');
+        setTwoFactorMethod('email');
         setTwoFactorError('');
         setResendError('');
         setResendSuccess('');
@@ -462,38 +494,70 @@ function Login() {
                         
                         <div className="flex items-center justify-center mb-4">
                             <div className="p-3 bg-[#35c56a69] rounded-full">
-                                <Mail size={24} className="text-[#11a15e]" />
+                                {twoFactorMethod === 'email' ? (
+                                    <Mail size={24} className="text-[#11a15e]" />
+                                ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#11a15e]">
+                                        <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                                        <circle cx="12" cy="5" r="2"/>
+                                        <path d="M12 7v4"/>
+                                    </svg>
+                                )}
                             </div>
                         </div>
                         
                         <h2 className="text-2xl font-bold text-white mb-2">Two-Factor Authentication</h2>
                         <p className="text-gray-400 text-sm mb-6 text-center">
-                            We've sent a 4-digit verification code to <span className="text-white font-medium">{twoFactorEmail}</span>
+                            {twoFactorMethod === 'email' ? (
+                                <>We've sent a 4-digit verification code to <span className="text-white font-medium">{twoFactorEmail}</span></>
+                            ) : (
+                                <>Enter the 6-digit code from your authenticator app</>
+                            )}
                         </p>
                         
                         <form className="w-full flex flex-col gap-4" onSubmit={handle2FAVerification}>
-                            <div className="text-center">
-                                <label htmlFor="otp" className="text-white text-sm font-bold mb-2 block">Verification Code</label>
-                                <div className="flex justify-center gap-2">
-                                    {[0,1,2,3].map((i) => (
-                                        <input
-                                            key={i}
-                                            ref={otpRefs[i]}
-                                            type="text"
-                                            inputMode="text"
-                                            autoComplete="one-time-code"
-                                            maxLength={1}
-                                            className="w-12 h-12 text-center text-2xl font-mono rounded-md border-2 border-[#35c56a69] bg-transparent text-white focus:border-[#11a15e] transition-colors outline-none"
-                                            value={twoFactorToken[i]}
-                                            onChange={e => handleOTPInput(e, i)}
-                                            onKeyDown={e => handleOTPKeyDown(e, i)}
-                                            onPaste={i === 0 ? handleOTPPaste : undefined}
-                                            aria-label={`OTP digit ${i+1}`}
-                                        />
-                                    ))}
+                            {twoFactorMethod === 'email' ? (
+                                // Email OTP Input
+                                <div className="text-center">
+                                    <label htmlFor="otp" className="text-white text-sm font-bold mb-2 block">Verification Code</label>
+                                    <div className="flex justify-center gap-2">
+                                        {[0,1,2,3].map((i) => (
+                                            <input
+                                                key={i}
+                                                ref={otpRefs[i]}
+                                                type="text"
+                                                inputMode="text"
+                                                autoComplete="one-time-code"
+                                                maxLength={1}
+                                                className="w-12 h-12 text-center text-2xl font-mono rounded-md border-2 border-[#35c56a69] bg-transparent text-white focus:border-[#11a15e] transition-colors outline-none"
+                                                value={twoFactorToken[i]}
+                                                onChange={e => handleOTPInput(e, i)}
+                                                onKeyDown={e => handleOTPKeyDown(e, i)}
+                                                onPaste={i === 0 ? handleOTPPaste : undefined}
+                                                aria-label={`OTP digit ${i+1}`}
+                                            />
+                                        ))}
+                                    </div>
+                                    <p className="text-gray-500 text-xs mt-2">Enter the 4-digit hex code from your email</p>
                                 </div>
-                                <p className="text-gray-500 text-xs mt-2">Enter the 4-digit hex code from your email</p>
-                            </div>
+                            ) : (
+                                // TOTP Input
+                                <div className="text-center">
+                                    <label htmlFor="totp" className="text-white text-sm font-bold mb-2 block">Authenticator Code</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        autoComplete="one-time-code"
+                                        maxLength={6}
+                                        className="w-full h-12 text-center text-2xl font-mono rounded-md border-2 border-[#35c56a69] bg-transparent text-white focus:border-[#11a15e] transition-colors outline-none"
+                                        value={totpToken}
+                                        onChange={handleTOTPInput}
+                                        placeholder="000000"
+                                        aria-label="TOTP code"
+                                    />
+                                    <p className="text-gray-500 text-xs mt-2">Enter the 6-digit code from your authenticator app</p>
+                                </div>
+                            )}
                             
                             {twoFactorError && (
                                 <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert">
@@ -524,8 +588,8 @@ function Login() {
                             
                             <button 
                                 type="submit" 
-                                disabled={twoFactorLoading || twoFactorToken.some(x => !x)}
-                                className={`w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${twoFactorLoading || twoFactorToken.some(x => !x) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                disabled={twoFactorLoading || (twoFactorMethod === 'email' ? twoFactorToken.some(x => !x) : !totpToken || totpToken.length !== 6)}
+                                className={`w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${twoFactorLoading || (twoFactorMethod === 'email' ? twoFactorToken.some(x => !x) : !totpToken || totpToken.length !== 6) ? 'opacity-60 cursor-not-allowed' : ''}`}
                             >
                                 {twoFactorLoading ? (
                                     <div className="flex items-center justify-center gap-2">
@@ -541,26 +605,29 @@ function Login() {
                             </button>
                         </form>
                         
-                        <div className="w-full mt-4 pt-4 border-t border-gray-700">
-                            <p className="text-gray-400 text-sm text-center mb-3">Didn't receive the code?</p>
-                            <button 
-                                onClick={handleResendOTP}
-                                disabled={resendLoading}
-                                className={`w-full h-10 rounded-md border-1 border-[#35c56a69] text-white text-sm font-medium hover:bg-[#35c56a69] transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${resendLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
-                            >
-                                {resendLoading ? (
-                                    <>
-                                        <RefreshCw size={16} className="animate-spin" />
-                                        Sending...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Mail size={16} />
-                                        Resend Code
-                                    </>
-                                )}
-                            </button>
-                        </div>
+                        {/* Only show resend for email 2FA */}
+                        {twoFactorMethod === 'email' && (
+                            <div className="w-full mt-4 pt-4 border-t border-gray-700">
+                                <p className="text-gray-400 text-sm text-center mb-3">Didn't receive the code?</p>
+                                <button 
+                                    onClick={handleResendOTP}
+                                    disabled={resendLoading}
+                                    className={`w-full h-10 rounded-md border-1 border-[#35c56a69] text-white text-sm font-medium hover:bg-[#35c56a69] transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${resendLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                >
+                                    {resendLoading ? (
+                                        <>
+                                            <RefreshCw size={16} className="animate-spin" />
+                                            Sending...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Mail size={16} />
+                                            Resend Code
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
