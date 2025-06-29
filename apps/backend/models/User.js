@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema({
     verificationToken: { type: String, default: null },
     resetPasswordToken: { type: String, default: null },
     oauthProvider: { type: String, default: null }, // 'google', 'github', etc.
-    oauthId: { type: String, default: null }, // OAuth provider's user ID
+    oauthId: { type: String, default: null },
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactormethod: { type: String, default: null },
+    twoFactorToken: { type: String, default: null },
+    twoFactorExpiresAt: { type: Date, default: null },
 });
 module.exports = mongoose.model('User', userSchema);

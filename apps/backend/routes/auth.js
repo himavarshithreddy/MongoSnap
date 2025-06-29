@@ -5,31 +5,14 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const crypto = require('crypto');
-const { sendVerificationEmail, sendResetPasswordEmail } = require('../utils/mailer');
+const { sendVerificationEmail, sendResetPasswordEmail, sendTwoFactorEmailOTP } = require('../utils/mailer');
 const databaseManager = require('../utils/databaseManager');
 const { verifyToken } = require('./middleware');
 dotenv.config();
-const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET ;
+const {generateAccessToken,generateRefreshToken,sendRefreshToken} = require('../utils/tokengeneration');
 
 // Helper to generate tokens
-function generateAccessToken(user) {
-  return jwt.sign({ id: user._id }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
-}
-function generateRefreshToken(user) {
-  return jwt.sign({ id: user._id }, process.env.REFRESH_TOKEN_SECRET, {
-    expiresIn: '1d',
-  });
-}
 
-function sendRefreshToken(res, token) {
-  res.cookie('refreshToken', token, {
-    httpOnly: true,
-    secure: false,
-    sameSite: 'lax',
-    path: '/',  // strict is best for refresh
-    maxAge: 1 * 24 * 60 * 60 * 1000, // 1 day
-  });
-}
 
 // POST /signup
 router.post('/signup', async (req, res) => {
@@ -72,7 +55,23 @@ router.post('/login', async (req, res) => {
     }
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid email or password' });
-   
+    if(user.twoFactorEnabled && user.twoFactormethod==='email'){
+    
+      const token=crypto.randomBytes(2).toString('hex');
+      const tokenHash=crypto.createHash('sha256').update(token).digest('hex');
+      user.twoFactorToken=tokenHash;
+      user.twoFactorExpiresAt=Date.now()+10*60*1000;
+      await user.save();
+      await sendTwoFactorEmailOTP(user.email,token);
+      
+       return res.status(200).json({ 
+        message: '2FA required', 
+        requires2FA: true,
+        user: {id: user._id, name: user.name, email: user.email }
+
+    });
+
+  }
     const accessToken = generateAccessToken(user);
 const refreshToken = generateRefreshToken(user);
 sendRefreshToken(res, refreshToken);
@@ -174,4 +173,4 @@ router.post('/request-password-change', verifyToken, async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = router;  

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom';
 import '../App.css'
-import { Eye, EyeOff } from 'lucide-react';     
+import { Eye, EyeOff, Mail, ArrowLeft, RefreshCw } from 'lucide-react';     
 import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 
@@ -45,6 +45,17 @@ function Login() {
     const [googleLoading, setGoogleLoading] = useState(false);
     const [githubLoading, setGithubLoading] = useState(false);
     const [redirecting, setRedirecting] = useState(false);
+
+    // 2FA States
+    const [show2FA, setShow2FA] = useState(false);
+    const [twoFactorEmail, setTwoFactorEmail] = useState('');
+    const [twoFactorToken, setTwoFactorToken] = useState(['', '', '', '']);
+    const otpRefs = [useRef(), useRef(), useRef(), useRef()];
+    const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+    const [twoFactorError, setTwoFactorError] = useState('');
+    const [resendLoading, setResendLoading] = useState(false);
+    const [resendSuccess, setResendSuccess] = useState('');
+    const [resendError, setResendError] = useState('');
 
     // Popup window reference
     const [popupWindow, setPopupWindow] = useState(null);
@@ -128,10 +139,17 @@ function Login() {
             if (!res.ok) throw new Error(data.message || 'Something went wrong');
             
             if (mode === 'login') {
-                // Use UserContext login function
-                login(data.token, data.user);
-                setSuccess('Login successful! Redirecting...');
-                setRedirecting(true);
+                // Check if 2FA is required
+                if (data.requires2FA) {
+                    setTwoFactorEmail(form.email);
+                    setShow2FA(true);
+                    setSuccess('Please check your email for the verification code.');
+                } else {
+                    // Use UserContext login function
+                    login(data.token, data.user);
+                    setSuccess('Login successful! Redirecting...');
+                    setRedirecting(true);
+                }
             } else {
                 setSuccess(data.message);
                 setForm({ name: '', email: '', password: '' });
@@ -221,6 +239,118 @@ function Login() {
         
         // Focus the popup
         popup.focus();
+    };
+
+    const handle2FAVerification = async (e) => {
+        e.preventDefault();
+        setTwoFactorLoading(true);
+        setTwoFactorError('');
+        const otp = twoFactorToken.join('').toLowerCase();
+        
+        try {
+            const res = await fetch('/api/twofactor/verify-two-factor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: twoFactorEmail,
+                    token: otp
+                }),
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Verification failed');
+            }
+            
+            // Login successful with 2FA
+            login(data.token, data.user);
+            setSuccess('Login successful! Redirecting...');
+            setRedirecting(true);
+        } catch (err) {
+            console.error('2FA verification error:', err);
+            setTwoFactorError(err.message);
+        } finally {
+            setTwoFactorLoading(false);
+        }
+    };
+
+    const handleOTPInput = (e, idx) => {
+        let val = e.target.value;
+        // Only allow hex chars
+        val = val.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+        if (val.length > 1) val = val.slice(-1);
+        const newToken = [...twoFactorToken];
+        newToken[idx] = val;
+        setTwoFactorToken(newToken);
+        if (val && idx < 3) {
+            otpRefs[idx + 1].current.focus();
+        }
+    };
+
+    const handleOTPKeyDown = (e, idx) => {
+        if (e.key === 'Backspace') {
+            if (twoFactorToken[idx]) {
+                // Clear current
+                const newToken = [...twoFactorToken];
+                newToken[idx] = '';
+                setTwoFactorToken(newToken);
+            } else if (idx > 0) {
+                otpRefs[idx - 1].current.focus();
+            }
+        } else if (e.key === 'ArrowLeft' && idx > 0) {
+            otpRefs[idx - 1].current.focus();
+        } else if (e.key === 'ArrowRight' && idx < 3) {
+            otpRefs[idx + 1].current.focus();
+        }
+    };
+
+    const handleOTPPaste = (e) => {
+        const paste = e.clipboardData.getData('text').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+        if (paste.length === 4) {
+            setTwoFactorToken(paste.split(''));
+            setTimeout(() => {
+                otpRefs[3].current.focus();
+            }, 0);
+            e.preventDefault();
+        }
+    };
+
+    const handleResendOTP = async () => {
+        setResendLoading(true);
+        setResendError('');
+        setResendSuccess('');
+        
+        try {
+            const res = await fetch('/api/twofactor/resend-two-factor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: twoFactorEmail }),
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to resend OTP');
+            }
+            
+            setResendSuccess('New verification code has been sent to your email.');
+        } catch (err) {
+            setResendError(err.message);
+        } finally {
+            setResendLoading(false);
+        }
+    };
+
+    const reset2FA = () => {
+        setShow2FA(false);
+        setTwoFactorEmail('');
+        setTwoFactorToken(['', '', '', '']);
+        setTwoFactorError('');
+        setResendError('');
+        setResendSuccess('');
+        setResendLoading(false);
+        setSuccess('');
     };
 
     // Show loading screen while checking authentication status
@@ -315,6 +445,122 @@ function Login() {
                                 </button>
                             </form>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Two-Factor Authentication Modal */}
+            {show2FA && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                    <div className="bg-[#17211b] rounded-xl p-8 md:w-[90vw] w-[95vw] max-w-md shadow-lg relative flex flex-col items-center">
+                        <button 
+                            className="absolute top-3 left-3 text-gray-400 hover:text-white p-2 rounded-lg transition-colors" 
+                            onClick={reset2FA}
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                        
+                        <div className="flex items-center justify-center mb-4">
+                            <div className="p-3 bg-[#35c56a69] rounded-full">
+                                <Mail size={24} className="text-[#11a15e]" />
+                            </div>
+                        </div>
+                        
+                        <h2 className="text-2xl font-bold text-white mb-2">Two-Factor Authentication</h2>
+                        <p className="text-gray-400 text-sm mb-6 text-center">
+                            We've sent a 4-digit verification code to <span className="text-white font-medium">{twoFactorEmail}</span>
+                        </p>
+                        
+                        <form className="w-full flex flex-col gap-4" onSubmit={handle2FAVerification}>
+                            <div className="text-center">
+                                <label htmlFor="otp" className="text-white text-sm font-bold mb-2 block">Verification Code</label>
+                                <div className="flex justify-center gap-2">
+                                    {[0,1,2,3].map((i) => (
+                                        <input
+                                            key={i}
+                                            ref={otpRefs[i]}
+                                            type="text"
+                                            inputMode="text"
+                                            autoComplete="one-time-code"
+                                            maxLength={1}
+                                            className="w-12 h-12 text-center text-2xl font-mono rounded-md border-2 border-[#35c56a69] bg-transparent text-white focus:border-[#11a15e] transition-colors outline-none"
+                                            value={twoFactorToken[i]}
+                                            onChange={e => handleOTPInput(e, i)}
+                                            onKeyDown={e => handleOTPKeyDown(e, i)}
+                                            onPaste={i === 0 ? handleOTPPaste : undefined}
+                                            aria-label={`OTP digit ${i+1}`}
+                                        />
+                                    ))}
+                                </div>
+                                <p className="text-gray-500 text-xs mt-2">Enter the 4-digit hex code from your email</p>
+                            </div>
+                            
+                            {twoFactorError && (
+                                <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>{twoFactorError}</span>
+                                </div>
+                            )}
+                            
+                            {resendSuccess && (
+                                <div className="flex items-center gap-2 bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded" role="status">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-400">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span>{resendSuccess}</span>
+                                </div>
+                            )}
+                            
+                            {resendError && (
+                                <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>{resendError}</span>
+                                </div>
+                            )}
+                            
+                            <button 
+                                type="submit" 
+                                disabled={twoFactorLoading || twoFactorToken.some(x => !x)}
+                                className={`w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${twoFactorLoading || twoFactorToken.some(x => !x) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                                {twoFactorLoading ? (
+                                    <div className="flex items-center justify-center gap-2">
+                                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                        </svg>
+                                        Verifying...
+                                    </div>
+                                ) : (
+                                    'Verify & Sign In'
+                                )}
+                            </button>
+                        </form>
+                        
+                        <div className="w-full mt-4 pt-4 border-t border-gray-700">
+                            <p className="text-gray-400 text-sm text-center mb-3">Didn't receive the code?</p>
+                            <button 
+                                onClick={handleResendOTP}
+                                disabled={resendLoading}
+                                className={`w-full h-10 rounded-md border-1 border-[#35c56a69] text-white text-sm font-medium hover:bg-[#35c56a69] transition-all duration-300 cursor-pointer flex items-center justify-center gap-2 ${resendLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            >
+                                {resendLoading ? (
+                                    <>
+                                        <RefreshCw size={16} className="animate-spin" />
+                                        Sending...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Mail size={16} />
+                                        Resend Code
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

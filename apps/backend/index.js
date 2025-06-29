@@ -13,6 +13,7 @@ const oauthRoutes = require('./routes/oauth');
 const connectionRoutes = require('./routes/connection');
 const queryHistoryRoutes = require('./routes/queryHistory');
 const databaseManager = require('./utils/databaseManager');
+const twoFactorRoutes = require('./routes/twofactor');
 const path = require('path');
 dotenv.config();
 
@@ -32,12 +33,9 @@ app.use('/api', forgotPasswordRoutes);
 app.use('/api/auth', oauthRoutes);
 app.use('/api/connection', connectionRoutes);
 app.use('/api/query', queryHistoryRoutes);
-
+app.use('/api/twofactor', twoFactorRoutes);
 console.log('✅ All routes registered successfully');
-console.log('📋 Available routes:');
-console.log('  - /api/auth/* (authentication routes)');
-console.log('  - /api/connection/* (database connection routes)');
-console.log('  - /api/query/* (query history and saved queries routes)');
+
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
