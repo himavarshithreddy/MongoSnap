@@ -30,5 +30,10 @@ const userSchema = new mongoose.Schema({
     twoFactorExpiresAt: { type: Date, default: null },
     twoFactorSecret: { type: String, default: null },
     twoFactorSetupPending: { type: Boolean, default: false },
+    backupCodes: [{ 
+        code: { type: String, required: true },
+        used: { type: Boolean, default: false },
+        usedAt: { type: Date, default: null }
+    }],
 });
 module.exports = mongoose.model('User', userSchema);

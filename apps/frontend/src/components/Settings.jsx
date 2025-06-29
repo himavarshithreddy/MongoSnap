@@ -21,6 +21,9 @@ function Settings({ isOpen, onClose }) {
     const [totpVerificationError, setTotpVerificationError] = useState('');
     const [twoFactorSuccess, setTwoFactorSuccess] = useState('');
     const [twoFactorError, setTwoFactorError] = useState('');
+    const [backupCodes, setBackupCodes] = useState([]);
+    const [showBackupCodes, setShowBackupCodes] = useState(false);
+    const [backupCodesStatus, setBackupCodesStatus] = useState(null);
 
     const isOAuthUser = user?.oauthProvider;
 
@@ -49,6 +52,63 @@ function Settings({ isOpen, onClose }) {
             fetch2FAStatus();
         }
     }, [user, isOAuthUser, fetch2FAStatus]);
+
+    // Fetch backup codes status when TOTP is enabled
+    useEffect(() => {
+        if (twoFactorEnabled && twoFactorMethod === 'totp') {
+            fetchBackupCodesStatus();
+        }
+    }, [twoFactorEnabled, twoFactorMethod]);
+
+    const fetchBackupCodesStatus = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/twofactor/backup-codes-status', {
+                headers: { 
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                setBackupCodesStatus(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch backup codes status:', error);
+        }
+    };
+
+    const handleRegenerateBackupCodes = async () => {
+        setTotp2FALoading(true);
+        setTwoFactorError('');
+        setTwoFactorSuccess('');
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/twofactor/regenerate-backup-codes', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to regenerate backup codes');
+            }
+            
+            setBackupCodes(data.backupCodes);
+            setShowBackupCodes(true);
+            setTwoFactorSuccess('New backup codes have been generated successfully!');
+            await fetchBackupCodesStatus();
+        } catch (err) {
+            setTwoFactorError(err.message);
+        } finally {
+            setTotp2FALoading(false);
+        }
+    };
 
     // Early return after all hooks
     if (!isOpen) return null;
@@ -202,6 +262,12 @@ function Settings({ isOpen, onClose }) {
                 throw new Error(data.message || 'Invalid verification code');
             }
             
+            // Show backup codes if they were generated
+            if (data.backupCodes) {
+                setBackupCodes(data.backupCodes);
+                setShowBackupCodes(true);
+            }
+            
             setTwoFactorSuccess('TOTP two-factor authentication has been enabled successfully!');
             setTwoFactorEnabled(true);
             setTwoFactorMethod('totp');
@@ -273,7 +339,7 @@ function Settings({ isOpen, onClose }) {
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4">
-            <div className="bg-[#17211b] rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex">
+            <div className="bg-[#17211b] rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl flex">
                 {/* Left Sidebar */}
                 <div className="w-64 bg-[#0f1611] p-6">
                     <div className="flex items-center gap-2 mb-6">
@@ -497,6 +563,41 @@ function Settings({ isOpen, onClose }) {
                                                 }
                                             </p>
                                             
+                                            {/* Backup Codes Section for TOTP */}
+                                            {twoFactorMethod === 'totp' && (
+                                                <div className="bg-[#0f1611] rounded-lg p-4 border border-gray-700 mb-4">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="p-2 bg-[#35c56a69] rounded-lg">
+                                                                <Key size={18} className="text-[#11a15e]" />
+                                                            </div>
+                                                            <div>
+                                                                <h5 className="text-white font-medium">Backup Codes</h5>
+                                                                <p className="text-gray-400 text-sm">
+                                                                    {backupCodesStatus ? 
+                                                                        `${backupCodesStatus.remainingCodes} of ${backupCodesStatus.totalCodes} codes remaining` :
+                                                                        'Recovery codes for emergency access'
+                                                                    }
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={handleRegenerateBackupCodes}
+                                                            disabled={totp2FALoading}
+                                                            className="px-3 py-2 bg-[#35c56a69] hover:bg-[#35c56a] text-white rounded text-sm font-medium transition-colors cursor-pointer"
+                                                        >
+                                                            {totp2FALoading ? 'Generating...' : 'Regenerate'}
+                                                        </button>
+                                                    </div>
+                                                    {backupCodesStatus?.needsRegeneration && (
+                                                        <div className="flex items-center gap-2 bg-yellow-900/50 border border-yellow-600 text-yellow-200 px-3 py-2 rounded-lg text-sm">
+                                                            <AlertCircle size={16} />
+                                                            <span>You have few backup codes left. Consider regenerating them.</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            
                                             <button
                                                 onClick={twoFactorMethod === 'email' ? handleDisableEmail2FA : handleDisableTOTP2FA}
                                                 disabled={email2FALoading || totp2FALoading}
@@ -631,6 +732,86 @@ function Settings({ isOpen, onClose }) {
                                     )}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Backup Codes Display Modal */}
+            {showBackupCodes && backupCodes.length > 0 && (
+                <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/80 p-4">
+                    <div className="bg-[#17211b] rounded-xl w-full max-w-md shadow-2xl">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[#35c56a69] rounded-lg">
+                                    <Key size={20} className="text-[#11a15e]" />
+                                </div>
+                                <h3 className="text-xl font-semibold text-white">Backup Codes</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowBackupCodes(false)}
+                                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div className="bg-yellow-900/50 border border-yellow-600 text-yellow-200 px-4 py-3 rounded-lg">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <AlertCircle size={16} />
+                                    <span className="font-medium">Important!</span>
+                                </div>
+                                <p className="text-sm">
+                                    Save these backup codes in a secure location. Each code can only be used once and they won't be shown again.
+                                </p>
+                            </div>
+
+                            <div className="bg-[#0f1611] rounded-lg p-4 border border-gray-700">
+                                <div className="grid grid-cols-2 gap-2">
+                                    {backupCodes.map((code, index) => (
+                                        <div key={index} className="bg-[#1a2520] rounded px-3 py-2 text-center">
+                                            <code className="text-[#35c56a] font-mono text-sm">{code}</code>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        const codesText = `MongoSnap Backup Codes\n========================\n\nGenerated: ${new Date().toLocaleString()}\n\nIMPORTANT: Save these codes in a secure location.\nEach code can only be used once.\n\nBackup Codes:\n${backupCodes.map((code, index) => `${index + 1}. ${code}`).join('\n')}\n\nInstructions:\n- Use these codes to sign in if you lose access to your authenticator app\n- Each code can only be used once\n- Keep these codes secure and private\n- Generate new codes if you suspect they have been compromised`;
+                                        
+                                        const blob = new Blob([codesText], { type: 'text/plain' });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = `mongosnap-backup-codes-${new Date().toISOString().split('T')[0]}.txt`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        URL.revokeObjectURL(url);
+                                    }}
+                                    className="flex-1 px-4 py-3 bg-[#35c56a69] hover:bg-[#35c56a] text-white rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="7,10 12,15 17,10"/>
+                                        <line x1="12" y1="15" x2="12" y2="3"/>
+                                    </svg>
+                                    Download Codes
+                                </button>
+                                <button
+                                    onClick={() => setShowBackupCodes(false)}
+                                    className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors cursor-pointer"
+                                >
+                                    I've Saved Them
+                                </button>
+                            </div>
+
+                            <p className="text-gray-400 text-xs text-center">
+                                Use these codes to sign in if you lose access to your authenticator app.
+                            </p>
                         </div>
                     </div>
                 </div>

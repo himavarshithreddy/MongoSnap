@@ -6,7 +6,7 @@ const crypto=require('crypto');
 const {verifyToken} = require('./middleware');
 const {generateAccessToken,generateRefreshToken,sendRefreshToken} = require('../utils/tokengeneration');
 const rateLimit = require('express-rate-limit');
-const {generateTOTPSecret, verifyTOTPToken} = require('../utils/totpgenerator');
+const {generateTOTPSecret, verifyTOTPToken, generateBackupCodes, verifyBackupCode} = require('../utils/totpgenerator');
 const speakeasy = require('speakeasy');
 
 const twoFactorLimiter = rateLimit({
@@ -225,12 +225,24 @@ router.post('/verify-totp-verification',verifyToken,async(req,res)=>{
         }
         
         // Only now enable 2FA after successful verification
+        const backupCodesData = generateBackupCodes();
         user.twoFactorEnabled = true;
         user.twoFactormethod = 'totp';
         user.twoFactorSetupPending = false; // Clear setup flag
+        // Store encrypted codes in database
+        user.backupCodes = backupCodesData.map(bc => ({
+            code: bc.code, // This is the encrypted version
+            used: bc.used,
+            usedAt: bc.usedAt
+        }));
         await user.save();
         
-        res.status(200).json({message:'TOTP two-factor authentication verified and enabled'});
+        // Return plain codes to user (only time they'll see them)
+        const backupCodesDisplay = backupCodesData.map(bc => bc.plainCode);
+        res.status(200).json({
+            message:'TOTP two-factor authentication verified and enabled',
+            backupCodes: backupCodesDisplay
+        });
     } catch (error) {
         console.error('Verify TOTP two-factor error:',error);
         res.status(500).json({message:'Something went wrong. Please try again.'});
@@ -284,9 +296,12 @@ router.post('/verify-totp-login', async (req, res) => {
         return res.status(400).json({ message: 'Email and token are required' });
     }
 
-    // Validate token input
-    if (!token || token.length !== 6 || !/^\d{6}$/.test(token)) {
-        return res.status(400).json({ message: 'Invalid TOTP token format. Please enter a 6-digit code.' });
+    // Validate token input - could be 6-digit TOTP or 8-character backup code
+    const isTotpToken = /^\d{6}$/.test(token);
+    const isBackupCode = /^[A-F0-9]{8}$/i.test(token);
+    
+    if (!isTotpToken && !isBackupCode) {
+        return res.status(400).json({ message: 'Invalid token format. Please enter a 6-digit TOTP code or 8-character backup code.' });
     }
 
     try {
@@ -299,14 +314,33 @@ router.post('/verify-totp-login', async (req, res) => {
             return res.status(400).json({ message: 'TOTP two-factor authentication is not enabled for this user' });
         }
 
-        if (!user.twoFactorSecret) {
-            return res.status(400).json({ message: 'TOTP secret not found' });
-        }
+        let verified = false;
+        let usedBackupCode = false;
 
-        const verified = verifyTOTPToken(user.twoFactorSecret, token);
+        if (isTotpToken) {
+            // Verify TOTP token
+            if (!user.twoFactorSecret) {
+                return res.status(400).json({ message: 'TOTP secret not found' });
+            }
+            verified = verifyTOTPToken(user.twoFactorSecret, token);
+        } else if (isBackupCode) {
+            // Verify backup code against encrypted versions
+            const backupCode = user.backupCodes.find(bc => 
+                !bc.used && verifyBackupCode(token, bc.code)
+            );
+            
+            if (backupCode) {
+                verified = true;
+                usedBackupCode = true;
+                // Mark backup code as used
+                backupCode.used = true;
+                backupCode.usedAt = new Date();
+                await user.save();
+            }
+        }
         
         if (!verified) {
-            return res.status(400).json({ message: 'Invalid TOTP token' });
+            return res.status(400).json({ message: 'Invalid token' });
         }
 
         // Generate JWT tokens
@@ -315,14 +349,83 @@ router.post('/verify-totp-login', async (req, res) => {
         sendRefreshToken(res, refreshToken);
 
         res.status(200).json({ 
-            message: 'TOTP two-factor authentication successful', 
+            message: usedBackupCode ? 'Backup code authentication successful' : 'TOTP two-factor authentication successful', 
             token: accessToken, 
-            user: {id: user._id, name: user.name, email: user.email } 
+            user: {id: user._id, name: user.name, email: user.email },
+            usedBackupCode: usedBackupCode
         });
 
     } catch (err) {
         console.error('TOTP verification error:', err);
         res.status(500).json({ message: 'Server error during verification' });
+    }
+});
+
+// Regenerate backup codes
+router.post('/regenerate-backup-codes', verifyToken, async (req, res) => {
+    const userId = req.userId;
+    
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(400).json({ message: 'User not found' });
+        }
+        
+        if (!user.twoFactorEnabled || user.twoFactormethod !== 'totp') {
+            return res.status(400).json({ message: 'TOTP two-factor authentication is not enabled' });
+        }
+        
+        // Generate new backup codes
+        const newBackupCodesData = generateBackupCodes();
+        // Store encrypted codes in database
+        user.backupCodes = newBackupCodesData.map(bc => ({
+            code: bc.code, // This is the encrypted version
+            used: bc.used,
+            usedAt: bc.usedAt
+        }));
+        await user.save();
+        
+        // Return plain codes to user (only time they'll see them)
+        const backupCodesDisplay = newBackupCodesData.map(bc => bc.plainCode);
+        res.status(200).json({
+            message: 'Backup codes regenerated successfully',
+            backupCodes: backupCodesDisplay
+        });
+        
+    } catch (error) {
+        console.error('Regenerate backup codes error:', error);
+        res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    }
+});
+
+// Get backup codes status
+router.get('/backup-codes-status', verifyToken, async (req, res) => {
+    const userId = req.userId;
+    
+    try {
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(400).json({ message: 'User not found' });
+        }
+        
+        if (!user.twoFactorEnabled || user.twoFactormethod !== 'totp') {
+            return res.status(400).json({ message: 'TOTP two-factor authentication is not enabled' });
+        }
+        
+        const totalCodes = user.backupCodes.length;
+        const usedCodes = user.backupCodes.filter(bc => bc.used).length;
+        const remainingCodes = totalCodes - usedCodes;
+        
+        res.status(200).json({
+            totalCodes,
+            usedCodes,
+            remainingCodes,
+            needsRegeneration: remainingCodes <= 2
+        });
+        
+    } catch (error) {
+        console.error('Get backup codes status error:', error);
+        res.status(500).json({ message: 'Something went wrong. Please try again.' });
     }
 });
 

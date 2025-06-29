@@ -49,7 +49,7 @@ function Login() {
     // 2FA States
     const [show2FA, setShow2FA] = useState(false);
     const [twoFactorEmail, setTwoFactorEmail] = useState('');
-    const [twoFactorToken, setTwoFactorToken] = useState(['', '', '', '']);
+    const [twoFactorToken, setTwoFactorToken] = useState('');
     const [twoFactorMethod, setTwoFactorMethod] = useState('email'); // 'email' or 'totp'
     const [totpToken, setTotpToken] = useState(''); // For 6-digit TOTP
     const otpRefs = [useRef(), useRef(), useRef(), useRef()];
@@ -58,6 +58,7 @@ function Login() {
     const [resendLoading, setResendLoading] = useState(false);
     const [resendError, setResendError] = useState('');
     const [resendSuccess, setResendSuccess] = useState('');
+    const [usingBackupCode, setUsingBackupCode] = useState(false);
 
     // Popup window reference
     const [popupWindow, setPopupWindow] = useState(null);
@@ -258,7 +259,8 @@ function Login() {
             let endpoint, payload;
             
             if (twoFactorMethod === 'email') {
-                const otp = twoFactorToken.join('').toLowerCase();
+                // For email, we still need to handle the array format
+                const otp = Array.isArray(twoFactorToken) ? twoFactorToken.join('').toLowerCase() : twoFactorToken.toLowerCase();
                 endpoint = '/api/twofactor/verify-two-factor';
                 payload = {
                     email: twoFactorEmail,
@@ -268,7 +270,7 @@ function Login() {
                 endpoint = '/api/twofactor/verify-totp-login';
                 payload = {
                     email: twoFactorEmail,
-                    token: totpToken
+                    token: twoFactorToken // This now contains either TOTP code or backup code
                 };
             }
             
@@ -375,7 +377,7 @@ function Login() {
     const reset2FA = () => {
         setShow2FA(false);
         setTwoFactorEmail('');
-        setTwoFactorToken(['', '', '', '']);
+        setTwoFactorToken('');
         setTotpToken('');
         setTwoFactorMethod('email');
         setTwoFactorError('');
@@ -506,56 +508,58 @@ function Login() {
                             </div>
                         </div>
                         
-                        <h2 className="text-2xl font-bold text-white mb-2">Two-Factor Authentication</h2>
-                        <p className="text-gray-400 text-sm mb-6 text-center">
-                            {twoFactorMethod === 'email' ? (
-                                <>We've sent a 4-digit verification code to <span className="text-white font-medium">{twoFactorEmail}</span></>
-                            ) : (
-                                <>Enter the 6-digit code from your authenticator app</>
-                            )}
-                        </p>
+                        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+                            <h3 className="text-xl font-semibold text-white">
+                                {usingBackupCode ? 'Enter Backup Code' : 'Two-Factor Authentication'}
+                            </h3>
+                        </div>
                         
                         <form className="w-full flex flex-col gap-4" onSubmit={handle2FAVerification}>
                             {twoFactorMethod === 'email' ? (
                                 // Email OTP Input
                                 <div className="text-center">
                                     <label htmlFor="otp" className="text-white text-sm font-bold mb-2 block">Verification Code</label>
-                                    <div className="flex justify-center gap-2">
-                                        {[0,1,2,3].map((i) => (
-                                            <input
-                                                key={i}
-                                                ref={otpRefs[i]}
-                                                type="text"
-                                                inputMode="text"
-                                                autoComplete="one-time-code"
-                                                maxLength={1}
-                                                className="w-12 h-12 text-center text-2xl font-mono rounded-md border-2 border-[#35c56a69] bg-transparent text-white focus:border-[#11a15e] transition-colors outline-none"
-                                                value={twoFactorToken[i]}
-                                                onChange={e => handleOTPInput(e, i)}
-                                                onKeyDown={e => handleOTPKeyDown(e, i)}
-                                                onPaste={i === 0 ? handleOTPPaste : undefined}
-                                                aria-label={`OTP digit ${i+1}`}
-                                            />
-                                        ))}
-                                    </div>
+                                    <input
+                                        type="text"
+                                        value={twoFactorToken}
+                                        onChange={(e) => {
+                                            // Allow hex chars for email OTP (4 chars max)
+                                            setTwoFactorToken(e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 4).toUpperCase());
+                                        }}
+                                        placeholder="A1B2"
+                                        className="w-full px-4 py-3 bg-[#0f1611] border border-gray-700 rounded-lg text-white text-center text-lg font-mono tracking-widest focus:outline-none focus:border-[#11a15e]"
+                                        maxLength={4}
+                                    />
                                     <p className="text-gray-500 text-xs mt-2">Enter the 4-digit hex code from your email</p>
                                 </div>
                             ) : (
-                                // TOTP Input
+                                // TOTP/Backup Code Input
                                 <div className="text-center">
-                                    <label htmlFor="totp" className="text-white text-sm font-bold mb-2 block">Authenticator Code</label>
+                                    <label htmlFor="totp" className="text-white text-sm font-bold mb-2 block">
+                                        {usingBackupCode ? 'Backup Code' : 'Authenticator Code'}
+                                    </label>
+                                    <p className="text-gray-400 text-sm mb-4">
+                                        {usingBackupCode 
+                                            ? 'Enter one of your 8-character backup codes:' 
+                                            : 'Enter the 6-digit code from your authenticator app:'
+                                        }
+                                    </p>
                                     <input
                                         type="text"
-                                        inputMode="numeric"
-                                        autoComplete="one-time-code"
-                                        maxLength={6}
-                                        className="w-full h-12 text-center text-2xl font-mono rounded-md border-2 border-[#35c56a69] bg-transparent text-white focus:border-[#11a15e] transition-colors outline-none"
-                                        value={totpToken}
-                                        onChange={handleTOTPInput}
-                                        placeholder="000000"
-                                        aria-label="TOTP code"
+                                        value={twoFactorToken}
+                                        onChange={(e) => {
+                                            if (usingBackupCode) {
+                                                // Allow alphanumeric for backup codes (8 chars max)
+                                                setTwoFactorToken(e.target.value.replace(/[^A-Fa-f0-9]/g, '').slice(0, 8).toUpperCase());
+                                            } else {
+                                                // Allow only digits for TOTP (6 digits max)
+                                                setTwoFactorToken(e.target.value.replace(/\D/g, '').slice(0, 6));
+                                            }
+                                        }}
+                                        placeholder={usingBackupCode ? "ABCD1234" : "000000"}
+                                        className="w-full px-4 py-3 bg-[#0f1611] border border-gray-700 rounded-lg text-white text-center text-lg font-mono tracking-widest focus:outline-none focus:border-[#11a15e]"
+                                        maxLength={usingBackupCode ? 8 : 6}
                                     />
-                                    <p className="text-gray-500 text-xs mt-2">Enter the 6-digit code from your authenticator app</p>
                                 </div>
                             )}
                             
@@ -586,10 +590,37 @@ function Login() {
                                 </div>
                             )}
                             
-                            <button 
-                                type="submit" 
-                                disabled={twoFactorLoading || (twoFactorMethod === 'email' ? twoFactorToken.some(x => !x) : !totpToken || totpToken.length !== 6)}
-                                className={`w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer ${twoFactorLoading || (twoFactorMethod === 'email' ? twoFactorToken.some(x => !x) : !totpToken || totpToken.length !== 6) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            {twoFactorMethod === 'totp' && (
+                                <div className="mt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setUsingBackupCode(!usingBackupCode);
+                                            setTwoFactorToken('');
+                                            setTwoFactorError('');
+                                        }}
+                                        className="text-[#35c56a] hover:text-[#4dd47b] text-sm font-medium transition-colors cursor-pointer"
+                                    >
+                                        {usingBackupCode ? 'Use authenticator app instead' : 'Use backup code instead'}
+                                    </button>
+                                </div>
+                            )}
+                            
+                            <button
+                                onClick={handle2FAVerification}
+                                disabled={twoFactorLoading || 
+                                    (twoFactorMethod === 'email' && twoFactorToken.length !== 4) ||
+                                    (twoFactorMethod === 'totp' && !usingBackupCode && twoFactorToken.length !== 6) || 
+                                    (twoFactorMethod === 'totp' && usingBackupCode && twoFactorToken.length !== 8)
+                                }
+                                className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-200 cursor-pointer ${
+                                    twoFactorLoading || 
+                                    (twoFactorMethod === 'email' && twoFactorToken.length !== 4) ||
+                                    (twoFactorMethod === 'totp' && !usingBackupCode && twoFactorToken.length !== 6) || 
+                                    (twoFactorMethod === 'totp' && usingBackupCode && twoFactorToken.length !== 8)
+                                        ? 'opacity-60 cursor-not-allowed bg-[#35c56a69] text-white'
+                                        : 'bg-[#35c56a69] hover:bg-[#35c56a] text-white hover:scale-105'
+                                }`}
                             >
                                 {twoFactorLoading ? (
                                     <div className="flex items-center justify-center gap-2">
