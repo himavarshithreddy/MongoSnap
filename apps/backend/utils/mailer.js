@@ -81,14 +81,29 @@ const createBaseTemplate = (content, title) => {
             
             .button {
                 display: inline-block;
-                background-color: #3CBC6B;
-                color: #ffffff;
-                text-decoration: none;
+                background-color: #3CBC6B !important;
+                color: #ffffff !important;
+                text-decoration: none !important;
                 padding: 12px 24px;
                 border-radius: 8px;
                 font-weight: 500;
                 font-size: 16px;
                 text-align: center;
+                border: none !important;
+                outline: none !important;
+            }
+            
+            .button:hover {
+                background-color: #2da55a !important;
+                color: #ffffff !important;
+            }
+            
+            .button:visited {
+                color: #ffffff !important;
+            }
+            
+            .button:active {
+                color: #ffffff !important;
             }
             
             .otp-code {
@@ -162,7 +177,7 @@ const createVerificationTemplate = (token) => {
     </div>
     
     <div style="text-align: center;">
-      <a href="${verificationLink}" class="button">Verify Email</a>
+      <a href="${verificationLink}" class="button" style="display: inline-block; background-color: #3CBC6B !important; color: #ffffff !important; text-decoration: none !important; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 16px; text-align: center; border: none !important; outline: none !important;">Verify Email</a>
     </div>
     
     <div class="warning">
@@ -182,7 +197,7 @@ const createPasswordResetTemplate = (link) => {
     </div>
     
     <div style="text-align: center;">
-      <a href="${link}" class="button">Reset Password</a>
+      <a href="${link}" class="button" style="display: inline-block; background-color: #3CBC6B !important; color: #ffffff !important; text-decoration: none !important; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 16px; text-align: center; border: none !important; outline: none !important;">Reset Password</a>
     </div>
     
     <div class="warning">
@@ -220,7 +235,7 @@ const createTwoFactorEnabledTemplate = () => {
     </div>
     
     <div style="text-align: center;">
-      <a href="https://mongosnap.mp:5173" class="button">Go to MongoSnap</a>
+      <a href="https://mongosnap.mp:5173" class="button" style="display: inline-block; background-color: #3CBC6B !important; color: #ffffff !important; text-decoration: none !important; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 16px; text-align: center; border: none !important; outline: none !important;">Go to MongoSnap</a>
     </div>
   `;
   
@@ -236,7 +251,7 @@ const createTwoFactorDisabledTemplate = () => {
     </div>
     
     <div style="text-align: center;">
-      <a href="https://mongosnap.mp:5173/settings" class="button">Re-enable 2FA</a>
+      <a href="https://mongosnap.mp:5173/settings" class="button" style="display: inline-block; background-color: #3CBC6B !important; color: #ffffff !important; text-decoration: none !important; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 16px; text-align: center; border: none !important; outline: none !important;">Re-enable 2FA</a>
     </div>
   `;
   

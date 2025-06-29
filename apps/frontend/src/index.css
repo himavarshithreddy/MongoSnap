@@ -116,7 +116,7 @@ body {
 /* Custom scrollbar for settings modal */
 .custom-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: #35c56a #1a2520;
+    scrollbar-color: #1e3f2b #1a2520;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
