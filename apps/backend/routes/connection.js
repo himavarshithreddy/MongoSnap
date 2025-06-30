@@ -312,6 +312,99 @@ router.post('/:id/test', verifyToken, async (req, res) => {
     }
 });
 
+// Sample database connection endpoint
+router.post('/sample', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        console.log('Connecting to sample database for user:', userId);
+        
+        // Get sample database URI from environment variables
+        const sampleDatabaseURI = process.env.SAMPLE_DATABASE_URI;
+        const sampleNickname = 'Sample Database (Read Only)';
+        
+        if (!sampleDatabaseURI) {
+            return res.status(500).json({
+                message: 'Sample database is not configured',
+                details: 'Please contact support'
+            });
+        }
+        
+        // Test the sample database connection first
+        console.log('Testing sample database connection...');
+        try {
+            await testConnection(sampleDatabaseURI);
+            console.log('Sample database connection test passed');
+        } catch (testError) {
+            console.error('Sample database connection test failed:', testError.message);
+            return res.status(500).json({
+                message: 'Sample database is currently unavailable',
+                details: 'Please try again later or use your own MongoDB connection'
+            });
+        }
+        
+        // Check if user already has a sample database connection
+        let sampleConnection = await Connection.findOne({ 
+            userId, 
+            nickname: sampleNickname 
+        });
+        
+        if (!sampleConnection) {
+            // Create new sample connection entry
+            const encryptedUri = encrypt(sampleDatabaseURI);
+            sampleConnection = new Connection({ 
+                userId, 
+                nickname: sampleNickname, 
+                uri: encryptedUri,
+                isSample: true  // Mark as sample connection
+            });
+            await sampleConnection.save();
+            console.log('Created new sample connection for user:', userId);
+        } else {
+            console.log('Using existing sample connection for user:', userId);
+        }
+        
+        // Connect to the database using the database manager
+        const connectionResult = await databaseManager.connect(
+            userId, 
+            sampleConnection._id.toString(), 
+            sampleDatabaseURI, 
+            sampleNickname
+        );
+        
+        // Update connection status in database
+        sampleConnection.isActive = true;
+        sampleConnection.isConnected = true;
+        sampleConnection.isAlive = true;
+        sampleConnection.disconnectedAt = null;
+        sampleConnection.lastUsed = new Date();
+        await sampleConnection.save();
+        
+        console.log('Sample database connection successful');
+        return res.status(200).json({
+            message: 'Successfully connected to sample database',
+            connection: {
+                _id: sampleConnection._id,
+                nickname: sampleConnection.nickname,
+                host: connectionResult.host,
+                databaseName: connectionResult.databaseName,
+                isActive: sampleConnection.isActive,
+                lastUsed: sampleConnection.lastUsed,
+                createdAt: sampleConnection.createdAt,
+                isSample: true,
+                connectedAt: connectionResult.connectedAt,
+                isReadOnly: true // Mark as read-only for UI
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error connecting to sample database:', error);
+        return res.status(500).json({ 
+            message: 'Failed to connect to sample database',
+            details: error.message 
+        });
+    }
+});
+
 // New endpoint for actual database connection
 router.post('/connect', verifyToken, async (req, res) => {
     try {

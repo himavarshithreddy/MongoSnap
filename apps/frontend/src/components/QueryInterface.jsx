@@ -435,8 +435,10 @@ function QueryInterface({
                 )}
                 
                 {queryError && (
-                    <div className="bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded text-center">
+                    <div className="bg-red-900/80 border border-red-500 text-red-200 px-4 py-3 rounded">
+                        <div className="whitespace-pre-line text-left">
                         {queryError}
+                        </div>
                     </div>
                 )}
 

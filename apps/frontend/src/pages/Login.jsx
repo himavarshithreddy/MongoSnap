@@ -708,16 +708,12 @@ function Login() {
                          <h3 className='text-white font-bold text-lg mb-1'>AI-Powered Queries</h3>
                          <p className='text-gray-300 text-sm'>Natural language to MongoDB query translation</p>
                      </div>
-                    <div id='feature-container-2' className='w-full md:h-32 h-24 bg-[#235337] rounded-xl hover:bg-[#235337e6] hover:scale-102 transition-all duration-300 flex flex-col justify-center px-5'>
-                         <h3 className='text-white font-bold text-lg mb-1'>Safe-by-Design with Undo</h3>
-                         <p className='text-gray-300 text-sm'>Make changes fearlessly. Undo anytime.</p>
-                     </div>
-                    </div>
-                    <div className='w-full h-auto flex flex-col gap-5'>
                     <div id='feature-container-3' className='w-full md:h-32 h-24 bg-[#235337] rounded-xl hover:bg-[#235337e6] hover:scale-102 transition-all duration-300 flex flex-col justify-center px-5'>
                          <h3 className='text-white font-bold text-lg mb-1'>Secure Access</h3>
                          <p className='text-gray-300 text-sm'>Your data and credentials are protected with high-grade security.</p>
                      </div>
+                    </div>
+                    <div className='w-full h-auto flex flex-col gap-5'>
                     <div id='feature-container-4' className='w-full md:h-32 h-24 bg-[#235337] rounded-xl hover:bg-[#235337e6] hover:scale-102 transition-all duration-300 flex flex-col justify-center px-5'>
                          <h3 className='text-white font-bold text-lg mb-1'>Preview and Execute Query</h3>
                          <p className='text-gray-300 text-sm'>Review and run your queries directly from here with confidence</p>

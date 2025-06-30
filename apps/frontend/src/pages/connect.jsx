@@ -424,6 +424,41 @@ function Connect() {
         }
     };
 
+    // Handle sample database connection
+    const handleSampleDatabase = async () => {
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        
+        try {
+            console.log('Connecting to sample database...');
+            
+            const response = await fetchWithAuth('/api/connection/sample', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            console.log('Sample database response status:', response.status);
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Sample database response data:', data);
+                
+                // Navigate to playground with sample database
+                navigate(`/playground?connectionId=${data.connection._id}&isSample=true`);
+            } else {
+                const errorData = await response.json();
+                console.error('Sample database error response:', errorData);
+                setError(errorData.message || 'Failed to connect to sample database');
+            }
+        } catch (error) {
+            console.error('Error connecting to sample database:', error);
+            setError('Failed to connect to sample database');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen w-full flex">
         {/* Mobile View - Show message to use desktop */}
@@ -489,14 +524,25 @@ function Connect() {
                         previousConnections.map((connection) => (
                             <div 
                                 key={connection._id}
-                                className='bg-brand-tertiary rounded-lg p-3 cursor-pointer hover:bg-opacity-80 transition-all duration-200 border border-transparent hover:border-brand-quaternary'
+                                className={`${connection.isSample 
+                                    ? 'bg-brand-quaternary/20 border-brand-quaternary/30' 
+                                    : 'bg-brand-tertiary border-transparent hover:border-brand-quaternary'
+                                } rounded-lg p-3 cursor-pointer hover:bg-opacity-80 transition-all duration-200 border`}
                                 onClick={() => loadConnection(connection)}
                             >
                                 <div className='flex items-start justify-between mb-2'>
-                                    <h3 className='text-white font-medium text-sm truncate flex-1'>
+                                    <div className='flex items-center gap-2 flex-1'>
+                                        <h3 className='text-white font-medium text-sm truncate'>
                                         {connection.nickname}
                                     </h3>
+                                        {connection.isSample && (
+                                            <span className='text-xs bg-brand-quaternary/50 text-brand-quaternary px-1.5 py-0.5 rounded font-medium'>
+                                                DEMO
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className='flex items-center gap-1'>
+                                        {!connection.isSample && (
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -507,11 +553,15 @@ function Connect() {
                                         >
                                             <Trash2 size={12} />
                                         </button>
+                                        )}
                                     </div>
                                 </div>
                                 
                                 <div className='text-gray-400 text-xs mb-2 truncate'>
-                                    {connection.uri ? getMaskedURI(connection.uri) : '••••••••••••••••••••••••••••••••••••••••'}
+                                    {connection.isSample 
+                                        ? 'Sample Database (Read Only)' 
+                                        : (connection.uri ? getMaskedURI(connection.uri) : '••••••••••••••••••••••••••••••••••••••••')
+                                    }
                                 </div>
                                 
                                 <div className='flex items-center gap-1 text-gray-300'>
@@ -519,6 +569,9 @@ function Connect() {
                                     <span className='text-xs'>{formatDate(connection.lastUsed)}</span>
                                     {connection.isActive && (
                                         <span className='text-xs text-green-400'>• Active</span>
+                                    )}
+                                    {connection.isSample && (
+                                        <span className='text-xs text-brand-quaternary'>• Read Only</span>
                                     )}
                                 </div>
                             </div>
@@ -740,6 +793,25 @@ function Connect() {
                         ) : (
                             <span>Test</span>
                         )}
+                    </button>
+                </div>
+                
+                {/* Sample Database Section */}
+                <div className='w-full mt-6 pt-6 border-t border-brand-tertiary'>
+                    <div className='text-center mb-4'>
+                        <h3 className='text-white font-semibold mb-2'>Try MongoSnap with Sample Data</h3>
+                        <p className='text-gray-400 text-sm'>
+                            No MongoDB setup? Connect to our read-only sample database to explore MongoSnap's features.
+                        </p>
+                    </div>
+                    
+                    <button
+                        type="button"
+                        onClick={handleSampleDatabase}
+                        disabled={loading}
+                        className={`w-full h-12 rounded-md bg-brand-quaternary/70 text-white text-md font-bold uppercase hover:bg-brand-quaternary hover:scale-102 transition-all duration-300 cursor-pointer border border-brand-quaternary/50 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                        {loading ? 'Connecting to Sample...' : 'Try Sample Database'}
                     </button>
                 </div>
                 

@@ -39,6 +39,10 @@ const connectionSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+    isSample: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 connectionSchema.index({ userId: 1, nickname: 1 }, { unique: true });

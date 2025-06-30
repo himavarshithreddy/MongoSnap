@@ -404,7 +404,64 @@ function Playground() {
                 fetchQueryHistory();
             } else {
                 const errorData = await response.json();
-                setQueryError(errorData.message || 'Failed to execute query');
+                
+                // Enhanced error handling for read-only databases and permissions
+                let userFriendlyError = errorData.message || 'Failed to execute query';
+                
+                // Check if this is a permission/read-only error
+                if (errorData.details) {
+                    const details = errorData.details.toLowerCase();
+                    
+                    // Detect read-only or permission errors
+                    if (details.includes('not allowed') || details.includes('permission') || 
+                        details.includes('unauthorized') || details.includes('forbidden')) {
+                        
+                        // Check if this is a sample database (from URL params)
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const isSample = urlParams.get('isSample') === 'true';
+                        
+                        if (isSample || connectionData?.isSample || connectionData?.isReadOnly) {
+                            // Sample database specific error
+                            userFriendlyError = '🔒 Sample Database is Read-Only';
+                            
+                            // Add detailed explanation based on operation type
+                            if (details.includes('insert')) {
+                                userFriendlyError += '\n\nTried to insert data, but this demo database only allows read operations like find(), count(), and aggregate(). To test write operations, connect to your own MongoDB database.';
+                            } else if (details.includes('update') || details.includes('modify')) {
+                                userFriendlyError += '\n\nTried to update data, but this demo database only allows read operations like find(), count(), and aggregate(). To test write operations, connect to your own MongoDB database.';
+                            } else if (details.includes('delete') || details.includes('remove')) {
+                                userFriendlyError += '\n\nTried to delete data, but this demo database only allows read operations like find(), count(), and aggregate(). To test write operations, connect to your own MongoDB database.';
+                            } else if (details.includes('drop')) {
+                                userFriendlyError += '\n\nTried to drop collection/database, but this demo database only allows read operations like find(), count(), and aggregate(). To test admin operations, connect to your own MongoDB database.';
+                            } else {
+                                userFriendlyError += '\n\nThis demo database only allows read operations like find(), count(), and aggregate(). To test write operations, connect to your own MongoDB database.';
+                            }
+                        } else {
+                            // Regular permission error for user's own database
+                            userFriendlyError = '🚫 Permission Denied';
+                            userFriendlyError += '\n\nYour database user doesn\'t have permission for this operation. Check your MongoDB user roles and permissions.';
+                            
+                            if (errorData.details) {
+                                userFriendlyError += '\n\nDetails: ' + errorData.details;
+                            }
+                        }
+                    } else if (details.includes('timeout') || details.includes('connection')) {
+                        userFriendlyError = '⏱️ Connection Timeout\n\nThe query took too long to execute or connection was lost. Try a simpler query or check your connection.';
+                    } else if (details.includes('syntax') || details.includes('invalid')) {
+                        userFriendlyError = '❌ Query Syntax Error\n\nThere\'s an issue with your query syntax. Check for typos and ensure proper MongoDB query format.';
+                        if (errorData.details) {
+                            userFriendlyError += '\n\nDetails: ' + errorData.details;
+                        }
+                    } else {
+                        // Include details for other errors
+                        userFriendlyError = errorData.message || 'Failed to execute query';
+                        if (errorData.details) {
+                            userFriendlyError += '\n\nDetails: ' + errorData.details;
+                        }
+                    }
+                }
+                
+                setQueryError(userFriendlyError);
                 console.error('Query execution failed:', errorData);
             }
         } catch (error) {
@@ -557,7 +614,64 @@ function Playground() {
                 console.log('History query executed successfully:', data.result);
             } else {
                 const errorData = await response.json();
-                setQueryError(errorData.message || 'Failed to execute query');
+                
+                // Enhanced error handling for read-only databases and permissions
+                let userFriendlyError = errorData.message || 'Failed to execute query';
+                
+                // Check if this is a permission/read-only error
+                if (errorData.details) {
+                    const details = errorData.details.toLowerCase();
+                    
+                    // Detect read-only or permission errors
+                    if (details.includes('not allowed') || details.includes('permission') || 
+                        details.includes('unauthorized') || details.includes('forbidden')) {
+                        
+                        // Check if this is a sample database (from URL params)
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const isSample = urlParams.get('isSample') === 'true';
+                        
+                        if (isSample || connectionData?.isSample || connectionData?.isReadOnly) {
+                            // Sample database specific error
+                            userFriendlyError = '🔒 Sample Database is Read-Only';
+                            
+                            // Add detailed explanation based on operation type
+                            if (details.includes('insert')) {
+                                userFriendlyError += '\n\nTried to insert data, but this demo database only allows read operations like find(), count(), and aggregate(). To test write operations, connect to your own MongoDB database.';
+                            } else if (details.includes('update') || details.includes('modify')) {
+                                userFriendlyError += '\n\nTried to update data, but this demo database only allows read operations like find(), count(), and aggregate(). To test write operations, connect to your own MongoDB database.';
+                            } else if (details.includes('delete') || details.includes('remove')) {
+                                userFriendlyError += '\n\nTried to delete data, but this demo database only allows read operations like find(), count(), and aggregate(). To test write operations, connect to your own MongoDB database.';
+                            } else if (details.includes('drop')) {
+                                userFriendlyError += '\n\nTried to drop collection/database, but this demo database only allows read operations like find(), count(), and aggregate(). To test admin operations, connect to your own MongoDB database.';
+                            } else {
+                                userFriendlyError += '\n\nThis demo database only allows read operations like find(), count(), and aggregate(). To test write operations, connect to your own MongoDB database.';
+                            }
+                        } else {
+                            // Regular permission error for user's own database
+                            userFriendlyError = '🚫 Permission Denied';
+                            userFriendlyError += '\n\nYour database user doesn\'t have permission for this operation. Check your MongoDB user roles and permissions.';
+                            
+                            if (errorData.details) {
+                                userFriendlyError += '\n\nDetails: ' + errorData.details;
+                            }
+                        }
+                    } else if (details.includes('timeout') || details.includes('connection')) {
+                        userFriendlyError = '⏱️ Connection Timeout\n\nThe query took too long to execute or connection was lost. Try a simpler query or check your connection.';
+                    } else if (details.includes('syntax') || details.includes('invalid')) {
+                        userFriendlyError = '❌ Query Syntax Error\n\nThere\'s an issue with your query syntax. Check for typos and ensure proper MongoDB query format.';
+                        if (errorData.details) {
+                            userFriendlyError += '\n\nDetails: ' + errorData.details;
+                        }
+                    } else {
+                        // Include details for other errors
+                        userFriendlyError = errorData.message || 'Failed to execute query';
+                        if (errorData.details) {
+                            userFriendlyError += '\n\nDetails: ' + errorData.details;
+                        }
+                    }
+                }
+                
+                setQueryError(userFriendlyError);
                 console.error('History query execution failed:', errorData);
             }
         } catch (error) {
@@ -817,7 +931,14 @@ function Playground() {
                     <div className='space-y-3'>
                         <div>
                             <label className='text-gray-400 text-xs font-medium'>Connection Name</label>
+                            <div className='flex items-center gap-2'>
                             <p className='text-white text-sm font-medium'>{connectionData?.nickname}</p>
+                                {(connectionData?.isSample || connectionData?.isReadOnly || new URLSearchParams(window.location.search).get('isSample') === 'true') && (
+                                    <span className='text-xs bg-brand-quaternary/50 text-brand-quaternary px-1.5 py-0.5 rounded font-medium'>
+                                        DEMO
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         
                         <div>
@@ -829,6 +950,20 @@ function Playground() {
                             <label className='text-gray-400 text-xs font-medium'>Host</label>
                             <p className='text-white text-sm'>{connectionData?.host}</p>
                         </div>
+                        
+                        {/* Read-Only Warning for Sample Databases */}
+                        {(connectionData?.isSample || connectionData?.isReadOnly || new URLSearchParams(window.location.search).get('isSample') === 'true') && (
+                            <div className='bg-brand-quaternary/20 border border-brand-quaternary/30 rounded-lg p-3 mt-3'>
+                                <div className='flex items-center gap-2 mb-2'>
+                                    <span className='text-brand-quaternary text-lg'>🔒</span>
+                                    <span className='text-brand-quaternary text-xs font-bold'>Read-Only Sample Database</span>
+                                </div>
+                                <p className='text-gray-300 text-xs leading-relaxed'>
+                                    This demo database only allows read operations like find(), count(), and aggregate(). 
+                                    To test write operations, connect to your own MongoDB database.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
