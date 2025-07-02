@@ -504,6 +504,24 @@ function Connect() {
             </div>
             
             <div className='flex flex-col gap-4 px-4 flex-1 overflow-hidden'>
+                {/* Sample Database Section */}
+                <div className='bg-brand-quaternary/20 border border-brand-quaternary/30 rounded-lg p-4'>
+                    <div className='text-center mb-3'>
+                        <h3 className='text-white font-semibold mb-1 text-sm'>Try MongoSnap</h3>
+                        <p className='text-gray-300 text-xs'>
+                            Explore features with our sample database
+                        </p>
+                    </div>
+                    
+                    <button
+                        onClick={handleSampleDatabase}
+                        disabled={loading}
+                        className={`w-full py-2 px-3 rounded-md bg-brand-quaternary/70 text-white text-sm font-medium hover:bg-brand-quaternary hover:scale-102 transition-all duration-300 cursor-pointer border border-brand-quaternary/50 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                        {loading ? 'Connecting...' : 'Try Sample Database'}
+                    </button>
+                </div>
+
                 <div className='flex items-center justify-between'>
                     <h2 className='text-white text-lg font-semibold'>Previous Connections</h2>
                 </div>
@@ -796,26 +814,7 @@ function Connect() {
                     </button>
                 </div>
                 
-                {/* Sample Database Section */}
-                <div className='w-full mt-6 pt-6 border-t border-brand-tertiary'>
-                    <div className='text-center mb-4'>
-                        <h3 className='text-white font-semibold mb-2'>Try MongoSnap with Sample Data</h3>
-                        <p className='text-gray-400 text-sm'>
-                            No MongoDB setup? Connect to our read-only sample database to explore MongoSnap's features.
-                        </p>
-                    </div>
-                    
-                    <button
-                        type="button"
-                        onClick={handleSampleDatabase}
-                        disabled={loading}
-                        className={`w-full h-12 rounded-md bg-brand-quaternary/70 text-white text-md font-bold uppercase hover:bg-brand-quaternary hover:scale-102 transition-all duration-300 cursor-pointer border border-brand-quaternary/50 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    >
-                        {loading ? 'Connecting to Sample...' : 'Try Sample Database'}
-                    </button>
-                </div>
-                
-                <p className='text-gray-400 text-sm text-center mt-2'>
+                <p className='text-gray-400 text-sm text-center mt-6'>
                     Your connection details are secured and encrypted.
                 </p>
             </form>
