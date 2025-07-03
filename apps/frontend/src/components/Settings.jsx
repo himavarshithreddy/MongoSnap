@@ -690,8 +690,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                                         <div className="flex items-center gap-2 bg-green-900/50 border border-green-500 text-green-200 px-4 py-3 rounded-lg mb-4">
                                             <Check size={16} />
                                             <span className="text-sm">{loginNotificationsSuccess}</span>
-                                        </div>
-                                    )}
+                            </div>
+                        )}
 
                                     {loginNotificationsError && (
                                         <div className="flex items-center gap-2 bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-4">
