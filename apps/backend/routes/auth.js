@@ -348,4 +348,38 @@ router.get('/usage-stats', generalAuthLimiter, verifyToken, async (req, res) => 
   }
 });
 
+// GET /me - Get current user data
+router.get('/me', generalAuthLimiter, verifyToken, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    const user = await User.findById(userId).select('-password -resetPasswordToken -twoFactorToken -verificationToken');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ 
+      success: true,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        isVerified: user.isVerified,
+        oauthProvider: user.oauthProvider,
+        createdAt: user.createdAt,
+        loginNotificationsEnabled: user.loginNotificationsEnabled !== false, // Default to true if undefined
+        twoFactorEnabled: user.twoFactorEnabled || false,
+        twoFactormethod: user.twoFactormethod || null
+      }
+    });
+
+  } catch (err) {
+    console.error('Get user data error:', err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error while fetching user data' 
+    });
+  }
+});
+
 module.exports = router;  

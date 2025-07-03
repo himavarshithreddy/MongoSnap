@@ -80,6 +80,7 @@ app.use('/api/verify-email', publicLimiter, verifyRoutes);
 app.use('/api/auth', publicLimiter, oauthRoutes); // OAuth routes are also public
 
 // Protected routes with standard rate limiting (already have specific limiters)
+app.use('/api', authRoutes); // Mount auth routes at /api for protected endpoints like /api/me
 app.use('/api/connection', connectionRoutes);
 app.use('/api/query', queryHistoryRoutes);
 app.use('/api/twofactor', twoFactorRoutes);
