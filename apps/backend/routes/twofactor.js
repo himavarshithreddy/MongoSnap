@@ -52,7 +52,7 @@ const getLoginDetails = (req) => {
     timestamp: new Date(),
     ipAddress: ipAddress,
     userAgent: deviceInfo,
-    location: null // We could integrate with a geolocation service here
+    location: null 
   };
 };
 

@@ -3,12 +3,99 @@ const router = express.Router();
 const { verifyToken } = require('./middleware');
 const Connection = require('../models/Connection');
 const QueryHistory = require('../models/QueryHistory');
+const UserUsage = require('../models/UserUsage');
 const databaseManager = require('../utils/databaseManager');
 const crypto = require('crypto');
 const dotenv = require('dotenv');
 const { MongoClient, ObjectId } = require('mongodb');
 const geminiApi = require('../utils/geminiApi');
+const rateLimit = require('express-rate-limit');
 dotenv.config();
+
+// Rate limiters for database operations
+const connectionLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 connection attempts per 15 minutes per IP
+    message: { message: 'Too many connection attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        console.log(`Connection rate limit exceeded for IP: ${req.ip}`);
+        res.status(429).json({ message: 'Too many connection attempts, please try again later' });
+    }
+});
+
+// User-based usage checking middleware
+const checkQueryUsage = async (req, res, next) => {
+    try {
+        const userId = req.userId;
+        const userUsage = await UserUsage.getOrCreateUsage(userId);
+        const canExecute = userUsage.canExecuteQuery();
+        
+        if (!canExecute.allowed) {
+            const message = canExecute.reason === 'daily_limit_exceeded' 
+                ? `Daily query limit reached (${canExecute.dailyLimit}/day). Resets tomorrow.`
+                : `Monthly query limit reached (${canExecute.monthlyLimit}/month). Resets next month.`;
+            
+            return res.status(429).json({ 
+                message: message,
+                limitType: canExecute.reason,
+                usage: {
+                    daily: { used: canExecute.dailyLimit - canExecute.dailyRemaining, limit: canExecute.dailyLimit },
+                    monthly: { used: canExecute.monthlyLimit - canExecute.monthlyRemaining, limit: canExecute.monthlyLimit }
+                }
+            });
+        }
+        
+        req.userUsage = userUsage;
+        next();
+    } catch (error) {
+        console.error('Error checking query usage:', error);
+        res.status(500).json({ message: 'Error checking usage limits' });
+    }
+};
+
+const checkAIUsage = async (req, res, next) => {
+    try {
+        const userId = req.userId;
+        const userUsage = await UserUsage.getOrCreateUsage(userId);
+        const canGenerate = userUsage.canGenerateAI();
+        
+        if (!canGenerate.allowed) {
+            const message = canGenerate.reason === 'daily_limit_exceeded' 
+                ? `Daily AI generation limit reached (${canGenerate.dailyLimit}/day). Resets tomorrow.`
+                : `Monthly AI generation limit reached (${canGenerate.monthlyLimit}/month). Resets next month.`;
+            
+            return res.status(429).json({ 
+                message: message,
+                limitType: canGenerate.reason,
+                usage: {
+                    daily: { used: canGenerate.dailyLimit - canGenerate.dailyRemaining, limit: canGenerate.dailyLimit },
+                    monthly: { used: canGenerate.monthlyLimit - canGenerate.monthlyRemaining, limit: canGenerate.monthlyLimit }
+                }
+            });
+        }
+        
+        req.userUsage = userUsage;
+        next();
+    } catch (error) {
+        console.error('Error checking AI usage:', error);
+        res.status(500).json({ message: 'Error checking usage limits' });
+    }
+};
+
+const generalDbLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // 100 requests per 15 minutes for general DB operations
+    message: { message: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    handler: (req, res) => {
+        console.log(`General DB rate limit exceeded for IP: ${req.ip}`);
+        res.status(429).json({ message: 'Too many requests, please try again later' });
+    }
+});
 
 const ENCRYPTION_KEY = process.env.CONNECTION_ENCRYPTION_KEY;
 const ENCRYPTION_IV_LENGTH = 16;
@@ -105,7 +192,7 @@ router.post('/', verifyToken, async (req, res) => {
     }
 });
 
-router.post('/test-uri', async (req, res) => {
+router.post('/test-uri', connectionLimiter, async (req, res) => {
     try {
         const { uri } = req.body;
         
@@ -313,7 +400,7 @@ router.post('/:id/test', verifyToken, async (req, res) => {
 });
 
 // Sample database connection endpoint
-router.post('/sample', verifyToken, async (req, res) => {
+router.post('/sample', connectionLimiter, verifyToken, async (req, res) => {
     try {
         const userId = req.userId;
         console.log('Connecting to sample database for user:', userId);
@@ -406,7 +493,7 @@ router.post('/sample', verifyToken, async (req, res) => {
 });
 
 // New endpoint for actual database connection
-router.post('/connect', verifyToken, async (req, res) => {
+router.post('/connect', connectionLimiter, verifyToken, async (req, res) => {
     try {
         const userId = req.userId;
         const { nickname, uri, connectionId } = req.body;
@@ -678,7 +765,7 @@ router.post('/:id/reconnect', verifyToken, async (req, res) => {
 });
 
 // Execute a query on the connected database
-router.post('/:id/query', verifyToken, async (req, res) => {
+router.post('/:id/query', verifyToken, checkQueryUsage, async (req, res) => {
     try {
         const userId = req.userId;
         const connectionId = req.params.id;
@@ -737,6 +824,10 @@ router.post('/:id/query', verifyToken, async (req, res) => {
             default:
                 return res.status(400).json({ message: 'Unsupported operation.' });
         }
+
+        // Track successful query execution
+        await req.userUsage.incrementQueryExecution(operation, connectionId);
+
         return res.status(200).json({ result });
     } catch (error) {
         console.error('Error executing query:', error);
@@ -833,7 +924,7 @@ const convertExtendedJSON = (obj) => {
 };
 
 // Execute a raw MongoDB query string directly (bypass parsing)
-router.post('/:id/execute-raw', verifyToken, async (req, res) => {
+router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) => {
     try {
         const userId = req.userId;
         const connectionId = req.params.id;
@@ -991,6 +1082,12 @@ router.post('/:id/execute-raw', verifyToken, async (req, res) => {
             console.error('Error saving raw query to history:', historyError);
             // Don't fail the main query if history saving fails
         }
+
+        // Track successful query execution
+        await req.userUsage.incrementQueryExecution(
+            queryString.match(/\.([a-zA-Z]+)\(/)?.[1] || 'unknown',
+            connectionId
+        );
 
         return res.status(200).json({ result });
     } catch (error) {
@@ -1458,7 +1555,7 @@ router.post('/disconnect-on-close', async (req, res) => {
 });
 
 // Generate MongoDB query from natural language using Gemini API
-router.post('/:id/generate-query', verifyToken, async (req, res) => {
+router.post('/:id/generate-query', verifyToken, checkAIUsage, async (req, res) => {
     try {
         const userId = req.userId;
         const connectionId = req.params.id;
@@ -1589,6 +1686,12 @@ router.post('/:id/generate-query', verifyToken, async (req, res) => {
         
         // Generate explanation
         const explanation = await geminiApi.explainQuery(generatedQuery, naturalLanguage);
+
+        // Track successful AI generation
+        await req.userUsage.incrementAIGeneration(
+            'query_generation',
+            connectionId
+        );
 
         res.json({
             success: true,

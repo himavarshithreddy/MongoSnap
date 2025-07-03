@@ -2,14 +2,66 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const UserUsage = require('../models/UserUsage');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const { sendVerificationEmail, sendResetPasswordEmail, sendTwoFactorEmailOTP, sendLoginNotificationEmail } = require('../utils/mailer');
 const databaseManager = require('../utils/databaseManager');
 const { verifyToken } = require('./middleware');
 dotenv.config();
 const {generateAccessToken,generateRefreshToken,sendRefreshToken} = require('../utils/tokengeneration');
+
+// Rate limiters for different types of operations
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 login attempts per 15 minutes per IP
+    message: { message: 'Too many authentication attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        console.log(`Auth rate limit exceeded for IP: ${req.ip}`);
+        res.status(429).json({ message: 'Too many authentication attempts, please try again later' });
+    }
+});
+
+const signupLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // 3 signup attempts per hour per IP
+    message: { message: 'Too many signup attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        console.log(`Signup rate limit exceeded for IP: ${req.ip}`);
+        res.status(429).json({ message: 'Too many signup attempts, please try again later' });
+    }
+});
+
+const passwordResetLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // 3 password reset requests per hour per IP
+    message: { message: 'Too many password reset requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        console.log(`Password reset rate limit exceeded for IP: ${req.ip}`);
+        res.status(429).json({ message: 'Too many password reset requests, please try again later' });
+    }
+});
+
+const generalAuthLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // 20 requests per 15 minutes for general auth operations
+    message: { message: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true, // Don't count successful requests
+    handler: (req, res) => {
+        console.log(`General auth rate limit exceeded for IP: ${req.ip}`);
+        res.status(429).json({ message: 'Too many requests, please try again later' });
+    }
+});
 
 // Helper function to get login details from request
 const getLoginDetails = (req) => {
@@ -64,7 +116,7 @@ const sendLoginNotification = async (user, req) => {
 
 
 // POST /signup
-router.post('/signup', async (req, res) => {
+router.post('/signup', signupLimiter, async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
@@ -92,7 +144,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // POST /login
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   const jwt = require('jsonwebtoken');
 
@@ -147,7 +199,7 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ message: 'Server error during login' });
   }
 });
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', generalAuthLimiter, async (req, res) => {
   const token = req.cookies.refreshToken;
   if (!token) return res.sendStatus(401);
 
@@ -200,7 +252,7 @@ router.post('/logout', async (req, res) => {
 });
 
 // POST /request-password-change - Send password change link to authenticated user
-router.post('/request-password-change', verifyToken, async (req, res) => {
+router.post('/request-password-change', passwordResetLimiter, verifyToken, async (req, res) => {
   const userId = req.userId;
 
   try {
@@ -239,7 +291,7 @@ router.post('/request-password-change', verifyToken, async (req, res) => {
 });
 
 // PUT /update-login-notifications - Update login notifications preference
-router.put('/update-login-notifications', verifyToken, async (req, res) => {
+router.put('/update-login-notifications', generalAuthLimiter, verifyToken, async (req, res) => {
   const userId = req.userId;
   const { loginNotificationsEnabled } = req.body;
 
@@ -268,6 +320,31 @@ router.put('/update-login-notifications', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('Update login notifications error:', err);
     res.status(500).json({ message: 'Server error during login notifications update' });
+  }
+});
+
+// GET /usage-stats - Get user's query and AI generation usage statistics
+router.get('/usage-stats', generalAuthLimiter, verifyToken, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    // Get or create usage record for user
+    const userUsage = await UserUsage.getOrCreateUsage(userId);
+    
+    // Get usage statistics
+    const stats = userUsage.getUsageStats();
+
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+
+  } catch (err) {
+    console.error('Get usage stats error:', err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error while fetching usage statistics' 
+    });
   }
 });
 

@@ -40,6 +40,8 @@ function Playground() {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [savedQueriesLoading, setSavedQueriesLoading] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [usageStats, setUsageStats] = useState(null);
+    const [usageLoading, setUsageLoading] = useState(false);
 
     // Fetch query history from backend
     const fetchQueryHistory = async () => {
@@ -81,12 +83,32 @@ function Playground() {
         }
     };
 
+    // Fetch user usage statistics
+    const fetchUsageStats = async () => {
+        setUsageLoading(true);
+        try {
+            const response = await fetchWithAuth('/api/auth/usage-stats');
+            if (response.ok) {
+                const data = await response.json();
+                setUsageStats(data.data);
+            } else {
+                console.error('Failed to fetch usage statistics');
+            }
+        } catch (error) {
+            console.error('Error fetching usage statistics:', error);
+        } finally {
+            setUsageLoading(false);
+        }
+    };
+
     // Initialize data with real backend data
     useEffect(() => {
         if (connectionIdRef.current) {
             fetchQueryHistory();
             fetchSavedQueries();
         }
+        // Fetch usage stats regardless of connection
+        fetchUsageStats();
     }, [connectionIdRef.current]);
 
     useEffect(() => {
@@ -400,10 +422,35 @@ function Playground() {
                 setQueryResult(data.result);
                 console.log('Query executed successfully:', data.result);
                 
-                // Refresh query history after successful execution
+                // Refresh query history and usage stats after successful execution
                 fetchQueryHistory();
+                fetchUsageStats();
             } else {
                 const errorData = await response.json();
+                
+                // Handle usage limit errors (429 status)
+                if (response.status === 429) {
+                    let limitError = '🚫 Usage Limit Reached\n\n';
+                    
+                    if (errorData.limitType === 'daily_limit_exceeded') {
+                        limitError += `You've reached your daily query limit. Your limit will reset tomorrow.\n\n`;
+                    } else if (errorData.limitType === 'monthly_limit_exceeded') {
+                        limitError += `You've reached your monthly query limit. Your limit will reset next month.\n\n`;
+                    } else {
+                        limitError += `${errorData.message}\n\n`;
+                    }
+                    
+                    if (errorData.usage) {
+                        limitError += `Current Usage:\n`;
+                        limitError += `Daily: ${errorData.usage.daily.used}/${errorData.usage.daily.limit}\n`;
+                        limitError += `Monthly: ${errorData.usage.monthly.used}/${errorData.usage.monthly.limit}`;
+                    }
+                    
+                    setQueryError(limitError);
+                    // Refresh usage stats to reflect current state
+                    fetchUsageStats();
+                    return;
+                }
                 
                 // Enhanced error handling for read-only databases and permissions
                 let userFriendlyError = errorData.message || 'Failed to execute query';
@@ -1006,6 +1053,80 @@ function Playground() {
                     </button>
                 </div>
 
+                {/* Usage Statistics */}
+                {usageStats && (
+                    <div className='bg-brand-tertiary rounded-lg p-4 border border-brand-quaternary'>
+                        <h3 className='text-white text-sm font-semibold mb-3'>Usage Limits</h3>
+                        
+                        {/* Query Execution Usage */}
+                        <div className='mb-4'>
+                            <div className='flex items-center justify-between mb-1'>
+                                <span className='text-gray-400 text-xs font-medium'>Query Execution</span>
+                                <span className='text-white text-xs'>
+                                    {usageStats.queryExecution.daily.used}/{usageStats.queryExecution.daily.limit}
+                                </span>
+                            </div>
+                            <div className='w-full bg-brand-secondary rounded-full h-2 mb-1'>
+                                <div 
+                                    className={`h-2 rounded-full transition-all duration-300 ${
+                                        usageStats.queryExecution.daily.percentage >= 90 ? 'bg-red-500' :
+                                        usageStats.queryExecution.daily.percentage >= 70 ? 'bg-yellow-500' :
+                                        'bg-green-500'
+                                    }`}
+                                    style={{ width: `${Math.min(usageStats.queryExecution.daily.percentage, 100)}%` }}
+                                ></div>
+                            </div>
+                            <div className='flex justify-between text-xs text-gray-400'>
+                                <span>Daily: {usageStats.queryExecution.daily.remaining} left</span>
+                                <span>Monthly: {usageStats.queryExecution.monthly.used}/{usageStats.queryExecution.monthly.limit}</span>
+                            </div>
+                        </div>
+                        
+                        {/* AI Generation Usage */}
+                        <div>
+                            <div className='flex items-center justify-between mb-1'>
+                                <span className='text-gray-400 text-xs font-medium'>AI Generation</span>
+                                <span className='text-white text-xs'>
+                                    {usageStats.aiGeneration.daily.used}/{usageStats.aiGeneration.daily.limit}
+                                </span>
+                            </div>
+                            <div className='w-full bg-brand-secondary rounded-full h-2 mb-1'>
+                                <div 
+                                    className={`h-2 rounded-full transition-all duration-300 ${
+                                        usageStats.aiGeneration.daily.percentage >= 90 ? 'bg-red-500' :
+                                        usageStats.aiGeneration.daily.percentage >= 70 ? 'bg-yellow-500' :
+                                        'bg-green-500'
+                                    }`}
+                                    style={{ width: `${Math.min(usageStats.aiGeneration.daily.percentage, 100)}%` }}
+                                ></div>
+                            </div>
+                            <div className='flex justify-between text-xs text-gray-400'>
+                                <span>Daily: {usageStats.aiGeneration.daily.remaining} left</span>
+                                <span>Monthly: {usageStats.aiGeneration.monthly.used}/{usageStats.aiGeneration.monthly.limit}</span>
+                            </div>
+                        </div>
+                        
+                        {/* Refresh button */}
+                        <button
+                            onClick={fetchUsageStats}
+                            disabled={usageLoading}
+                            className='w-full cursor-pointer mt-3 flex items-center justify-center gap-2 p-2 bg-brand-secondary text-gray-300 rounded-md hover:text-white hover:bg-opacity-80 transition-all duration-200 text-xs disabled:opacity-50'
+                        >
+                            {usageLoading ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-brand-quaternary"></div>
+                                    <span>Updating...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <RefreshCw size={12} />
+                                    <span>Refresh Usage</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                )}
+
                 {/* Navigation */}
                 <div className='space-y-2'>
                     {!showConnectionConfirm ? (
@@ -1214,6 +1335,7 @@ function Playground() {
                         saveMessage={saveMessage}
                         queryMode={queryMode}
                         setQueryMode={setQueryMode}
+                        onUsageUpdate={fetchUsageStats}
                     />
                 )}
             </div>

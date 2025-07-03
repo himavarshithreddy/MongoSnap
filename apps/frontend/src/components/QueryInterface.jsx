@@ -14,7 +14,8 @@ function QueryInterface({
     onSaveQuery,
     saveMessage,
     queryMode,
-    setQueryMode
+    setQueryMode,
+    onUsageUpdate
 }) {
     const [generatedQuery, setGeneratedQuery] = useState('');
     const [queryExplanation, setQueryExplanation] = useState('');
@@ -207,16 +208,48 @@ function QueryInterface({
                     setGeneratedQuery(data.data.query);
                     setQueryExplanation(data.data.explanation);
                     setShowGeneratedQuery(true);
+                    
+                    // Update usage stats after successful AI generation
+                    if (onUsageUpdate) {
+                        onUsageUpdate();
+                    }
                 } else {
                     throw new Error(data.message || 'Failed to generate query');
                 }
             } else {
                 const errorData = await response.json();
+                
+                // Handle usage limit errors (429 status)
+                if (response.status === 429) {
+                    let limitError = '🚫 AI Generation Limit Reached\n\n';
+                    
+                    if (errorData.limitType === 'daily_limit_exceeded') {
+                        limitError += `You've reached your daily AI generation limit. Your limit will reset tomorrow.\n\n`;
+                    } else if (errorData.limitType === 'monthly_limit_exceeded') {
+                        limitError += `You've reached your monthly AI generation limit. Your limit will reset next month.\n\n`;
+                    } else {
+                        limitError += `${errorData.message}\n\n`;
+                    }
+                    
+                    if (errorData.usage) {
+                        limitError += `Current Usage:\n`;
+                        limitError += `Daily: ${errorData.usage.daily.used}/${errorData.usage.daily.limit}\n`;
+                        limitError += `Monthly: ${errorData.usage.monthly.used}/${errorData.usage.monthly.limit}`;
+                    }
+                    
+                    throw new Error(limitError);
+                }
+                
                 throw new Error(errorData.message || 'Failed to generate query');
             }
         } catch (error) {
             console.error('Error generating query:', error);
             setQueryError(error.message || 'Failed to generate query');
+            
+            // Update usage stats when there's an error (especially for usage limits)
+            if (onUsageUpdate) {
+                onUsageUpdate();
+            }
         } finally {
             setIsGenerating(false);
         }

@@ -15,6 +15,7 @@ const queryHistoryRoutes = require('./routes/queryHistory');
 const databaseManager = require('./utils/databaseManager');
 const twoFactorRoutes = require('./routes/twofactor');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 dotenv.config();
 
 const app = express();
@@ -26,14 +27,63 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-app.use('/api/auth', authRoutes);
-app.use('/api', testRoutes);
-app.use('/api', verifyRoutes);
-app.use('/api', forgotPasswordRoutes);
-app.use('/api/auth', oauthRoutes);
+// Global rate limiter - applies to all requests
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // 1000 requests per 15 minutes per IP
+    message: { message: 'Too many requests from this IP, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        console.log(`Global rate limit exceeded for IP: ${req.ip}, User-Agent: ${req.get('User-Agent')}`);
+        res.status(429).json({ 
+            message: 'Too many requests from this IP, please try again later',
+            retryAfter: Math.round(15 * 60) // 15 minutes in seconds
+        });
+    },
+    // Skip rate limiting for certain routes
+    skip: (req) => {
+        // Skip rate limiting for health checks and static files
+        return req.path === '/health' || req.path.startsWith('/static/');
+    }
+});
+
+// Strict rate limiter for unauthenticated endpoints
+const publicLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // 100 requests per 15 minutes for public endpoints
+    message: { message: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        console.log(`Public endpoint rate limit exceeded for IP: ${req.ip}, Path: ${req.path}`);
+        res.status(429).json({ message: 'Too many requests, please try again later' });
+    }
+});
+
+// Apply global rate limiter to all requests
+app.use(globalLimiter);
+
+// Health check endpoint (bypassed by rate limiter)
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
+// Apply public rate limiter to public/auth routes (more restrictive)
+app.use('/api/auth', publicLimiter, authRoutes);
+app.use('/api/forgot-password', publicLimiter, forgotPasswordRoutes);
+app.use('/api/verify-email', publicLimiter, verifyRoutes);
+app.use('/api/auth', publicLimiter, oauthRoutes); // OAuth routes are also public
+
+// Protected routes with standard rate limiting (already have specific limiters)
 app.use('/api/connection', connectionRoutes);
 app.use('/api/query', queryHistoryRoutes);
 app.use('/api/twofactor', twoFactorRoutes);
+app.use('/api/test', testRoutes);
 console.log('✅ All routes registered successfully');
 
 

@@ -4,9 +4,23 @@ const User = require('../models/User');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { sendResetPasswordEmail } = require('../utils/mailer');
+const rateLimit = require('express-rate-limit');
+
+// Rate limiter specifically for password reset operations
+const passwordResetLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // 3 password reset requests per hour per IP
+    message: { message: 'Too many password reset attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        console.log(`Password reset rate limit exceeded for IP: ${req.ip}`);
+        res.status(429).json({ message: 'Too many password reset attempts, please try again later' });
+    }
+});
 
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     const { email } = req.body;
 
     try {
@@ -34,7 +48,7 @@ router.post('/forgot-password', async (req, res) => {
     }
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', passwordResetLimiter, async (req, res) => {
     const { token, password } = req.body;
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const user = await User.findOne({ resetPasswordToken: tokenHash });

@@ -3,7 +3,7 @@ const axios = require('axios');
 class GeminiAPI {
     constructor() {
         this.apiKey = process.env.GEMINI_API_KEY;
-        this.baseURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+        this.baseURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent';
     }
 
     async generateMongoQuery(naturalLanguage, schema = null) {
