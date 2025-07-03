@@ -5,6 +5,7 @@ const qs = require('qs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
+const { sendLoginNotificationEmail } = require('../utils/mailer');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -33,6 +34,55 @@ function generateRefreshToken(user) {
       maxAge: 1 * 24 * 60 * 60 * 1000, // 1 day
     });
   }
+
+// Helper function to get login details from request
+const getLoginDetails = (req) => {
+  const userAgent = req.get('User-Agent') || 'Unknown Device';
+  const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
+    (req.connection.socket ? req.connection.socket.remoteAddress : null) || 'Unknown IP';
+  
+  // Clean up the user agent for better readability
+  let deviceInfo = userAgent;
+  if (userAgent.includes('Chrome')) {
+    const chromeMatch = userAgent.match(/Chrome\/([0-9.]+)/);
+    const osMatch = userAgent.match(/\(([^)]+)\)/);
+    if (chromeMatch && osMatch) {
+      deviceInfo = `Chrome ${chromeMatch[1]} on ${osMatch[1]}`;
+    }
+  } else if (userAgent.includes('Firefox')) {
+    const firefoxMatch = userAgent.match(/Firefox\/([0-9.]+)/);
+    const osMatch = userAgent.match(/\(([^)]+)\)/);
+    if (firefoxMatch && osMatch) {
+      deviceInfo = `Firefox ${firefoxMatch[1]} on ${osMatch[1]}`;
+    }
+  } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+    const safariMatch = userAgent.match(/Safari\/([0-9.]+)/);
+    const osMatch = userAgent.match(/\(([^)]+)\)/);
+    if (safariMatch && osMatch) {
+      deviceInfo = `Safari ${safariMatch[1]} on ${osMatch[1]}`;
+    }
+  }
+
+  return {
+    timestamp: new Date(),
+    ipAddress: ipAddress,
+    userAgent: deviceInfo,
+    location: null // We could integrate with a geolocation service here
+  };
+};
+
+// Helper function to send login notification
+const sendLoginNotification = async (user, req) => {
+  try {
+    if (user.loginNotificationsEnabled) {
+      const loginDetails = getLoginDetails(req);
+      await sendLoginNotificationEmail(user.email, loginDetails);
+    }
+  } catch (error) {
+    console.error('Failed to send login notification:', error);
+    // Don't throw error as this shouldn't fail the login process
+  }
+};
   
 
 // Step 1: Redirect to Google OAuth
@@ -153,6 +203,9 @@ router.get('/google/callback', async (req, res) => {
         const refreshToken = generateRefreshToken(user);
         sendRefreshToken(res, refreshToken);
 
+        // Send login notification email
+        await sendLoginNotification(user, req);
+
         console.log('Redirecting to frontend...');
 
         // Redirect to frontend popup with token
@@ -272,6 +325,9 @@ router.get('/github/callback', async (req, res) => {
         const token = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
         sendRefreshToken(res, refreshToken);
+
+        // Send login notification email
+        await sendLoginNotification(user, req);
 
         console.log('Redirecting to frontend...');
 

@@ -258,6 +258,53 @@ const createTwoFactorDisabledTemplate = () => {
   return createBaseTemplate(content, '2FA Disabled');
 };
 
+// Login notification template
+const createLoginNotificationTemplate = (loginDetails) => {
+  const { timestamp, ipAddress, userAgent, location } = loginDetails;
+  const formattedTime = new Date(timestamp).toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short'
+  });
+
+  const content = `
+    <div class="message">
+      <h2 style="color: #3CBC6B; margin-bottom: 16px;">New Login to Your Account</h2>
+      <p>We noticed a new login to your MongoSnap account. Here are the details:</p>
+    </div>
+    
+    <div style="background-color: #1a2f24; border: 1px solid #3CBC6B; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <div style="margin-bottom: 12px;">
+        <strong style="color: #3CBC6B;">Time:</strong> <strong style="color: white;">${formattedTime}</strong>
+      </div>
+      ${ipAddress ? `<div style="margin-bottom: 12px;">
+        <strong style="color: #3CBC6B;">IP Address:</strong> <strong style="color: white;">${ipAddress}</strong>
+      </div>` : ''}
+      ${location ? `<div style="margin-bottom: 12px;">
+        <strong style="color: #3CBC6B;">Location:</strong> <strong style="color: white;">${location}</strong>
+      </div>` : ''}
+      ${userAgent ? `<div style="margin-bottom: 12px;">
+        <strong style="color: #3CBC6B;">Device:</strong> <strong style="color: white;">${userAgent}</strong>
+      </div>` : ''}
+    </div>
+    
+    <div style="text-align: center; margin: 20px 0;">
+      <p style="color: #e0e0e0; margin-bottom: 16px;">If this was you, no action is required.</p>
+      <a href="https://mongosnap.mp:5173/settings" class="button" style="display: inline-block; background-color: #3CBC6B !important; color: #ffffff !important; text-decoration: none !important; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 16px; text-align: center; border: none !important; outline: none !important;">Review Security Settings</a>
+    </div>
+    
+    <div class="warning">
+      If this wasn't you, please secure your account immediately by changing your password and enabling two-factor authentication.
+    </div>
+  `;
+  
+  return createBaseTemplate(content, 'New Login Alert');
+};
+
 // Email sending functions
 const sendVerificationEmail = async (email, token) => {
   const html = createVerificationTemplate(token);
@@ -309,10 +356,21 @@ const sendTwoFactorDisableConfirmationEmail = async (email) => {
   });
 };
 
+const sendLoginNotificationEmail = async (email, loginDetails) => {
+  const html = createLoginNotificationTemplate(loginDetails);
+  await transporter.sendMail({
+    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    to: email,
+    subject: "New Login to Your MongoSnap Account",
+    html: html
+  });
+};
+
 module.exports = { 
   sendVerificationEmail, 
   sendResetPasswordEmail, 
   sendTwoFactorConfirmationEmail, 
   sendTwoFactorDisableConfirmationEmail, 
-  sendTwoFactorEmailOTP 
+  sendTwoFactorEmailOTP,
+  sendLoginNotificationEmail
 };

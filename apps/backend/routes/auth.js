@@ -5,11 +5,60 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const crypto = require('crypto');
-const { sendVerificationEmail, sendResetPasswordEmail, sendTwoFactorEmailOTP } = require('../utils/mailer');
+const { sendVerificationEmail, sendResetPasswordEmail, sendTwoFactorEmailOTP, sendLoginNotificationEmail } = require('../utils/mailer');
 const databaseManager = require('../utils/databaseManager');
 const { verifyToken } = require('./middleware');
 dotenv.config();
 const {generateAccessToken,generateRefreshToken,sendRefreshToken} = require('../utils/tokengeneration');
+
+// Helper function to get login details from request
+const getLoginDetails = (req) => {
+  const userAgent = req.get('User-Agent') || 'Unknown Device';
+  const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
+    (req.connection.socket ? req.connection.socket.remoteAddress : null) || 'Unknown IP';
+  
+  // Clean up the user agent for better readability
+  let deviceInfo = userAgent;
+  if (userAgent.includes('Chrome')) {
+    const chromeMatch = userAgent.match(/Chrome\/([0-9.]+)/);
+    const osMatch = userAgent.match(/\(([^)]+)\)/);
+    if (chromeMatch && osMatch) {
+      deviceInfo = `Chrome ${chromeMatch[1]} on ${osMatch[1]}`;
+    }
+  } else if (userAgent.includes('Firefox')) {
+    const firefoxMatch = userAgent.match(/Firefox\/([0-9.]+)/);
+    const osMatch = userAgent.match(/\(([^)]+)\)/);
+    if (firefoxMatch && osMatch) {
+      deviceInfo = `Firefox ${firefoxMatch[1]} on ${osMatch[1]}`;
+    }
+  } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+    const safariMatch = userAgent.match(/Safari\/([0-9.]+)/);
+    const osMatch = userAgent.match(/\(([^)]+)\)/);
+    if (safariMatch && osMatch) {
+      deviceInfo = `Safari ${safariMatch[1]} on ${osMatch[1]}`;
+    }
+  }
+
+  return {
+    timestamp: new Date(),
+    ipAddress: ipAddress,
+    userAgent: deviceInfo,
+    location: null // We could integrate with a geolocation service here
+  };
+};
+
+// Helper function to send login notification
+const sendLoginNotification = async (user, req) => {
+  try {
+    if (user.loginNotificationsEnabled) {
+      const loginDetails = getLoginDetails(req);
+      await sendLoginNotificationEmail(user.email, loginDetails);
+    }
+  } catch (error) {
+    console.error('Failed to send login notification:', error);
+    // Don't throw error as this shouldn't fail the login process
+  }
+};
 
 // Helper to generate tokens
 
@@ -88,6 +137,9 @@ router.post('/login', async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
     sendRefreshToken(res, refreshToken);
+
+    // Send login notification email
+    await sendLoginNotification(user, req);
 
     res.status(200).json({ message: 'Login successful', token: accessToken, user: {id: user._id, name: user.name, email: user.email } });
   } catch (err) {
@@ -183,6 +235,39 @@ router.post('/request-password-change', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('Request password change error:', err);
     res.status(500).json({ message: 'Server error during password change request' });
+  }
+});
+
+// PUT /update-login-notifications - Update login notifications preference
+router.put('/update-login-notifications', verifyToken, async (req, res) => {
+  const userId = req.userId;
+  const { loginNotificationsEnabled } = req.body;
+
+  // Validate input
+  if (typeof loginNotificationsEnabled !== 'boolean') {
+    return res.status(400).json({ message: 'loginNotificationsEnabled must be a boolean value' });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Update user preference
+    user.loginNotificationsEnabled = loginNotificationsEnabled;
+    await user.save();
+
+    console.log(`Login notifications ${loginNotificationsEnabled ? 'enabled' : 'disabled'} for user: ${user.email}`);
+    
+    res.status(200).json({ 
+      message: `Login notifications have been ${loginNotificationsEnabled ? 'enabled' : 'disabled'}`,
+      loginNotificationsEnabled: user.loginNotificationsEnabled
+    });
+
+  } catch (err) {
+    console.error('Update login notifications error:', err);
+    res.status(500).json({ message: 'Server error during login notifications update' });
   }
 });
 

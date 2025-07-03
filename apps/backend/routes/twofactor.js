@@ -1,7 +1,7 @@
 const express=require('express');
 const router=express.Router();
 const User = require('../models/User');
-const { sendTwoFactorConfirmationEmail, sendTwoFactorDisableConfirmationEmail, sendTwoFactorEmailOTP } = require('../utils/mailer');
+const { sendTwoFactorConfirmationEmail, sendTwoFactorDisableConfirmationEmail, sendTwoFactorEmailOTP, sendLoginNotificationEmail } = require('../utils/mailer');
 const crypto=require('crypto');
 const {verifyToken} = require('./middleware');
 const {generateAccessToken,generateRefreshToken,sendRefreshToken} = require('../utils/tokengeneration');
@@ -19,6 +19,55 @@ const twoFactorLimiter = rateLimit({
         res.status(429).json({ message: 'Too many 2FA attempts, please try again later' });
     }
 });
+
+// Helper function to get login details from request
+const getLoginDetails = (req) => {
+  const userAgent = req.get('User-Agent') || 'Unknown Device';
+  const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
+    (req.connection.socket ? req.connection.socket.remoteAddress : null) || 'Unknown IP';
+  
+  // Clean up the user agent for better readability
+  let deviceInfo = userAgent;
+  if (userAgent.includes('Chrome')) {
+    const chromeMatch = userAgent.match(/Chrome\/([0-9.]+)/);
+    const osMatch = userAgent.match(/\(([^)]+)\)/);
+    if (chromeMatch && osMatch) {
+      deviceInfo = `Chrome ${chromeMatch[1]} on ${osMatch[1]}`;
+    }
+  } else if (userAgent.includes('Firefox')) {
+    const firefoxMatch = userAgent.match(/Firefox\/([0-9.]+)/);
+    const osMatch = userAgent.match(/\(([^)]+)\)/);
+    if (firefoxMatch && osMatch) {
+      deviceInfo = `Firefox ${firefoxMatch[1]} on ${osMatch[1]}`;
+    }
+  } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+    const safariMatch = userAgent.match(/Safari\/([0-9.]+)/);
+    const osMatch = userAgent.match(/\(([^)]+)\)/);
+    if (safariMatch && osMatch) {
+      deviceInfo = `Safari ${safariMatch[1]} on ${osMatch[1]}`;
+    }
+  }
+
+  return {
+    timestamp: new Date(),
+    ipAddress: ipAddress,
+    userAgent: deviceInfo,
+    location: null // We could integrate with a geolocation service here
+  };
+};
+
+// Helper function to send login notification
+const sendLoginNotification = async (user, req) => {
+  try {
+    if (user.loginNotificationsEnabled) {
+      const loginDetails = getLoginDetails(req);
+      await sendLoginNotificationEmail(user.email, loginDetails);
+    }
+  } catch (error) {
+    console.error('Failed to send login notification:', error);
+    // Don't throw error as this shouldn't fail the login process
+  }
+};
 
 // GET /status - Get current 2FA status
 router.get('/status', verifyToken, async (req, res) => {
@@ -123,6 +172,9 @@ router.post('/verify-two-factor', async (req, res) => {
         const accessToken = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
         sendRefreshToken(res, refreshToken);
+
+        // Send login notification email
+        await sendLoginNotification(user, req);
 
         res.status(200).json({ 
             message: 'Two-factor authentication successful', 
@@ -347,6 +399,9 @@ router.post('/verify-totp-login', async (req, res) => {
         const accessToken = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);
         sendRefreshToken(res, refreshToken);
+
+        // Send login notification email
+        await sendLoginNotification(user, req);
 
         res.status(200).json({ 
             message: usedBackupCode ? 'Backup code authentication successful' : 'TOTP two-factor authentication successful', 

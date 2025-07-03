@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Shield, Mail, Key, Smartphone, Check, AlertCircle, Settings as SettingsIcon, User, QrCode, Clock, Smartphone as PhoneIcon } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 
-function Settings({ isOpen, onClose }) {
+function Settings({ isOpen, onClose, isStandalone = false }) {
     const { user } = useUser();
     const [changePasswordLoading, setChangePasswordLoading] = useState(false);
     const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
@@ -24,6 +24,12 @@ function Settings({ isOpen, onClose }) {
     const [backupCodes, setBackupCodes] = useState([]);
     const [showBackupCodes, setShowBackupCodes] = useState(false);
     const [backupCodesStatus, setBackupCodesStatus] = useState(null);
+    
+    // Login Notifications States
+    const [loginNotificationsEnabled, setLoginNotificationsEnabled] = useState(true);
+    const [loginNotificationsLoading, setLoginNotificationsLoading] = useState(false);
+    const [loginNotificationsError, setLoginNotificationsError] = useState('');
+    const [loginNotificationsSuccess, setLoginNotificationsSuccess] = useState('');
 
     const isOAuthUser = user?.oauthProvider;
 
@@ -52,6 +58,13 @@ function Settings({ isOpen, onClose }) {
             fetch2FAStatus();
         }
     }, [user, isOAuthUser, fetch2FAStatus]);
+
+    // Set login notifications state from user data
+    useEffect(() => {
+        if (user) {
+            setLoginNotificationsEnabled(user.loginNotificationsEnabled !== false); // Default to true if undefined
+        }
+    }, [user]);
 
     // Fetch backup codes status when TOTP is enabled
     useEffect(() => {
@@ -337,9 +350,51 @@ function Settings({ isOpen, onClose }) {
         setTotpVerificationError('');
     };
 
+    const handleToggleLoginNotifications = async () => {
+        setLoginNotificationsLoading(true);
+        setLoginNotificationsError('');
+        setLoginNotificationsSuccess('');
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/auth/update-login-notifications', {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ loginNotificationsEnabled: !loginNotificationsEnabled })
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to update login notifications setting');
+            }
+            
+            setLoginNotificationsEnabled(!loginNotificationsEnabled);
+            setLoginNotificationsSuccess(
+                !loginNotificationsEnabled 
+                    ? 'Login notifications have been enabled.' 
+                    : 'Login notifications have been disabled.'
+            );
+        } catch (err) {
+            setLoginNotificationsError(err.message);
+        } finally {
+            setLoginNotificationsLoading(false);
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4">
-            <div className="bg-[#17211b] rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl flex">
+        <div className={isStandalone 
+            ? "min-h-screen bg-[#101813] flex items-center justify-center p-4" 
+            : "fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4"
+        }>
+            <div className={`bg-[#17211b] w-full max-w-5xl overflow-hidden shadow-2xl flex ${
+                isStandalone 
+                    ? "rounded-xl min-h-[80vh]" 
+                    : "rounded-xl max-h-[90vh]"
+            }`}>
                 {/* Left Sidebar */}
                 <div className="w-64 bg-[#0f1611] p-6">
                     <div className="flex items-center gap-2 mb-6">
@@ -616,6 +671,77 @@ function Settings({ isOpen, onClose }) {
                                             </button>
                                         </div>
                                     )}
+                                </div>
+
+                                {/* Login Notifications Section */}
+                                <div className="bg-[#1a2520] rounded-lg p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="p-2 bg-[#35c56a69] rounded-lg">
+                                            <Mail size={20} className="text-[#11a15e]" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-white">Login Notifications</h4>
+                                            <p className="text-gray-400 text-sm">Get notified when someone logs into your account</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Success/Error Messages */}
+                                    {loginNotificationsSuccess && (
+                                        <div className="flex items-center gap-2 bg-green-900/50 border border-green-500 text-green-200 px-4 py-3 rounded-lg mb-4">
+                                            <Check size={16} />
+                                            <span className="text-sm">{loginNotificationsSuccess}</span>
+                                        </div>
+                                    )}
+
+                                    {loginNotificationsError && (
+                                        <div className="flex items-center gap-2 bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-4">
+                                            <AlertCircle size={16} />
+                                            <span className="text-sm">{loginNotificationsError}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Login Notifications Toggle */}
+                                    <div className="bg-[#0f1611] rounded-lg p-4 border border-gray-700">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-3 h-3 rounded-full ${loginNotificationsEnabled ? 'bg-green-500' : 'bg-gray-500'}`}></div>
+                                                <div>
+                                                    <h5 className="text-white font-medium">Email Notifications</h5>
+                                                    <p className="text-gray-400 text-sm">
+                                                        {loginNotificationsEnabled 
+                                                            ? 'You will receive emails when someone logs into your account' 
+                                                            : 'Login notifications are currently disabled'
+                                                        }
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={handleToggleLoginNotifications}
+                                                disabled={loginNotificationsLoading}
+                                                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 cursor-pointer ${
+                                                    loginNotificationsLoading 
+                                                        ? 'opacity-60 cursor-not-allowed bg-gray-600 text-white' 
+                                                        : loginNotificationsEnabled
+                                                            ? 'bg-red-600 hover:bg-red-700 text-white'
+                                                            : 'bg-[#35c56a69] hover:bg-[#35c56a] text-white hover:scale-105'
+                                                }`}
+                                            >
+                                                {loginNotificationsLoading ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                                        <span>Updating...</span>
+                                                    </div>
+                                                ) : (
+                                                    loginNotificationsEnabled ? 'Disable' : 'Enable'
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-gray-300 text-sm mt-4">
+                                        When enabled, you'll receive an email notification with login details including timestamp, 
+                                        IP address, and device information whenever someone successfully logs into your account.
+                                    </p>
                                 </div>
                             </div>
                         )}

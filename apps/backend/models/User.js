@@ -35,5 +35,6 @@ const userSchema = new mongoose.Schema({
         used: { type: Boolean, default: false },
         usedAt: { type: Date, default: null }
     }],
+    loginNotificationsEnabled: { type: Boolean, default: true },
 });
 module.exports = mongoose.model('User', userSchema);
