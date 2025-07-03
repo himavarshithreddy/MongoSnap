@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Database, CheckCircle, Clock, Calendar, Server, Home, ArrowLeft, Wifi, WifiOff, Power, RefreshCw, WifiIcon, ChevronDown, ChevronRight, FileText, Hash, LogOut, Settings } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
@@ -44,7 +44,7 @@ function Playground() {
     const [usageLoading, setUsageLoading] = useState(false);
 
     // Fetch query history from backend
-    const fetchQueryHistory = async () => {
+    const fetchQueryHistory = useCallback(async () => {
         if (!connectionIdRef.current) return;
         
         setHistoryLoading(true);
@@ -61,10 +61,10 @@ function Playground() {
         } finally {
             setHistoryLoading(false);
         }
-    };
+    }, [fetchWithAuth]);
 
     // Fetch saved queries from backend
-    const fetchSavedQueries = async () => {
+    const fetchSavedQueries = useCallback(async () => {
         if (!connectionIdRef.current) return;
         
         setSavedQueriesLoading(true);
@@ -81,10 +81,10 @@ function Playground() {
         } finally {
             setSavedQueriesLoading(false);
         }
-    };
+    }, [fetchWithAuth]);
 
     // Fetch user usage statistics
-    const fetchUsageStats = async () => {
+    const fetchUsageStats = useCallback(async () => {
         setUsageLoading(true);
         try {
             const response = await fetchWithAuth('/api/auth/usage-stats');
@@ -99,7 +99,7 @@ function Playground() {
         } finally {
             setUsageLoading(false);
         }
-    };
+    }, [fetchWithAuth]);
 
     // Initialize data with real backend data
     useEffect(() => {
@@ -109,7 +109,7 @@ function Playground() {
         }
         // Fetch usage stats regardless of connection
         fetchUsageStats();
-    }, [connectionIdRef.current]);
+    }, [fetchQueryHistory, fetchSavedQueries, fetchUsageStats]);
 
     useEffect(() => {
         // Get connection ID from URL parameters
@@ -130,7 +130,7 @@ function Playground() {
                 handleAutoDisconnect(connectionIdRef.current);
             }
         };
-    }, [location.search]);
+    }, [location.search, fetchConnectionDetails, fetchActiveConnection, handleAutoDisconnect]);
 
     // Add periodic connection health check
     useEffect(() => {
@@ -164,7 +164,7 @@ function Playground() {
         return () => {
             clearInterval(healthCheckInterval);
         };
-    }, [connectionIdRef.current, fetchWithAuth]);
+    }, [fetchWithAuth, handleReconnect]);
 
     // Add beforeunload event listener for page close only
     useEffect(() => {
@@ -224,10 +224,10 @@ function Playground() {
             window.removeEventListener('beforeunload', handleBeforeUnload);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, []);
+    }, [handleAutoDisconnect]);
 
     // Auto-disconnect function
-    const handleAutoDisconnect = async (connectionId = connectionIdRef.current) => {
+    const handleAutoDisconnect = useCallback(async (connectionId = connectionIdRef.current) => {
         if (!connectionId) return;
         
         try {
@@ -239,10 +239,10 @@ function Playground() {
         } catch (error) {
             console.error('Error auto-disconnecting:', error);
         }
-    };
+    }, [fetchWithAuth]);
 
     // Fetch connection details securely
-    const fetchConnectionDetails = async (connectionId) => {
+    const fetchConnectionDetails = useCallback(async (connectionId) => {
         try {
             const response = await fetchWithAuth(`/api/connection/${connectionId}/status`);
             if (response.ok) {
@@ -257,10 +257,10 @@ function Playground() {
             console.error('Error fetching connection details:', error);
             setError('Failed to load connection details.');
         }
-    };
+    }, [fetchWithAuth]);
 
     // Fetch active connection if no connection ID in URL
-    const fetchActiveConnection = async () => {
+    const fetchActiveConnection = useCallback(async () => {
         try {
             const response = await fetchWithAuth('/api/connection/active');
             if (response.ok) {
@@ -279,7 +279,7 @@ function Playground() {
             console.error('Error fetching active connection:', error);
             setError('Failed to load active connection.');
         }
-    };
+    }, [fetchWithAuth]);
 
     // Disconnect from database
     const handleDisconnect = async () => {
@@ -315,7 +315,7 @@ function Playground() {
     };
 
     // Reconnect to database
-    const handleReconnect = async () => {
+    const handleReconnect = useCallback(async () => {
         if (!connectionData?._id) return;
         
         setIsReconnecting(true);
@@ -348,7 +348,7 @@ function Playground() {
         } finally {
             setIsReconnecting(false);
         }
-    };
+    }, [connectionData?._id, fetchWithAuth]);
 
     // Handle navigation
     const handleNavigation = async (path) => {
@@ -520,9 +520,8 @@ function Playground() {
     };
 
     // Fetch database schema
-    const fetchSchema = async () => {
+    const fetchSchema = useCallback(async () => {
         if (!connectionIdRef.current) return;
-        
         setSchemaLoading(true);
         try {
             const response = await fetchWithAuth(`/api/connection/${connectionIdRef.current}/schema`);
@@ -537,14 +536,14 @@ function Playground() {
         } finally {
             setSchemaLoading(false);
         }
-    };
+    }, [fetchWithAuth]);
 
     // Fetch schema when connection is established
     useEffect(() => {
         if (connectionIdRef.current && connectionData) {
             fetchSchema();
         }
-    }, [connectionIdRef.current, connectionData]);
+    }, [connectionData, fetchSchema]);
 
     // Toggle collection expansion
     const toggleCollection = (collectionName) => {
@@ -833,7 +832,7 @@ function Playground() {
                 handleAutoDisconnect(connectionIdRef.current);
             }
         };
-    }, []);
+    }, [handleAutoDisconnect]);
 
     if (userLoading) {
         return (
