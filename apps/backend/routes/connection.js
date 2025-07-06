@@ -178,8 +178,19 @@ router.get('/', verifyToken, async (req, res) => {
         }));
         
         // Get connection limit info
-        const limitCheck = await checkConnectionLimit(userId);
-        
+        let limitCheck;
+        try {
+            limitCheck = await checkConnectionLimit(userId);
+        } catch (error) {
+            console.error('Failed to check connection limits:', error);
+            // Provide default values if limit check fails
+            limitCheck = {
+                currentCount: 0,
+                limit: MAX_CONNECTIONS_PER_USER,
+                allowed: true
+            };
+        }
+
         res.status(200).json({ 
             connections: transformedConnections,
             connectionLimits: {

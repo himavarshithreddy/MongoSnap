@@ -597,11 +597,7 @@ function Connect() {
                                         <h3 className='text-white font-medium text-sm truncate'>
                                         {connection.nickname}
                                     </h3>
-                                        {connection.isSample && (
-                                            <span className='text-xs bg-brand-quaternary/50 text-brand-quaternary px-1.5 py-0.5 rounded font-medium'>
-                                                DEMO
-                                            </span>
-                                        )}
+                                       
                                     </div>
                                     <div className='flex items-center gap-1'>
                                         {!connection.isSample && (
