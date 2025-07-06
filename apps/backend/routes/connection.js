@@ -99,12 +99,41 @@ const generalDbLimiter = rateLimit({
 
 const ENCRYPTION_KEY = process.env.CONNECTION_ENCRYPTION_KEY;
 const ENCRYPTION_IV_LENGTH = 16;
+const MAX_CONNECTIONS_PER_USER = 2; // Limit per user (excluding sample connections)
 
 // Check if encryption key is set
 if (!ENCRYPTION_KEY) {
     console.error('CONNECTION_ENCRYPTION_KEY is not set in environment variables');
     process.exit(1);
 }
+
+// Helper function to check connection limits
+const checkConnectionLimit = async (userId) => {
+    try {
+        const nonSampleConnections = await Connection.countDocuments({ 
+            userId, 
+            isSample: { $ne: true } // Exclude sample connections
+        });
+        
+        if (nonSampleConnections >= MAX_CONNECTIONS_PER_USER) {
+            return {
+                allowed: false,
+                message: `Connection limit reached. You can have up to ${MAX_CONNECTIONS_PER_USER} database connections (excluding sample database).`,
+                currentCount: nonSampleConnections,
+                limit: MAX_CONNECTIONS_PER_USER
+            };
+        }
+        
+        return {
+            allowed: true,
+            currentCount: nonSampleConnections,
+            limit: MAX_CONNECTIONS_PER_USER
+        };
+    } catch (error) {
+        console.error('Error checking connection limit:', error);
+        throw new Error('Failed to check connection limits');
+    }
+};
 
 const encrypt = (text) => {
     try {
@@ -144,10 +173,22 @@ router.get('/', verifyToken, async (req, res) => {
             nickname: conn.nickname,
             lastUsed: conn.lastUsed,
             isActive: conn.isActive || false,
-            createdAt: conn.createdAt
+            createdAt: conn.createdAt,
+            isSample: conn.isSample || false
         }));
         
-        res.status(200).json({ connections: transformedConnections });
+        // Get connection limit info
+        const limitCheck = await checkConnectionLimit(userId);
+        
+        res.status(200).json({ 
+            connections: transformedConnections,
+            connectionLimits: {
+                current: limitCheck.currentCount,
+                maximum: limitCheck.limit,
+                remaining: limitCheck.limit - limitCheck.currentCount,
+                canCreateMore: limitCheck.allowed
+            }
+        });
     } catch (error) {
         console.error('Error fetching connections:', error);
         res.status(500).json({ message: 'Failed to fetch connections' });
@@ -158,6 +199,16 @@ router.post('/', verifyToken, async (req, res) => {
     try {
         const userId = req.userId;
         const { nickname, uri } = req.body;
+        
+        // Check connection limit before creating new connection
+        const limitCheck = await checkConnectionLimit(userId);
+        if (!limitCheck.allowed) {
+            return res.status(429).json({ 
+                message: limitCheck.message,
+                currentCount: limitCheck.currentCount,
+                limit: limitCheck.limit
+            });
+        }
        
         await testConnection(uri);
         const encryptedUri = encrypt(uri);
@@ -228,6 +279,36 @@ router.post('/test-uri', connectionLimiter, async (req, res) => {
             message: 'Failed to test connection',
             details: error.message 
         });
+    }
+});
+
+// Get connection limits for the current user
+router.get('/limits', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const limitCheck = await checkConnectionLimit(userId);
+        
+        // Get more detailed connection info
+        const totalConnections = await Connection.countDocuments({ userId });
+        const sampleConnections = await Connection.countDocuments({ userId, isSample: true });
+        const regularConnections = totalConnections - sampleConnections;
+        
+        res.status(200).json({
+            limits: {
+                maximum: limitCheck.limit,
+                current: limitCheck.currentCount,
+                remaining: limitCheck.limit - limitCheck.currentCount,
+                canCreateMore: limitCheck.allowed
+            },
+            breakdown: {
+                total: totalConnections,
+                regular: regularConnections,
+                sample: sampleConnections
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching connection limits:', error);
+        res.status(500).json({ message: 'Failed to fetch connection limits' });
     }
 });
 
@@ -536,7 +617,17 @@ router.post('/connect', connectionLimiter, verifyToken, async (req, res) => {
                 connection = existingConnection;
                 console.log('Using existing connection with same nickname:', connection.nickname);
             } else {
-                // Create new connection only after successful test
+                // Check connection limit before creating new connection
+                const limitCheck = await checkConnectionLimit(userId);
+                if (!limitCheck.allowed) {
+                    return res.status(429).json({ 
+                        message: limitCheck.message,
+                        currentCount: limitCheck.currentCount,
+                        limit: limitCheck.limit
+                    });
+                }
+                
+                // Create new connection only after successful test and limit check
                 const encryptedUri = encrypt(uri);
                 connection = new Connection({ userId, nickname, uri: encryptedUri });
                 await connection.save();

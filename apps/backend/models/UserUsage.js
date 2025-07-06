@@ -52,7 +52,6 @@ const userUsageSchema = new mongoose.Schema({
 });
 
 // Index for efficient queries
-userUsageSchema.index({ userId: 1 });
 userUsageSchema.index({ 'queryExecution.daily.date': 1 });
 userUsageSchema.index({ 'queryExecution.monthly.month': 1 });
 userUsageSchema.index({ 'aiGeneration.daily.date': 1 });

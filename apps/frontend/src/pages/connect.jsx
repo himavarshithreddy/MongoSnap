@@ -19,8 +19,10 @@ function Connect() {
     const [showInstructions, setShowInstructions] = useState(false);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [sampleLoading, setSampleLoading] = useState(false);
     const [connectionsLoading, setConnectionsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [limitError, setLimitError] = useState('');
     const [success, setSuccess] = useState('');
     const [loadedConnection, setLoadedConnection] = useState(null);
     const [testingConnection, setTestingConnection] = useState(false);
@@ -144,14 +146,17 @@ function Connect() {
                 setUriError('');
                 setNicknameError('');
                 setError('');
+                setLimitError('');
                 // Store the loaded connection for testing
                 setLoadedConnection(data.connection);
             } else {
                 const errorData = await response.json();
+                setLimitError('');
                 setError(errorData.message || 'Failed to load connection');
             }
         } catch (error) {
             console.error('Error loading connection:', error);
+            setLimitError('');
             setError('Failed to load connection');
         }
     };
@@ -168,6 +173,8 @@ function Connect() {
             if (response.ok) {
                 setPreviousConnections(prev => prev.filter(conn => conn._id !== id));
                 setSuccess('Connection removed successfully');
+                setError('');
+                setLimitError('');
                 setTimeout(() => setSuccess(''), 3000);
                 // Clear loaded connection if it was the one removed
                 if (loadedConnection && loadedConnection._id === id) {
@@ -178,11 +185,28 @@ function Connect() {
             } else {
                 const errorData = await response.json();
                 console.error('Remove error response:', errorData);
+                setLimitError('');
                 setError(errorData.message || 'Failed to remove connection');
             }
         } catch (error) {
             console.error('Error removing connection:', error);
+            setLimitError('');
             setError('Failed to remove connection');
+        }
+    };
+
+    // Check connection limits
+    const checkConnectionLimits = async () => {
+        try {
+            const response = await fetchWithAuth('/api/connection/limits');
+            if (response.ok) {
+                const data = await response.json();
+                return data.limits.canCreateMore;
+            }
+            return true; // If we can't check, assume it's OK
+        } catch (error) {
+            console.error('Error checking connection limits:', error);
+            return true; // If we can't check, assume it's OK
         }
     };
 
@@ -193,6 +217,7 @@ function Connect() {
         setUriError('');
         setNicknameError('');
         setError('');
+        setLimitError('');
         setSuccess('');
         
         if (!nickname.trim()) {
@@ -220,6 +245,15 @@ function Connect() {
             setShowInstructions(true);
             autoDismissInstructions();
             return;
+        }
+
+        // Check connection limits before testing (only for new connections)
+        if (!loadedConnection) {
+            const canCreateMore = await checkConnectionLimits();
+            if (!canCreateMore) {
+                setLimitError('limit_reached');
+                return;
+            }
         }
         
         setLoading(true);
@@ -254,13 +288,20 @@ function Connect() {
             } else {
                 const errorData = await connectResponse.json();
                 console.error('Connect error response:', errorData);
-                setError(errorData.message || 'Failed to connect to database');
-                // Auto-expand instructions on connection failure
-                setShowInstructions(true);
-                autoDismissInstructions();
+                
+                // Handle connection limit errors with less prominent styling
+                if (connectResponse.status === 429 && errorData.message.includes('Connection limit')) {
+                    setLimitError('limit_reached');
+                } else {
+                    setError(errorData.message || 'Failed to connect to database');
+                    // Auto-expand instructions on connection failure (but not for limit errors)
+                    setShowInstructions(true);
+                    autoDismissInstructions();
+                }
             }
         } catch (error) {
             console.error('Error connecting to database:', error);
+            setLimitError('');
             setError('Failed to connect to database');
             // Auto-expand instructions on connection failure
             setShowInstructions(true);
@@ -276,6 +317,7 @@ function Connect() {
         let valid = true;
         setUriError('');
         setError('');
+        setLimitError('');
         setSuccess('');
         
         if (!connectionURI.trim()) {
@@ -330,6 +372,7 @@ function Connect() {
             }
         } catch (error) {
             console.error('Error testing connection:', error);
+            setLimitError('');
             setError('Failed to test connection');
             // Auto-expand instructions on test failure
             setShowInstructions(true);
@@ -426,8 +469,9 @@ function Connect() {
 
     // Handle sample database connection
     const handleSampleDatabase = async () => {
-        setLoading(true);
+        setSampleLoading(true);
         setError('');
+        setLimitError('');
         setSuccess('');
         
         try {
@@ -455,7 +499,7 @@ function Connect() {
             console.error('Error connecting to sample database:', error);
             setError('Failed to connect to sample database');
         } finally {
-            setLoading(false);
+            setSampleLoading(false);
         }
     };
 
@@ -515,10 +559,10 @@ function Connect() {
                     
                     <button
                         onClick={handleSampleDatabase}
-                        disabled={loading}
-                        className={`w-full py-2 px-3 rounded-md bg-brand-quaternary/70 text-white text-sm font-medium hover:bg-brand-quaternary hover:scale-102 transition-all duration-300 cursor-pointer border border-brand-quaternary/50 ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        disabled={sampleLoading}
+                        className={`w-full py-2 px-3 rounded-md bg-brand-quaternary/70 text-white text-sm font-medium hover:bg-brand-quaternary hover:scale-102 transition-all duration-300 cursor-pointer border border-brand-quaternary/50 ${sampleLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
-                        {loading ? 'Connecting...' : 'Try Sample Database'}
+                        {sampleLoading ? 'Connecting...' : 'Try Sample Database'}
                     </button>
                 </div>
 
@@ -526,7 +570,7 @@ function Connect() {
                     <h2 className='text-white text-lg font-semibold'>Previous Connections</h2>
                 </div>
                 
-                <div className='flex-1 overflow-y-auto space-y-2 pr-2'>
+                <div className='flex-1 overflow-y-auto space-y-2 pr-2 previous-connections'>
                     {connectionsLoading ? (
                         <div className='text-center py-8'>
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-quaternary mx-auto mb-2"></div>
@@ -566,7 +610,7 @@ function Connect() {
                                                 e.stopPropagation();
                                                 removeConnection(connection._id);
                                             }}
-                                            className='text-gray-500 hover:text-red-400 transition-colors p-1'
+                                            className='text-gray-500 cursor-pointer hover:text-red-400 transition-colors p-1'
                                             title="Remove connection"
                                         >
                                             <Trash2 size={12} />
@@ -680,14 +724,88 @@ function Connect() {
             
             {/* Success/Error Messages */}
             {success && (
-                <div className="w-[50%] bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded text-center">
-                    {success}
+                <div className="w-[50%] bg-brand-secondary border border-green-500/50 rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-green-400 text-sm">✓</span>
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-green-200 text-sm">{success}</p>
+                        </div>
+                        <button
+                            onClick={() => setSuccess('')}
+                            className="text-xs bg-brand-tertiary text-gray-300 px-3 py-1.5 rounded-md hover:text-white hover:bg-opacity-80 transition-colors cursor-pointer"
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            )}
+            
+            {limitError && (
+                <div className="w-[50%] bg-brand-secondary border border-brand-quaternary/50 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-brand-quaternary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-brand-quaternary text-sm">ℹ️</span>
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="text-white font-medium text-sm mb-2">Connection Limit Reached</h4>
+                            <p className="text-gray-300 text-sm leading-relaxed mb-3">
+                                You can only have up to 2 database connections. To create a new connection, please remove an existing one first, or use one of your previous connections below.
+                            </p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        setLimitError('');
+                                        // Smooth scroll to previous connections section
+                                        setTimeout(() => {
+                                            const connectionsSection = document.querySelector('.previous-connections');
+                                            if (connectionsSection) {
+                                                connectionsSection.parentElement.scrollIntoView({ 
+                                                    behavior: 'smooth',
+                                                    block: 'center'
+                                                });
+                                                // Brief highlight effect
+                                                connectionsSection.parentElement.style.backgroundColor = 'rgba(60, 188, 107, 0.1)';
+                                                setTimeout(() => {
+                                                    connectionsSection.parentElement.style.backgroundColor = '';
+                                                }, 2000);
+                                            }
+                                        }, 100);
+                                    }}
+                                    className="text-xs bg-brand-quaternary/20 text-white px-3 py-1.5 rounded-md hover:bg-brand-quaternary/30 transition-colors cursor-pointer"
+                                >
+                                    View Connections
+                                </button>
+                                <button
+                                    onClick={() => setLimitError('')}
+                                    className="text-xs bg-brand-tertiary text-gray-300 px-3 py-1.5 rounded-md hover:text-white hover:bg-opacity-80 transition-colors cursor-pointer"
+                                >
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
             
             {error && (
-                <div className="w-[50%] bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded text-center">
-                    {error}
+                <div className="w-[50%] bg-brand-secondary border border-red-500/50 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-red-400 text-sm">⚠</span>
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="text-white font-medium text-sm mb-1">Connection Error</h4>
+                            <p className="text-gray-300 text-sm leading-relaxed">{error}</p>
+                        </div>
+                        <button
+                            onClick={() => setError('')}
+                            className="text-xs bg-brand-tertiary text-gray-300 px-3 py-1.5 rounded-md hover:text-white hover:bg-opacity-80 transition-colors cursor-pointer"
+                        >
+                            Dismiss
+                        </button>
+                    </div>
                 </div>
             )}
             
