@@ -43,6 +43,8 @@ function Playground() {
     const [usageStats, setUsageStats] = useState(null);
     const [usageLoading, setUsageLoading] = useState(false);
     const [exportLoading, setExportLoading] = useState(false);
+    const [exportError, setExportError] = useState('');
+    const [exportSuccess, setExportSuccess] = useState('');
 
     // Fetch query history from backend
     const fetchQueryHistory = async () => {

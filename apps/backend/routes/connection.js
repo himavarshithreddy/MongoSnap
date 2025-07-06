@@ -3,6 +3,7 @@ const router = express.Router();
 const { verifyToken } = require('./middleware');
 const Connection = require('../models/Connection');
 const QueryHistory = require('../models/QueryHistory');
+const User = require('../models/User');
 const UserUsage = require('../models/UserUsage');
 const databaseManager = require('../utils/databaseManager');
 const crypto = require('crypto');
@@ -95,6 +96,22 @@ const generalDbLimiter = rateLimit({
     handler: (req, res) => {
         console.log(`General DB rate limit exceeded for IP: ${req.ip}`);
         res.status(429).json({ message: 'Too many requests, please try again later' });
+    }
+});
+
+// Rate limiter for export operations
+const exportLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 2, // 2 exports per hour per IP
+    message: { message: 'Export limit reached. You can export up to 2 databases per hour.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        console.log(`Export rate limit exceeded for IP: ${req.ip}`);
+        res.status(429).json({ 
+            message: 'Export limit reached. You can export up to 2 databases per hour.',
+            retryAfter: 3600 // 1 hour in seconds
+        });
     }
 });
 
@@ -1816,7 +1833,7 @@ router.post('/:id/generate-query', verifyToken, checkAIUsage, async (req, res) =
 });
 
 // Export database as ZIP file
-router.post('/:id/export', verifyToken, async (req, res) => {
+router.post('/:id/export', verifyToken, exportLimiter, async (req, res) => {
     try {
         const userId = req.userId;
         const connectionId = req.params.id;
@@ -1835,6 +1852,10 @@ router.post('/:id/export', verifyToken, async (req, res) => {
 
         console.log('Starting database export for:', dbConn.nickname);
 
+        // Get user information for metadata
+        const user = await User.findById(userId).select('name email');
+        const exportedByName = user ? user.name : 'Unknown User';
+
         // Get all collections
         const collections = await db.listCollections().toArray();
         console.log(`Found ${collections.length} collections to export`);
@@ -1848,55 +1869,137 @@ router.post('/:id/export', verifyToken, async (req, res) => {
 
         // Create ZIP archive
         const archive = archiver('zip', {
-            zlib: { level: 9 } // Best compression
+            zlib: { level: 9 } 
         });
 
         // Pipe archive to response
         archive.pipe(res);
 
-        // Add metadata file
+        // Add metadata file with export limits and statistics
         const metadata = {
             database: db.databaseName,
             exportedAt: new Date().toISOString(),
-            exportedBy: userId,
+            exportedBy: exportedByName,
+            exportedByEmail: user ? user.email : null,
             connectionName: dbConn.nickname,
+            totalCollections: collections.length,
+            exportLimits: {
+                maxCollectionSize: "100MB",
+                maxDocumentsPerCollection: 50000,
+                note: "Large collections may be skipped or truncated. Use mongodump for complete exports."
+            },
             collections: collections.map(col => ({
                 name: col.name,
                 type: col.type
             })),
             version: "1.0",
-            mongoSnapVersion: "2.1.0"
+            mongoSnapVersion: "2.1.0",
+            exportMethod: "MongoSnap Web Export (Memory-Safe)"
         };
 
         archive.append(JSON.stringify(metadata, null, 2), { name: 'metadata.json' });
 
-        // Export each collection
+        // Export each collection with memory-safe streaming
         for (const collectionInfo of collections) {
             try {
                 const collection = db.collection(collectionInfo.name);
-                const documents = await collection.find({}).toArray();
                 
-                console.log(`Exporting collection ${collectionInfo.name}: ${documents.length} documents`);
+                // Check collection size before export
+                let collectionStats;
+                try {
+                    collectionStats = await db.command({ collStats: collectionInfo.name });
+                } catch (statsError) {
+                    console.warn(`Could not get stats for collection ${collectionInfo.name}, proceeding with export`);
+                    collectionStats = { size: 0, count: 0 };
+                }
                 
-                // Convert ObjectId and other MongoDB types to JSON-serializable format
-                const jsonDocuments = documents.map(doc => {
-                    return JSON.parse(JSON.stringify(doc, (key, value) => {
-                        if (value && typeof value === 'object' && value._bsontype === 'ObjectId') {
-                            return { $oid: value.toString() };
-                        }
-                        if (value instanceof Date) {
-                            return { $date: value.toISOString() };
-                        }
-                        return value;
-                    }));
-                });
-
-                // Add collection file to ZIP
+                const MAX_COLLECTION_SIZE = 100 * 1024 * 1024; // 100MB limit
+                const MAX_DOCUMENT_COUNT = 50000; // 50k documents limit
+                
+                if (collectionStats.size > MAX_COLLECTION_SIZE) {
+                    console.warn(`Skipping large collection ${collectionInfo.name}: ${Math.round(collectionStats.size / 1024 / 1024)}MB (limit: 100MB)`);
+                    
+                    const skipData = {
+                        collection: collectionInfo.name,
+                        skipped: true,
+                        reason: `Collection too large: ${Math.round(collectionStats.size / 1024 / 1024)}MB (limit: 100MB)`,
+                        suggestedAction: "Use MongoDB tools like mongodump for large collections",
+                        exportedAt: new Date().toISOString()
+                    };
+                    
+                    archive.append(
+                        JSON.stringify(skipData, null, 2), 
+                        { name: `collections/${collectionInfo.name}_SKIPPED.json` }
+                    );
+                    continue;
+                }
+                
+                // Stream documents in batches to avoid memory issues
+                const BATCH_SIZE = 1000;
+                const cursor = collection.find({});
+                const documents = [];
+                let totalProcessed = 0;
+                let hasMore = true;
+                
+                console.log(`Exporting collection ${collectionInfo.name} (estimated: ${collectionStats.count || 'unknown'} documents)`);
+                
+                while (hasMore && totalProcessed < MAX_DOCUMENT_COUNT) {
+                    const batch = [];
+                    
+                    // Process documents in batches
+                    for (let i = 0; i < BATCH_SIZE && await cursor.hasNext(); i++) {
+                        const doc = await cursor.next();
+                        
+                        // Convert MongoDB types to JSON-serializable format
+                        const jsonDoc = JSON.parse(JSON.stringify(doc, (key, value) => {
+                            if (value && typeof value === 'object' && value._bsontype === 'ObjectId') {
+                                return { $oid: value.toString() };
+                            }
+                            if (value instanceof Date) {
+                                return { $date: value.toISOString() };
+                            }
+                            return value;
+                        }));
+                        
+                        batch.push(jsonDoc);
+                        totalProcessed++;
+                    }
+                    
+                    // Add batch to documents array
+                    documents.push(...batch);
+                    
+                    // Check if we've reached the end or hit limits
+                    hasMore = await cursor.hasNext();
+                    
+                    if (totalProcessed >= MAX_DOCUMENT_COUNT) {
+                        console.warn(`Reached document limit for collection ${collectionInfo.name}: ${MAX_DOCUMENT_COUNT} documents`);
+                        break;
+                    }
+                    
+                    // Log progress for large collections
+                    if (totalProcessed % (BATCH_SIZE * 5) === 0) {
+                        console.log(`Processed ${totalProcessed} documents from ${collectionInfo.name}`);
+                    }
+                }
+                
+                await cursor.close();
+                
+                console.log(`Exported collection ${collectionInfo.name}: ${documents.length} documents`);
+                
+                // Create collection data with metadata
                 const collectionData = {
                     collection: collectionInfo.name,
                     count: documents.length,
-                    documents: jsonDocuments
+                    totalDocuments: collectionStats.count || documents.length,
+                    truncated: totalProcessed >= MAX_DOCUMENT_COUNT,
+                    exportedAt: new Date().toISOString(),
+                    documents: documents
                 };
+                
+                // Add warning if truncated
+                if (collectionData.truncated) {
+                    collectionData.warning = `Collection truncated to ${MAX_DOCUMENT_COUNT} documents. Use MongoDB tools for complete export.`;
+                }
 
                 archive.append(
                     JSON.stringify(collectionData, null, 2), 
@@ -1906,10 +2009,12 @@ router.post('/:id/export', verifyToken, async (req, res) => {
             } catch (collectionError) {
                 console.error(`Error exporting collection ${collectionInfo.name}:`, collectionError);
                 
-                // Add error file for failed collection
+                // Add detailed error file for failed collection
                 const errorData = {
                     collection: collectionInfo.name,
                     error: collectionError.message,
+                    errorType: collectionError.name || 'UnknownError',
+                    suggestion: "Check database permissions and collection accessibility",
                     exportedAt: new Date().toISOString()
                 };
                 
