@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Database, CheckCircle, Clock, Calendar, Server, Home, ArrowLeft, Wifi, WifiOff, Power, RefreshCw, WifiIcon, ChevronDown, ChevronRight, FileText, Hash, LogOut, Settings, BarChart3 } from 'lucide-react';
+import { Database, CheckCircle, Clock, Calendar, Server, Home, ArrowLeft, Wifi, WifiOff, Power, RefreshCw, WifiIcon, ChevronDown, ChevronRight, FileText, Hash, LogOut, Settings, BarChart3, Download } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 import QueryInterface from '../components/QueryInterface';
@@ -42,6 +42,7 @@ function Playground() {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [usageStats, setUsageStats] = useState(null);
     const [usageLoading, setUsageLoading] = useState(false);
+    const [exportLoading, setExportLoading] = useState(false);
 
     // Fetch query history from backend
     const fetchQueryHistory = async () => {
@@ -391,6 +392,53 @@ function Playground() {
         }
         
         await logout();
+    };
+
+    // Handle database export
+    const handleExportDatabase = async () => {
+        if (!connectionIdRef.current) return;
+        
+        setExportLoading(true);
+        try {
+            console.log('Exporting database for connection:', connectionIdRef.current);
+            
+            const response = await fetchWithAuth(`/api/connection/${connectionIdRef.current}/export`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (response.ok) {
+                // Get the ZIP file blob
+                const blob = await response.blob();
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                
+                // Generate filename with database name and timestamp
+                const timestamp = new Date().toISOString().split('T')[0];
+                const filename = `${connectionData?.databaseName || 'database'}-export-${timestamp}.zip`;
+                link.download = filename;
+                
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                
+                console.log('Database export successful');
+            } else {
+                const errorData = await response.json();
+                console.error('Export error response:', errorData);
+                // You could show an error message here if needed
+            }
+        } catch (error) {
+            console.error('Error exporting database:', error);
+            // You could show an error message here if needed
+        } finally {
+            setExportLoading(false);
+        }
     };
 
     // Handler for query submission
@@ -1074,6 +1122,24 @@ function Playground() {
                             <>
                                 <Power size={16} />
                                 <span>Disconnect</span>
+                            </>
+                        )}
+                    </button>
+                    
+                    <button
+                        onClick={handleExportDatabase}
+                        disabled={exportLoading || !connectionStatus?.isConnected}
+                        className='w-full flex items-center gap-2 p-3 bg-brand-quaternary text-white rounded-lg hover:bg-opacity-80 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
+                    >
+                        {exportLoading ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                <span>Exporting...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Download size={16} />
+                                <span>Export Database</span>
                             </>
                         )}
                     </button>

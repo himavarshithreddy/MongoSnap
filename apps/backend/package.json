@@ -13,6 +13,7 @@
   "packageManager": "pnpm@10.12.1",
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
+    "archiver": "^7.0.1",
     "axios": "^1.10.0",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",

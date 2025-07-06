@@ -10,6 +10,7 @@ const dotenv = require('dotenv');
 const { MongoClient, ObjectId } = require('mongodb');
 const geminiApi = require('../utils/geminiApi');
 const rateLimit = require('express-rate-limit');
+const archiver = require('archiver');
 dotenv.config();
 
 // Rate limiters for database operations
@@ -183,7 +184,7 @@ router.get('/', verifyToken, async (req, res) => {
             limitCheck = await checkConnectionLimit(userId);
         } catch (error) {
             console.error('Failed to check connection limits:', error);
-            // Provide default values if limit check fails
+      
             limitCheck = {
                 currentCount: 0,
                 limit: MAX_CONNECTIONS_PER_USER,
@@ -1811,6 +1812,128 @@ router.post('/:id/generate-query', verifyToken, checkAIUsage, async (req, res) =
             message: 'Failed to generate query',
             details: error.message 
         });
+    }
+});
+
+// Export database as ZIP file
+router.post('/:id/export', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const connectionId = req.params.id;
+
+        // Get the connection info from DB
+        const dbConn = await Connection.findOne({ _id: connectionId, userId });
+        if (!dbConn) {
+            return res.status(404).json({ message: 'Connection not found.' });
+        }
+
+        // Get the database using the connection manager
+        const db = databaseManager.getDatabase(userId, connectionId);
+        if (!db) {
+            return res.status(400).json({ message: 'Not connected to the database.' });
+        }
+
+        console.log('Starting database export for:', dbConn.nickname);
+
+        // Get all collections
+        const collections = await db.listCollections().toArray();
+        console.log(`Found ${collections.length} collections to export`);
+
+        // Set response headers for ZIP download
+        const timestamp = new Date().toISOString().split('T')[0];
+        const filename = `MongoSnap-${db.databaseName}-export-${timestamp}.zip`;
+        
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        // Create ZIP archive
+        const archive = archiver('zip', {
+            zlib: { level: 9 } // Best compression
+        });
+
+        // Pipe archive to response
+        archive.pipe(res);
+
+        // Add metadata file
+        const metadata = {
+            database: db.databaseName,
+            exportedAt: new Date().toISOString(),
+            exportedBy: userId,
+            connectionName: dbConn.nickname,
+            collections: collections.map(col => ({
+                name: col.name,
+                type: col.type
+            })),
+            version: "1.0",
+            mongoSnapVersion: "2.1.0"
+        };
+
+        archive.append(JSON.stringify(metadata, null, 2), { name: 'metadata.json' });
+
+        // Export each collection
+        for (const collectionInfo of collections) {
+            try {
+                const collection = db.collection(collectionInfo.name);
+                const documents = await collection.find({}).toArray();
+                
+                console.log(`Exporting collection ${collectionInfo.name}: ${documents.length} documents`);
+                
+                // Convert ObjectId and other MongoDB types to JSON-serializable format
+                const jsonDocuments = documents.map(doc => {
+                    return JSON.parse(JSON.stringify(doc, (key, value) => {
+                        if (value && typeof value === 'object' && value._bsontype === 'ObjectId') {
+                            return { $oid: value.toString() };
+                        }
+                        if (value instanceof Date) {
+                            return { $date: value.toISOString() };
+                        }
+                        return value;
+                    }));
+                });
+
+                // Add collection file to ZIP
+                const collectionData = {
+                    collection: collectionInfo.name,
+                    count: documents.length,
+                    documents: jsonDocuments
+                };
+
+                archive.append(
+                    JSON.stringify(collectionData, null, 2), 
+                    { name: `collections/${collectionInfo.name}.json` }
+                );
+
+            } catch (collectionError) {
+                console.error(`Error exporting collection ${collectionInfo.name}:`, collectionError);
+                
+                // Add error file for failed collection
+                const errorData = {
+                    collection: collectionInfo.name,
+                    error: collectionError.message,
+                    exportedAt: new Date().toISOString()
+                };
+                
+                archive.append(
+                    JSON.stringify(errorData, null, 2), 
+                    { name: `collections/${collectionInfo.name}_ERROR.json` }
+                );
+            }
+        }
+
+        // Finalize the archive
+        await archive.finalize();
+        console.log('Database export completed successfully');
+
+    } catch (error) {
+        console.error('Error exporting database:', error);
+        
+        // If response hasn't been sent yet, send error
+        if (!res.headersSent) {
+            res.status(500).json({ 
+                message: 'Failed to export database', 
+                details: error.message 
+            });
+        }
     }
 });
 
