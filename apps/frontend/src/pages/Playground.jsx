@@ -401,6 +401,9 @@ function Playground() {
         if (!connectionIdRef.current) return;
         
         setExportLoading(true);
+        setExportError('');
+        setExportSuccess('');
+        
         try {
             console.log('Exporting database for connection:', connectionIdRef.current);
             
@@ -418,9 +421,17 @@ function Playground() {
                 const link = document.createElement('a');
                 link.href = url;
                 
-                // Generate filename with database name and timestamp
-                const timestamp = new Date().toISOString().split('T')[0];
-                const filename = `${connectionData?.databaseName || 'database'}-export-${timestamp}.zip`;
+                // Extract filename from response headers or generate one
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `${connectionData?.databaseName || 'database'}-export-${new Date().toISOString().split('T')[0]}.zip`;
+                
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                
                 link.download = filename;
                 
                 // Trigger download
@@ -429,15 +440,40 @@ function Playground() {
                 document.body.removeChild(link);
                 window.URL.revokeObjectURL(url);
                 
+                // Show success message
+                setExportSuccess(`Database exported successfully as ${filename}. Large collections may be truncated - check metadata.json for details.`);
+                
+                // Clear success message after 10 seconds
+                setTimeout(() => setExportSuccess(''), 10000);
+                
                 console.log('Database export successful');
             } else {
                 const errorData = await response.json();
                 console.error('Export error response:', errorData);
-                // You could show an error message here if needed
+                
+                // Handle different error types with user-friendly messages
+                if (response.status === 429) {
+                    // Rate limit error
+                    const retryAfter = errorData.retryAfter ? Math.ceil(errorData.retryAfter / 60) : 60;
+                    setExportError(`🕒 Export limit reached. You can export up to 2 databases per hour. Please try again in ${retryAfter} minutes.`);
+                } else if (response.status === 404) {
+                    setExportError('❌ Database connection not found. Please reconnect and try again.');
+                } else if (response.status === 400) {
+                    setExportError('⚠️ Database connection issue. Please check your connection and try again.');
+                } else {
+                    setExportError(`❌ Export failed: ${errorData.message || 'Unknown error occurred'}`);
+                }
             }
         } catch (error) {
             console.error('Error exporting database:', error);
-            // You could show an error message here if needed
+            
+            if (error.name === 'AbortError') {
+                setExportError('⏱️ Export was cancelled or timed out. Please try again.');
+            } else if (error.message.includes('Failed to fetch')) {
+                setExportError('🌐 Network error. Please check your connection and try again.');
+            } else {
+                setExportError(`❌ Export failed: ${error.message}`);
+            }
         } finally {
             setExportLoading(false);
         }
@@ -1110,6 +1146,47 @@ function Playground() {
                         )}
                     </button>
                     
+                    <div className="relative group">
+                        <button
+                            onClick={handleExportDatabase}
+                            disabled={exportLoading || !connectionStatus?.isConnected}
+                            className='w-full flex items-center gap-2 p-3 bg-brand-quaternary text-white rounded-lg hover:bg-opacity-80 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
+                            title={!connectionStatus?.isConnected ? 'Connect to database first' : 'Export all collections as ZIP file (hover for limits)'}
+                        >
+                            {exportLoading ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    <span>Exporting...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Download size={16} />
+                                    <span>Export Database</span>
+                                </>
+                            )}
+                        </button>
+                        
+                        {/* Export limits tooltip - shows on hover */}
+                        <div className='absolute left-0 bottom-full mb-2 w-full opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-10'>
+                            <div className='bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-lg'>
+                                <div className='flex items-start gap-2'>
+                                    <span className='text-yellow-400 text-sm'>⚠️</span>
+                                    <div>
+                                        <h4 className='text-white text-xs font-medium mb-1'>Export Limits</h4>
+                                        <ul className='text-gray-300 text-xs space-y-0.5'>
+                                            <li>• Collections {'>'}100MB will be skipped</li>
+                                            <li>• Max 50k documents per collection</li>
+                                            <li>• Large collections may be truncated, check metadata.json for details</li>
+                                            <li>• 2 exports per hour per user</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                {/* Arrow pointing down */}
+                                <div className='absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900'></div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <button
                         onClick={handleDisconnect}
                         disabled={isDisconnecting}
@@ -1127,25 +1204,48 @@ function Playground() {
                             </>
                         )}
                     </button>
-                    
-                    <button
-                        onClick={handleExportDatabase}
-                        disabled={exportLoading || !connectionStatus?.isConnected}
-                        className='w-full flex items-center gap-2 p-3 bg-brand-quaternary text-white rounded-lg hover:bg-opacity-80 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
-                    >
-                        {exportLoading ? (
-                            <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                <span>Exporting...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Download size={16} />
-                                <span>Export Database</span>
-                            </>
-                        )}
-                    </button>
                 </div>
+
+                {/* Export Status Messages */}
+                {exportSuccess && (
+                    <div className='bg-brand-secondary border border-green-500/50 rounded-lg p-3'>
+                        <div className='flex items-start gap-3'>
+                            <div className='w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5'>
+                                <span className='text-green-400 text-xs'>✓</span>
+                            </div>
+                            <div className='flex-1'>
+                                <h4 className='text-white font-medium text-xs mb-1'>Export Successful</h4>
+                                <p className='text-gray-300 text-xs leading-relaxed'>{exportSuccess}</p>
+                            </div>
+                            <button
+                                onClick={() => setExportSuccess('')}
+                                className='text-xs bg-brand-tertiary text-gray-300 px-2 py-1 rounded hover:text-white hover:bg-opacity-80 transition-colors cursor-pointer'
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {exportError && (
+                    <div className='bg-brand-secondary border border-red-500/50 rounded-lg p-3'>
+                        <div className='flex items-start gap-3'>
+                            <div className='w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5'>
+                                <span className='text-red-400 text-xs'>⚠</span>
+                            </div>
+                            <div className='flex-1'>
+                                <h4 className='text-white font-medium text-xs mb-1'>Export Failed</h4>
+                                <p className='text-gray-300 text-xs leading-relaxed'>{exportError}</p>
+                            </div>
+                            <button
+                                onClick={() => setExportError('')}
+                                className='text-xs bg-brand-tertiary text-gray-300 px-2 py-1 rounded hover:text-white hover:bg-opacity-80 transition-colors cursor-pointer'
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                )}
 
 
 
