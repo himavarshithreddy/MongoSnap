@@ -176,9 +176,11 @@ export const UserProvider = ({ children }) => {
                         }
                     } catch (csrfError) {
                         console.error('Failed to get fresh CSRF token:', csrfError);
+                        // Return original response to preserve error details
+                        return res;
                     }
                 }
-            } catch (parseError) {
+            } catch {
                 // If we can't parse the error, continue with normal flow
             }
         }

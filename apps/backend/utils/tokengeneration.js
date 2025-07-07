@@ -146,16 +146,36 @@ async function updateTokenUsage(token, req) {
                 console.warn(`⚠️ Device fingerprint mismatch for token ${token.substring(0, 10)}...`);
                 console.warn(`Expected: ${refreshTokenDoc.deviceInfo.deviceFingerprint}`);
                 console.warn(`Actual: ${currentDeviceInfo.deviceFingerprint}`);
-                // Could implement additional security measures here
+                
+                // Track device changes for security analytics
+                refreshTokenDoc.deviceChanges = refreshTokenDoc.deviceChanges || [];
+                refreshTokenDoc.deviceChanges.push({
+                    timestamp: new Date(),
+                    oldFingerprint: refreshTokenDoc.deviceInfo.deviceFingerprint,
+                    newFingerprint: currentDeviceInfo.deviceFingerprint,
+                    ipAddress: currentDeviceInfo.ipAddress
+                });
+                
+                // Update device info to the new fingerprint
+                refreshTokenDoc.deviceInfo = currentDeviceInfo;
+                
+                // Consider revoking if too many device changes
+                if (refreshTokenDoc.deviceChanges.length > 5) {
+                    await refreshTokenDoc.revoke('suspicious_device_changes');
+                    throw new Error('Token revoked due to suspicious device changes');
+                }
             }
             
             await refreshTokenDoc.save();
         }
     } catch (error) {
         console.error('Error updating token usage:', error);
+        // Re-throw security-related errors
+        if (error.message && error.message.includes('suspicious')) {
+            throw error;
+        }
     }
 }
-
 // Function to revoke all tokens for a user
 async function revokeAllUserTokens(userId, reason = 'user') {
     try {

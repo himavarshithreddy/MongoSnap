@@ -140,8 +140,10 @@ refreshTokenSchema.statics.revokeAllForUser = async function(userId, reason = 'u
 refreshTokenSchema.statics.getTokenChain = async function(startToken) {
     const chain = [];
     let currentToken = await this.findOne({ token: startToken });
+    const maxChainLength = 100; // Reasonable maximum for token rotation
+    let chainLength = 0;
     
-    while (currentToken) {
+    while (currentToken && chainLength < maxChainLength) {
         chain.push({
             token: currentToken.token.substring(0, 10) + '...', // Partial token for security
             family: currentToken.family,
@@ -151,6 +153,7 @@ refreshTokenSchema.statics.getTokenChain = async function(startToken) {
             revokedBy: currentToken.revokedBy
         });
         
+        chainLength++;
         if (currentToken.successorToken) {
             currentToken = await this.findOne({ token: currentToken.successorToken });
         } else {
@@ -211,10 +214,16 @@ refreshTokenSchema.statics.getSecurityAnalytics = async function(userId, days = 
 };
 
 // Static method to find suspicious sessions
-refreshTokenSchema.statics.findSuspiciousSessions = async function(userId) {
+refreshTokenSchema.statics.findSuspiciousSessions = async function(userId, options = {}) {
+    const {
+        maxTokensPerHour = process.env.MAX_TOKENS_PER_HOUR || 5,
+        maxUniqueIpsPerWeek = process.env.MAX_UNIQUE_IPS_PER_WEEK || 10,
+        lookbackDays = 7
+    } = options;
+
     const recentTokens = await this.find({
         userId: userId,
-        createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Last 7 days
+        createdAt: { $gte: new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000) }
     }).sort({ createdAt: -1 });
     
     const suspicious = [];
@@ -227,7 +236,7 @@ refreshTokenSchema.statics.findSuspiciousSessions = async function(userId) {
     });
     
     tokensByHour.forEach((count, hour) => {
-        if (count > 5) { // More than 5 tokens in one hour
+        if (count > maxTokensPerHour) {
             suspicious.push({
                 type: 'rapid_token_creation',
                 hour: new Date(hour),
@@ -244,7 +253,7 @@ refreshTokenSchema.statics.findSuspiciousSessions = async function(userId) {
         ipCounts.set(ip, (ipCounts.get(ip) || 0) + 1);
     });
     
-    if (ipCounts.size > 10) { // More than 10 different IPs in 7 days
+    if (ipCounts.size > maxUniqueIpsPerWeek) {
         suspicious.push({
             type: 'multiple_ip_addresses',
             uniqueIps: ipCounts.size,
