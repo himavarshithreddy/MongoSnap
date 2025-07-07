@@ -286,7 +286,7 @@ router.post('/logout', async (req, res) => {
         console.log('Token verification failed during logout, continuing with logout');
       }
     }
-
+    
     // Clear refresh token cookie
     clearRefreshToken(res);
     

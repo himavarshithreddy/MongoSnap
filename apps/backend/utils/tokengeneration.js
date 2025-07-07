@@ -8,9 +8,9 @@ const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
 
 function generateAccessToken(user) {
     return jwt.sign({ id: user._id }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
-}
+  }
 
-function generateRefreshToken(user) {
+  function generateRefreshToken(user) {
     return jwt.sign({ id: user._id }, process.env.REFRESH_TOKEN_SECRET, {
         expiresIn: '7d', // Extended to 7 days for better UX
     });
@@ -57,7 +57,7 @@ async function createAndStoreRefreshToken(user, req, family = null) {
     } catch (error) {
         console.error('Error creating refresh token:', error);
         throw new Error('Failed to create refresh token');
-    }
+  }
 }
 
 // Function to validate and rotate refresh token
@@ -184,9 +184,9 @@ function extractDeviceInfo(req) {
 }
 
 // Enhanced function to send refresh token as HTTP-only cookie
-function sendRefreshToken(res, token) {
+  function sendRefreshToken(res, token) {
     res.cookie('refreshToken', token, {
-        httpOnly: true,
+      httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
@@ -199,7 +199,7 @@ function clearRefreshToken(res) {
     res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+      sameSite: 'lax',
         path: '/',
     });
 }

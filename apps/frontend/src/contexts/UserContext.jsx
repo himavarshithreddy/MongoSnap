@@ -178,54 +178,54 @@ export const UserProvider = ({ children }) => {
                         console.error('Failed to get fresh CSRF token:', csrfError);
                     }
                 }
-            } catch (parseError) {
+            } catch {
                 // If we can't parse the error, continue with normal flow
             }
         }
 
         // Handle authentication errors (401)
         if (res && res.status === 401) {
-            // Got 401: need to refresh
-            if (!isRefreshing.current) {
-                isRefreshing.current = true;
-                refreshPromise.current = (async () => {
-                    try {
-                        const refreshRes = await fetch('/api/auth/refresh', {
-                            method: 'POST',
-                            credentials: 'include'
-                        });
-                        
-                        if (!refreshRes.ok) throw new Error('Refresh failed');
-                        
+        // Got 401: need to refresh
+        if (!isRefreshing.current) {
+            isRefreshing.current = true;
+            refreshPromise.current = (async () => {
+                try {
+                    const refreshRes = await fetch('/api/auth/refresh', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    
+                    if (!refreshRes.ok) throw new Error('Refresh failed');
+                    
                         const refreshData = await refreshRes.json();
                         const newToken = refreshData.token;
-                        localStorage.setItem('token', newToken);
+                    localStorage.setItem('token', newToken);
                         
                         // Handle new CSRF token from refresh
                         if (refreshData.csrfToken) {
                             setCachedCSRFToken(refreshData.csrfToken);
                         }
-                        
-                        // Fetch fresh user data after token refresh
-                        await fetchAndCacheUserData();
-                        
-                        isRefreshing.current = false;
+                    
+                    // Fetch fresh user data after token refresh
+                    await fetchAndCacheUserData();
+                    
+                    isRefreshing.current = false;
                         return { token: newToken, csrfToken: refreshData.csrfToken };
-                    } catch (err) {
-                        isRefreshing.current = false;
-                        throw err;
-                    }
-                })();
-            }
+                } catch (err) {
+                    isRefreshing.current = false;
+                    throw err;
+                }
+            })();
+        }
 
             let refreshResult;
-            try {
+        try {
                 refreshResult = await refreshPromise.current;
-            } catch (err) {
-                console.log('Token refresh failed:', err);
-                logout();
-                return null;
-            }
+        } catch (err) {
+            console.log('Token refresh failed:', err);
+            logout();
+            return null;
+        }
 
             // Retry with new tokens
             return doFetch(refreshResult.token, refreshResult.csrfToken);
