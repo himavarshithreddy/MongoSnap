@@ -3,8 +3,8 @@ const router=express.Router();
 const User = require('../models/User');
 const { sendTwoFactorConfirmationEmail, sendTwoFactorDisableConfirmationEmail, sendTwoFactorEmailOTP, sendLoginNotificationEmail } = require('../utils/mailer');
 const crypto=require('crypto');
-const {verifyToken} = require('./middleware');
-const {generateAccessToken,generateRefreshToken,sendRefreshToken} = require('../utils/tokengeneration');
+const {verifyToken, verifyTokenAndValidateCSRF} = require('./middleware');
+const {generateAccessToken,createAndStoreRefreshToken,sendRefreshToken} = require('../utils/tokengeneration');
 const rateLimit = require('express-rate-limit');
 const {generateTOTPSecret, verifyTOTPToken, generateBackupCodes, verifyBackupCode} = require('../utils/totpgenerator');
 const speakeasy = require('speakeasy');
@@ -88,7 +88,7 @@ router.get('/status', verifyToken, async (req, res) => {
     }
 });
 
-router.post('/enable-email-two-factor',verifyToken,async(req,res)=>{
+router.post('/enable-email-two-factor',verifyTokenAndValidateCSRF,async(req,res)=>{
 const userId=req.userId;
 try {
     const user=await User.findById(userId);
@@ -110,7 +110,7 @@ try {
    
 });
 
-router.post('/disable-email-two-factor',verifyToken,async(req,res)=>{
+router.post('/disable-email-two-factor',verifyTokenAndValidateCSRF,async(req,res)=>{
     const userId=req.userId;
     try {
         const user=await User.findById(userId);
@@ -170,8 +170,12 @@ router.post('/verify-two-factor', async (req, res) => {
 
         // Generate JWT tokens
         const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-        sendRefreshToken(res, refreshToken);
+        const refreshTokenData = await createAndStoreRefreshToken(user, req);
+        sendRefreshToken(res, refreshTokenData.token);
+
+        // Generate and set CSRF token
+        const csrfToken = user.generateCSRFToken();
+        await user.save();
 
         // Send login notification email
         await sendLoginNotification(user, req);
@@ -179,6 +183,7 @@ router.post('/verify-two-factor', async (req, res) => {
         res.status(200).json({ 
             message: 'Two-factor authentication successful', 
             token: accessToken, 
+            csrfToken: csrfToken,
             user: {id: user._id, name: user.name, email: user.email } 
         });
 
@@ -223,7 +228,7 @@ router.post('/resend-two-factor', twoFactorLimiter, async(req,res)=>{
     }
 });
 
-router.post('/enable-totp-verification',verifyToken,async(req,res)=>{
+router.post('/enable-totp-verification',verifyTokenAndValidateCSRF,async(req,res)=>{
     const userId=req.userId;
     try {
         const user=await User.findById(userId);
@@ -321,7 +326,7 @@ router.post('/cancel-totp-setup',verifyToken,async(req,res)=>{
     }
 });
 
-router.post('/disable-totp-verification',verifyToken,async(req,res)=>{
+router.post('/disable-totp-verification',verifyTokenAndValidateCSRF,async(req,res)=>{
     const userId=req.userId;
     try {
         const user=await User.findById(userId);
@@ -397,8 +402,12 @@ router.post('/verify-totp-login', async (req, res) => {
 
         // Generate JWT tokens
         const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-        sendRefreshToken(res, refreshToken);
+        const refreshTokenData = await createAndStoreRefreshToken(user, req);
+        sendRefreshToken(res, refreshTokenData.token);
+
+        // Generate and set CSRF token
+        const csrfToken = user.generateCSRFToken();
+        await user.save();
 
         // Send login notification email
         await sendLoginNotification(user, req);
@@ -406,6 +415,7 @@ router.post('/verify-totp-login', async (req, res) => {
         res.status(200).json({ 
             message: usedBackupCode ? 'Backup code authentication successful' : 'TOTP two-factor authentication successful', 
             token: accessToken, 
+            csrfToken: csrfToken,
             user: {id: user._id, name: user.name, email: user.email },
             usedBackupCode: usedBackupCode
         });
@@ -417,7 +427,7 @@ router.post('/verify-totp-login', async (req, res) => {
 });
 
 // Regenerate backup codes
-router.post('/regenerate-backup-codes', verifyToken, async (req, res) => {
+router.post('/regenerate-backup-codes', verifyTokenAndValidateCSRF, async (req, res) => {
     const userId = req.userId;
     
     try {

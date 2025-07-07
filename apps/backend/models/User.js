@@ -36,5 +36,42 @@ const userSchema = new mongoose.Schema({
         usedAt: { type: Date, default: null }
     }],
     loginNotificationsEnabled: { type: Boolean, default: true },
+    // CSRF Protection
+    csrfToken: { type: String, default: null },
+    csrfTokenExpiresAt: { type: Date, default: null },
+    // Refresh token tracking
+    refreshTokenFamily: { type: String, default: null },
+    lastActiveTokenFamily: { type: String, default: null }
 });
+
+// Method to generate new CSRF token
+userSchema.methods.generateCSRFToken = function() {
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    this.csrfToken = token;
+    this.csrfTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    return token;
+};
+
+// Method to validate CSRF token
+userSchema.methods.validateCSRFToken = function(token) {
+    if (!this.csrfToken || !this.csrfTokenExpiresAt) {
+        return false;
+    }
+    if (new Date() > this.csrfTokenExpiresAt) {
+        return false;
+    }
+    return this.csrfToken === token;
+};
+
+// Method to clear expired CSRF token
+userSchema.methods.clearExpiredCSRFToken = function() {
+    if (this.csrfTokenExpiresAt && new Date() > this.csrfTokenExpiresAt) {
+        this.csrfToken = null;
+        this.csrfTokenExpiresAt = null;
+        return true;
+    }
+    return false;
+};
+
 module.exports = mongoose.model('User', userSchema);

@@ -155,7 +155,7 @@ function Login() {
                     }
                 } else {
                     // Use UserContext login function
-                    login(data.token, data.user);
+                    login(data.token, data.user, data.csrfToken);
                     setSuccess('Login successful! Redirecting...');
                     setRedirecting(true);
                 }
@@ -287,7 +287,7 @@ function Login() {
             }
             
             // Login successful with 2FA
-            login(data.token, data.user);
+            login(data.token, data.user, data.csrfToken);
             setSuccess('Login successful! Redirecting...');
             setRedirecting(true);
         } catch (err) {

@@ -3,15 +3,28 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const UserUsage = require('../models/UserUsage');
+const RefreshToken = require('../models/RefreshToken');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { sendVerificationEmail, sendResetPasswordEmail, sendTwoFactorEmailOTP, sendLoginNotificationEmail } = require('../utils/mailer');
 const databaseManager = require('../utils/databaseManager');
-const { verifyToken } = require('./middleware');
+const { 
+  verifyToken, 
+  verifyTokenAndGenerateCSRF, 
+  verifyTokenAndValidateCSRF 
+} = require('./middleware');
 dotenv.config();
-const {generateAccessToken,generateRefreshToken,sendRefreshToken} = require('../utils/tokengeneration');
+const {
+  generateAccessToken,
+  createAndStoreRefreshToken,
+  validateAndRotateRefreshToken,
+  revokeRefreshToken,
+  revokeAllUserTokens,
+  sendRefreshToken,
+  clearRefreshToken
+} = require('../utils/tokengeneration');
 
 // Rate limiters for different types of operations
 const authLimiter = rateLimit({
@@ -187,13 +200,22 @@ router.post('/login', authLimiter, async (req, res) => {
 
     // No 2FA or 2FA not enabled - proceed with normal login
     const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
-    sendRefreshToken(res, refreshToken);
+    const refreshTokenData = await createAndStoreRefreshToken(user, req);
+    sendRefreshToken(res, refreshTokenData.token);
+
+    // Generate and set CSRF token
+    const csrfToken = user.generateCSRFToken();
+    await user.save();
 
     // Send login notification email
     await sendLoginNotification(user, req);
 
-    res.status(200).json({ message: 'Login successful', token: accessToken, user: {id: user._id, name: user.name, email: user.email } });
+    res.status(200).json({ 
+      message: 'Login successful', 
+      token: accessToken, 
+      csrfToken: csrfToken,
+      user: {id: user._id, name: user.name, email: user.email } 
+    });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ message: 'Server error during login' });
@@ -201,58 +223,84 @@ router.post('/login', authLimiter, async (req, res) => {
 });
 router.post('/refresh', generalAuthLimiter, async (req, res) => {
   const token = req.cookies.refreshToken;
-  if (!token) return res.sendStatus(401);
+  if (!token) {
+    return res.status(401).json({ message: 'Refresh token not provided' });
+  }
 
   try {
-    const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
-    const user = await User.findById(payload.id);
-    if (!user) return res.sendStatus(403);
+    // Validate and rotate refresh token
+    const tokenData = await validateAndRotateRefreshToken(token, req);
+    
+    // Send new refresh token as cookie
+    sendRefreshToken(res, tokenData.refreshToken);
 
-    const newAccessToken = generateAccessToken(user);
-    res.status(200).json({ token: newAccessToken });
+    // Generate and set new CSRF token
+    const csrfToken = tokenData.user.generateCSRFToken();
+    await tokenData.user.save();
+
+    res.status(200).json({ 
+      token: tokenData.accessToken,
+      csrfToken: csrfToken,
+      message: 'Tokens refreshed successfully'
+    });
   } catch (err) {
     console.error('Refresh error:', err.message);
-    return res.sendStatus(403);
+    
+    // Clear the invalid refresh token cookie
+    clearRefreshToken(res);
+    
+    if (err.message === 'Token reuse detected - security breach') {
+      return res.status(403).json({ 
+        message: 'Security breach detected. Please log in again.',
+        code: 'TOKEN_REUSE_DETECTED'
+      });
+    }
+    
+    return res.status(403).json({ 
+      message: 'Invalid refresh token',
+      code: 'INVALID_REFRESH_TOKEN'
+    });
   }
 });
 router.post('/logout', async (req, res) => {
   try {
-    // Get user ID from token if available
+    // Get refresh token from cookie
     const token = req.cookies.refreshToken;
+    let userId = null;
+
     if (token) {
       try {
+        // Revoke the specific refresh token with logout reason
+        await revokeRefreshToken(token, 'logout');
+        
+        // Get user ID for database disconnection
         const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
-        const user = await User.findById(payload.id);
-        if (user) {
+        userId = payload.id;
+        
+        if (userId) {
           // Disconnect all database connections for this user
-          await databaseManager.disconnectAll(user._id.toString());
-          console.log(`Disconnected all database connections for user: ${user._id}`);
+          await databaseManager.disconnectAll(userId.toString());
+          console.log(`Disconnected all database connections for user: ${userId}`);
         }
       } catch (tokenError) {
         console.log('Token verification failed during logout, continuing with logout');
       }
     }
+
+    // Clear refresh token cookie
+    clearRefreshToken(res);
     
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-    });
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
     console.error('Error during logout:', error);
     // Still clear the cookie even if there's an error
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-    });
+    clearRefreshToken(res);
     res.status(200).json({ message: 'Logged out successfully' });
   }
 });
 
 // POST /request-password-change - Send password change link to authenticated user
-router.post('/request-password-change', passwordResetLimiter, verifyToken, async (req, res) => {
+router.post('/request-password-change', passwordResetLimiter, verifyTokenAndValidateCSRF, async (req, res) => {
   const userId = req.userId;
 
   try {
@@ -291,7 +339,7 @@ router.post('/request-password-change', passwordResetLimiter, verifyToken, async
 });
 
 // PUT /update-login-notifications - Update login notifications preference
-router.put('/update-login-notifications', generalAuthLimiter, verifyToken, async (req, res) => {
+router.put('/update-login-notifications', generalAuthLimiter, verifyTokenAndValidateCSRF, async (req, res) => {
   const userId = req.userId;
   const { loginNotificationsEnabled } = req.body;
 
@@ -349,7 +397,7 @@ router.get('/usage-stats', generalAuthLimiter, verifyToken, async (req, res) => 
 });
 
 // GET /me - Get current user data
-router.get('/me', generalAuthLimiter, verifyToken, async (req, res) => {
+router.get('/me', generalAuthLimiter, verifyTokenAndGenerateCSRF, async (req, res) => {
   const userId = req.userId;
 
   try {
@@ -381,5 +429,272 @@ router.get('/me', generalAuthLimiter, verifyToken, async (req, res) => {
     });
   }
 });
+
+// GET /active-sessions - Get user's active refresh token sessions
+router.get('/active-sessions', generalAuthLimiter, verifyTokenAndGenerateCSRF, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    const activeSessions = await RefreshToken.getActiveTokensForUser(userId);
+    const currentRefreshToken = req.cookies.refreshToken;
+    
+    // Transform data for frontend (don't expose actual tokens)
+    const sessionData = activeSessions.map(session => {
+      const isCurrent = currentRefreshToken && session.token === currentRefreshToken;
+      
+      return {
+        id: session._id,
+        family: session.family,
+        createdAt: session.createdAt,
+        lastUsedAt: session.lastUsedAt || session.createdAt, // Fallback to creation time
+        expiresAt: session.expiresAt,
+        deviceInfo: {
+          userAgent: session.deviceInfo.userAgent,
+          ipAddress: session.deviceInfo.ipAddress,
+          deviceFingerprint: session.deviceInfo.deviceFingerprint ? 
+            session.deviceInfo.deviceFingerprint.substring(0, 8) + '...' : null // Partial fingerprint for display
+        },
+        isCurrent: isCurrent,
+        isUsed: session.isUsed,
+        // Add security metadata
+        securityInfo: {
+          hasSuccessor: !!session.successorToken,
+          revokedBy: session.revokedBy,
+          revokedAt: session.revokedAt
+        }
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      sessions: sessionData,
+      total: sessionData.length,
+      currentSessionId: sessionData.find(s => s.isCurrent)?._id || null
+    });
+
+  } catch (err) {
+    console.error('Get active sessions error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching active sessions'
+    });
+  }
+});
+
+// POST /revoke-session - Revoke a specific refresh token session
+router.post('/revoke-session', generalAuthLimiter, verifyTokenAndValidateCSRF, async (req, res) => {
+  const userId = req.userId;
+  const { sessionId } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Session ID is required'
+    });
+  }
+
+  try {
+    // Find the session and verify it belongs to the user
+    const session = await RefreshToken.findOne({
+      _id: sessionId,
+      userId: userId,
+      isRevoked: false
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found or already revoked'
+      });
+    }
+
+    // Revoke the session with specific reason
+    await session.revoke('user_revocation');
+
+    res.status(200).json({
+      success: true,
+      message: 'Session revoked successfully'
+    });
+
+  } catch (err) {
+    console.error('Revoke session error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while revoking session'
+    });
+  }
+});
+
+// POST /revoke-all-sessions - Revoke all refresh token sessions for user
+router.post('/revoke-all-sessions', generalAuthLimiter, verifyTokenAndValidateCSRF, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    // Revoke all tokens for the user
+    await revokeAllUserTokens(userId, 'logout_all_devices');
+
+    // Clear the current refresh token cookie as well
+    clearRefreshToken(res);
+
+    res.status(200).json({
+      success: true,
+      message: 'All sessions revoked successfully. Please log in again.'
+    });
+
+  } catch (err) {
+    console.error('Revoke all sessions error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while revoking all sessions'
+    });
+  }
+});
+
+// GET /csrf-token - Generate and return a new CSRF token
+router.get('/csrf-token', generalAuthLimiter, verifyTokenAndGenerateCSRF, async (req, res) => {
+  try {
+    // The CSRF token is already generated by the middleware and available in req.csrfToken
+    res.status(200).json({
+      success: true,
+      csrfToken: req.csrfToken,
+      message: 'CSRF token generated successfully'
+    });
+  } catch (err) {
+    console.error('CSRF token generation error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while generating CSRF token'
+    });
+  }
+});
+
+// GET /session-analytics - Get detailed session analytics for current user
+router.get('/session-analytics', generalAuthLimiter, verifyTokenAndGenerateCSRF, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    // Get all tokens for user (including revoked ones for analytics)
+    const allTokens = await RefreshToken.find({ userId: userId })
+      .sort({ createdAt: -1 })
+      .limit(50); // Limit to last 50 tokens
+
+    // Get active tokens
+    const activeTokens = await RefreshToken.getActiveTokensForUser(userId);
+
+    // Calculate analytics
+    const analytics = {
+      totalSessions: allTokens.length,
+      activeSessions: activeTokens.length,
+      revokedSessions: allTokens.filter(t => t.isRevoked).length,
+      usedSessions: allTokens.filter(t => t.isUsed).length,
+      
+      // Token families (unique login sessions)
+      uniqueFamilies: [...new Set(allTokens.map(t => t.family))].length,
+      
+      // Device analytics
+      uniqueDevices: [...new Set(allTokens.map(t => t.deviceInfo.deviceFingerprint))].length,
+      
+      // Usage patterns
+      lastActivity: allTokens.reduce((latest, token) => {
+        const tokenLastUsed = token.lastUsedAt || token.createdAt;
+        return tokenLastUsed > latest ? tokenLastUsed : latest;
+      }, new Date(0)),
+      
+      // Revocation reasons
+      revocationReasons: allTokens
+        .filter(t => t.revokedBy)
+        .reduce((acc, token) => {
+          acc[token.revokedBy] = (acc[token.revokedBy] || 0) + 1;
+          return acc;
+        }, {}),
+      
+      // Recent session history (last 10 sessions)
+      recentSessions: allTokens.slice(0, 10).map(session => ({
+        id: session._id,
+        family: session.family,
+        createdAt: session.createdAt,
+        lastUsedAt: session.lastUsedAt,
+        isActive: !session.isRevoked && !session.isUsed && session.expiresAt > new Date(),
+        revokedBy: session.revokedBy,
+        deviceFingerprint: session.deviceInfo.deviceFingerprint ? 
+          session.deviceInfo.deviceFingerprint.substring(0, 8) + '...' : null,
+        userAgent: session.deviceInfo.userAgent
+      }))
+    };
+
+    res.status(200).json({
+      success: true,
+      analytics: analytics
+    });
+
+  } catch (err) {
+    console.error('Get session analytics error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching session analytics'
+    });
+  }
+});
+
+// GET /security-monitor - Get security monitoring data for current user
+router.get('/security-monitor', generalAuthLimiter, verifyTokenAndGenerateCSRF, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    // Get security analytics
+    const securityAnalytics = await RefreshToken.getSecurityAnalytics(userId, 30);
+    
+    // Find suspicious sessions
+    const suspiciousSessions = await RefreshToken.findSuspiciousSessions(userId);
+    
+    // Get current token chain (if available)
+    const currentRefreshToken = req.cookies.refreshToken;
+    let tokenChain = [];
+    if (currentRefreshToken) {
+      tokenChain = await RefreshToken.getTokenChain(currentRefreshToken);
+    }
+
+    res.status(200).json({
+      success: true,
+      securityData: {
+        analytics: securityAnalytics,
+        suspiciousActivity: suspiciousSessions,
+        currentTokenChain: tokenChain,
+        riskLevel: calculateRiskLevel(securityAnalytics, suspiciousSessions)
+      }
+    });
+
+  } catch (err) {
+    console.error('Get security monitor error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching security data'
+    });
+  }
+});
+
+// Helper function to calculate risk level
+function calculateRiskLevel(analytics, suspicious) {
+  let riskScore = 0;
+  
+  // Device changes contribute to risk
+  riskScore += analytics.deviceChanges.length * 2;
+  
+  // Security events
+  riskScore += analytics.securityEvents.tokenReuse * 10;
+  riskScore += analytics.securityEvents.familyBreaches * 15;
+  
+  // Suspicious activity
+  suspicious.forEach(event => {
+    if (event.severity === 'high') riskScore += 20;
+    if (event.severity === 'medium') riskScore += 10;
+  });
+  
+  // Determine risk level
+  if (riskScore === 0) return 'low';
+  if (riskScore < 10) return 'low';
+  if (riskScore < 30) return 'medium';
+  return 'high';
+}
 
 module.exports = router;  
