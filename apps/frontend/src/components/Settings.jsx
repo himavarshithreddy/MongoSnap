@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Shield, Mail, Key, Smartphone, Check, AlertCircle, Settings as SettingsIcon, User, QrCode, Clock, Smartphone as PhoneIcon } from 'lucide-react';
+import { X, Shield, Mail, Key, Smartphone, Check, AlertCircle, Settings as SettingsIcon, User, QrCode, Clock, Smartphone as PhoneIcon, Monitor, Activity } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
+import SessionManager from './SessionManager';
 
 function Settings({ isOpen, onClose, isStandalone = false }) {
     const { user } = useUser();
+    const [activeTab, setActiveTab] = useState('security');
     const [changePasswordLoading, setChangePasswordLoading] = useState(false);
     const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
     const [changePasswordError, setChangePasswordError] = useState('');
@@ -390,10 +392,10 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
             ? "min-h-screen bg-[#101813] flex items-center justify-center p-4" 
             : "fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4"
         }>
-            <div className={`bg-[#17211b] w-full max-w-5xl overflow-hidden shadow-2xl flex ${
+            <div className={`bg-[#17211b] w-full max-w-6xl h-[85vh] overflow-hidden shadow-2xl flex ${
                 isStandalone 
-                    ? "rounded-xl min-h-[80vh]" 
-                    : "rounded-xl max-h-[90vh]"
+                    ? "rounded-xl" 
+                    : "rounded-xl"
             }`}>
                 {/* Left Sidebar */}
                 <div className="w-64 bg-[#0f1611] p-6">
@@ -402,9 +404,30 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                         <h2 className="text-xl font-bold text-white">Settings</h2>
                     </div>
                     
-                    <div className="bg-[#35c56a69] rounded-lg p-4 flex items-center gap-3">
-                        <Shield size={18} className="text-[#11a15e]" />
-                        <span className="font-medium text-white">Security</span>
+                    <div className="space-y-2">
+                        <button
+                            onClick={() => setActiveTab('security')}
+                            className={`w-full rounded-lg p-4 flex items-center gap-3 transition-colors cursor-pointer ${
+                                activeTab === 'security' 
+                                    ? 'bg-[#35c56a69] text-white' 
+                                    : 'text-gray-400 hover:text-white hover:bg-[#1a2520]'
+                            }`}
+                        >
+                            <Shield size={18} className={activeTab === 'security' ? 'text-[#11a15e]' : ''} />
+                            <span className="font-medium">Security</span>
+                        </button>
+                        
+                        <button
+                            onClick={() => setActiveTab('sessions')}
+                            className={`w-full rounded-lg p-4 flex items-center gap-3 transition-colors cursor-pointer ${
+                                activeTab === 'sessions' 
+                                    ? 'bg-[#35c56a69] text-white' 
+                                    : 'text-gray-400 hover:text-white hover:bg-[#1a2520]'
+                            }`}
+                        >
+                            <Monitor size={18} className={activeTab === 'sessions' ? 'text-[#11a15e]' : ''} />
+                            <span className="font-medium">Sessions</span>
+                        </button>
                     </div>
                 </div>
 
@@ -412,7 +435,9 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                 <div className="flex-1 flex flex-col">
                     {/* Header */}
                     <div className="flex items-center justify-between p-6">
-                        <h3 className="text-xl font-semibold text-white">Security</h3>
+                        <h3 className="text-xl font-semibold text-white">
+                            {activeTab === 'security' ? 'Security' : 'Session Management'}
+                        </h3>
                         <button
                             onClick={onClose}
                             className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg cursor-pointer"
@@ -423,6 +448,12 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
 
                     {/* Content */}
                     <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                        {activeTab === 'sessions' ? (
+                            <div className="h-full">
+                                <SessionManager />
+                            </div>
+                        ) : (
+                            <>
                         {isOAuthUser ? (
                             /* OAuth User Message */
                             <div className="bg-[#1a2520] rounded-lg p-8 text-center">
@@ -744,6 +775,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                                     </p>
                                 </div>
                             </div>
+                        )}
+                            </>
                         )}
                     </div>
                 </div>

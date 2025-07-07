@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 const { sendLoginNotificationEmail } = require('../utils/mailer');
+const { generateAccessToken, createAndStoreRefreshToken, sendRefreshToken } = require('../utils/tokengeneration');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -15,25 +16,7 @@ const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 const GITHUB_REDIRECT_URI = process.env.GITHUB_REDIRECT_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Helper to generate tokens
-function generateAccessToken(user) {
-    return jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '15m' });
-}
-function generateRefreshToken(user) {
-    return jwt.sign({ id: user._id }, process.env.REFRESH_TOKEN_SECRET, {
-      expiresIn: '1d',
-    });
-  }
-  
-  function sendRefreshToken(res, token) {
-    res.cookie('refreshToken', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/', // strict is best for refresh
-      maxAge: 1 * 24 * 60 * 60 * 1000, // 1 day
-    });
-  }
+// Helper functions are now imported from utils/tokengeneration.js
 
 // Helper function to get login details from request
 const getLoginDetails = (req) => {
@@ -198,10 +181,14 @@ router.get('/google/callback', async (req, res) => {
 
         console.log('Generating JWT token...');
 
-        // Generate JWT
+        // Generate JWT with proper session management
         const token = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-        sendRefreshToken(res, refreshToken);
+        const refreshTokenData = await createAndStoreRefreshToken(user, req);
+        sendRefreshToken(res, refreshTokenData.token);
+
+        // Generate and set CSRF token
+        const csrfToken = user.generateCSRFToken();
+        await user.save();
 
         // Send login notification email
         await sendLoginNotification(user, req);
@@ -321,10 +308,14 @@ router.get('/github/callback', async (req, res) => {
 
         console.log('Generating JWT token...');
 
-        // Generate JWT
+        // Generate JWT with proper session management
         const token = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-        sendRefreshToken(res, refreshToken);
+        const refreshTokenData = await createAndStoreRefreshToken(user, req);
+        sendRefreshToken(res, refreshTokenData.token);
+
+        // Generate and set CSRF token
+        const csrfToken = user.generateCSRFToken();
+        await user.save();
 
         // Send login notification email
         await sendLoginNotification(user, req);
