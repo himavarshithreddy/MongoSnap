@@ -12,6 +12,11 @@ const { MongoClient, ObjectId } = require('mongodb');
 const geminiApi = require('../utils/geminiApi');
 const rateLimit = require('express-rate-limit');
 const archiver = require('archiver');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { exec } = require('child_process');
+const util = require('util');
 dotenv.config();
 
 // Rate limiters for database operations
@@ -118,6 +123,51 @@ const exportLimiter = rateLimit({
 const ENCRYPTION_KEY = process.env.CONNECTION_ENCRYPTION_KEY;
 const ENCRYPTION_IV_LENGTH = 16;
 const MAX_CONNECTIONS_PER_USER = 2; // Limit per user (excluding sample connections)
+const execAsync = util.promisify(exec);
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, '../uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        // Create unique filename with user ID and timestamp
+        const uniqueName = `${req.userId}_${Date.now()}_${file.originalname}`;
+        cb(null, uniqueName);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        // Accept various MongoDB dump formats
+        const allowedTypes = [
+            'application/gzip',
+            'application/x-gzip',
+            'application/tar+gzip',
+            'application/octet-stream',
+            'application/zip',
+            'application/x-tar',
+            'application/tar'
+        ];
+        
+        const allowedExtensions = ['.gz', '.tar', '.tar.gz', '.zip', '.bson', '.json'];
+        const fileExtension = path.extname(file.originalname).toLowerCase();
+        
+        if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(fileExtension)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Please upload a MongoDB dump file (.gz, .tar, .tar.gz, .zip, .bson, or .json)'));
+        }
+    }
+});
 
 // Check if encryption key is set
 if (!ENCRYPTION_KEY) {
@@ -130,13 +180,14 @@ const checkConnectionLimit = async (userId) => {
     try {
         const nonSampleConnections = await Connection.countDocuments({ 
             userId, 
-            isSample: { $ne: true } // Exclude sample connections
+            isSample: { $ne: true }, // Exclude sample connections
+            isTemporary: { $ne: true } // Exclude temporary connections
         });
         
         if (nonSampleConnections >= MAX_CONNECTIONS_PER_USER) {
             return {
                 allowed: false,
-                message: `Connection limit reached. You can have up to ${MAX_CONNECTIONS_PER_USER} database connections (excluding sample database).`,
+                message: `Connection limit reached. You can have up to ${MAX_CONNECTIONS_PER_USER} database connections (excluding sample and temporary databases).`,
                 currentCount: nonSampleConnections,
                 limit: MAX_CONNECTIONS_PER_USER
             };
@@ -192,7 +243,10 @@ router.get('/', verifyToken, async (req, res) => {
             lastUsed: conn.lastUsed,
             isActive: conn.isActive || false,
             createdAt: conn.createdAt,
-            isSample: conn.isSample || false
+            isSample: conn.isSample || false,
+            isTemporary: conn.isTemporary || false,
+            tempExpiresAt: conn.tempExpiresAt,
+            originalFileName: conn.originalFileName
         }));
         
         // Get connection limit info
@@ -320,7 +374,8 @@ router.get('/limits', verifyToken, async (req, res) => {
         // Get more detailed connection info
         const totalConnections = await Connection.countDocuments({ userId });
         const sampleConnections = await Connection.countDocuments({ userId, isSample: true });
-        const regularConnections = totalConnections - sampleConnections;
+        const temporaryConnections = await Connection.countDocuments({ userId, isTemporary: true });
+        const regularConnections = totalConnections - sampleConnections - temporaryConnections;
         
         res.status(200).json({
             limits: {
@@ -332,7 +387,8 @@ router.get('/limits', verifyToken, async (req, res) => {
             breakdown: {
                 total: totalConnections,
                 regular: regularConnections,
-                sample: sampleConnections
+                sample: sampleConnections,
+                temporary: temporaryConnections
             }
         });
     } catch (error) {
@@ -418,15 +474,29 @@ router.get('/:id', verifyToken, async (req, res) => {
         if (!connection) {
             return res.status(404).json({ message: 'Connection not found' });
         }
-        const decryptedUri = decrypt(connection.uri);
+        
+        let uri = '';
+        if (connection.isTemporary) {
+            // For temporary databases, reconstruct the URI but don't expose the main database credentials
+            // We'll return a placeholder that indicates it's a temporary database
+            uri = `[Temporary Database: ${connection.tempDatabaseName}]`;
+        } else {
+            // For regular connections, decrypt and return the actual URI
+            uri = decrypt(connection.uri);
+        }
+        
         res.status(200).json({
             connection: {
                 _id: connection._id,
                 nickname: connection.nickname,
-                uri: decryptedUri,
+                uri: uri,
                 lastUsed: connection.lastUsed,
                 isActive: connection.isActive || false,
-                createdAt: connection.createdAt
+                createdAt: connection.createdAt,
+                isTemporary: connection.isTemporary || false,
+                tempDatabaseName: connection.tempDatabaseName,
+                tempExpiresAt: connection.tempExpiresAt,
+                originalFileName: connection.originalFileName
             }
         });
     } catch (error) {
@@ -465,12 +535,20 @@ router.post('/:id/test', verifyToken, async (req, res) => {
             return res.status(404).json({ message: 'Connection not found' });
         }
         
-        const decryptedUri = decrypt(connection.uri);
-        console.log('Testing URI:', decryptedUri.substring(0, 20) + '...');
+        let uri = '';
+        if (connection.isTemporary) {
+            // For temporary databases, reconstruct the actual URI for testing
+            uri = createTempMongoURI(connection.tempDatabaseName);
+        } else {
+            // For regular connections, decrypt the stored URI
+            uri = decrypt(connection.uri);
+        }
+        
+        console.log('Testing URI:', uri.substring(0, 20) + '...');
         
         try {
             console.log('Starting connection test...');
-        await testConnection(decryptedUri);
+        await testConnection(uri);
             
             // Update connection status on successful test
             connection.isActive = true;
@@ -665,14 +743,21 @@ router.post('/connect', connectionLimiter, verifyToken, async (req, res) => {
             }
         }
         
-        // Get the decrypted URI
-        const decryptedUri = decrypt(connection.uri);
+        // Get the URI for connection
+        let connectionUri = '';
+        if (connection.isTemporary) {
+            // For temporary databases, reconstruct the actual URI
+            connectionUri = createTempMongoURI(connection.tempDatabaseName);
+        } else {
+            // For regular connections, decrypt the stored URI
+            connectionUri = decrypt(connection.uri);
+        }
         
         // Connect to the database using the database manager
         const connectionResult = await databaseManager.connect(
             userId, 
             connection._id.toString(), 
-            decryptedUri, 
+            connectionUri, 
             connection.nickname
         );
         
@@ -790,8 +875,16 @@ router.get('/:id/status', verifyToken, async (req, res) => {
         }
         
         // Extract database info from URI
-        const decryptedUri = decrypt(connection.uri);
-        const uriMatch = decryptedUri.match(/mongodb(?:\+srv)?:\/\/[^@]+@([^\/]+)\/([^?]+)/);
+        let statusUri = '';
+        if (connection.isTemporary) {
+            // For temporary databases, reconstruct the actual URI
+            statusUri = createTempMongoURI(connection.tempDatabaseName);
+        } else {
+            // For regular connections, decrypt the stored URI
+            statusUri = decrypt(connection.uri);
+        }
+        
+        const uriMatch = statusUri.match(/mongodb(?:\+srv)?:\/\/[^@]+@([^\/]+)\/([^?]+)/);
         const host = uriMatch ? uriMatch[1] : 'Unknown';
         const databaseName = uriMatch ? uriMatch[2] : 'Unknown';
         
@@ -1082,51 +1175,107 @@ router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) =
         const startTime = Date.now();
 
         try {
+            // Helper function to create collection operations
+            const createCollectionOperations = (collectionName) => ({
+                find: (query = {}, options = {}) => db.collection(collectionName).find(query, options).toArray(),
+                findOne: (query = {}, options = {}) => db.collection(collectionName).findOne(query, options),
+                insertOne: (doc) => db.collection(collectionName).insertOne(doc),
+                insertMany: (docs) => db.collection(collectionName).insertMany(docs),
+                updateOne: (filter, update, options = {}) => db.collection(collectionName).updateOne(filter, update, options),
+                updateMany: (filter, update, options = {}) => db.collection(collectionName).updateMany(filter, update, options),
+                deleteOne: (filter, options = {}) => db.collection(collectionName).deleteOne(filter, options),
+                deleteMany: (filter, options = {}) => db.collection(collectionName).deleteMany(filter, options),
+                countDocuments: (query = {}) => db.collection(collectionName).countDocuments(query),
+                estimatedDocumentCount: () => db.collection(collectionName).estimatedDocumentCount(),
+                aggregate: (pipeline) => db.collection(collectionName).aggregate(pipeline).toArray(),
+                distinct: (field, query = {}) => db.collection(collectionName).distinct(field, query),
+                createIndex: (keys, options = {}) => db.collection(collectionName).createIndex(keys, options),
+                listIndexes: () => db.collection(collectionName).listIndexes().toArray(),
+                dropIndex: (indexSpec) => db.collection(collectionName).dropIndex(indexSpec),
+                dropIndexes: () => db.collection(collectionName).dropIndexes(),
+                drop: () => db.collection(collectionName).drop(),
+                renameCollection: (newName, options = {}) => db.collection(collectionName).rename(newName, options),
+                replaceOne: (filter, replacement, options = {}) => db.collection(collectionName).replaceOne(filter, replacement, options),
+                collMod: (options) => db.command({ collMod: collectionName, ...options }),
+                // Add additional methods for completeness
+                findAndModify: (options) => db.collection(collectionName).findAndModify(options.query || {}, options.sort || {}, options.update || {}, options),
+                findOneAndUpdate: (filter, update, options = {}) => db.collection(collectionName).findOneAndUpdate(filter, update, options),
+                findOneAndDelete: (filter, options = {}) => db.collection(collectionName).findOneAndDelete(filter, options),
+                findOneAndReplace: (filter, replacement, options = {}) => db.collection(collectionName).findOneAndReplace(filter, replacement, options),
+                bulkWrite: (operations, options = {}) => db.collection(collectionName).bulkWrite(operations, options),
+                watch: (pipeline = [], options = {}) => db.collection(collectionName).watch(pipeline, options),
+                stats: () => db.command({ collStats: collectionName }),
+                validate: (options = {}) => db.command({ validate: collectionName, ...options })
+            });
+
             // Create a safe execution context with MongoDB operations
             const executionContext = {
                 db: new Proxy({}, {
-                    get: function(target, collectionName) {
-                        // Handle database-level operations
-                        if (collectionName === 'dropDatabase') {
-                            return () => db.dropDatabase();
-                        }
-                        if (collectionName === 'createCollection') {
-                            return (name, options = {}) => db.createCollection(name, options);
-                        }
-                        if (collectionName === 'runCommand') {
-                            return (command) => db.command(command);
-                        }
-                        if (collectionName === 'listCollections') {
-                            return () => db.listCollections().toArray();
+                    get: function(target, propertyName) {
+                        // Handle getCollection method specifically
+                        if (propertyName === 'getCollection') {
+                            return (collectionName) => {
+                                if (typeof collectionName !== 'string') {
+                                    throw new Error('Collection name must be a string');
+                                }
+                                return createCollectionOperations(collectionName);
+                            };
                         }
                         
-                        // Return collection operations for any collection name
-                        return {
-                            find: (query = {}, options = {}) => db.collection(collectionName).find(query, options).toArray(),
-                            findOne: (query = {}, options = {}) => db.collection(collectionName).findOne(query, options),
-                            insertOne: (doc) => db.collection(collectionName).insertOne(doc),
-                            insertMany: (docs) => db.collection(collectionName).insertMany(docs),
-                            updateOne: (filter, update, options = {}) => db.collection(collectionName).updateOne(filter, update, options),
-                            updateMany: (filter, update, options = {}) => db.collection(collectionName).updateMany(filter, update, options),
-                            deleteOne: (filter, options = {}) => db.collection(collectionName).deleteOne(filter, options),
-                            deleteMany: (filter, options = {}) => db.collection(collectionName).deleteMany(filter, options),
-                            countDocuments: (query = {}) => db.collection(collectionName).countDocuments(query),
-                            estimatedDocumentCount: () => db.collection(collectionName).estimatedDocumentCount(),
-                            aggregate: (pipeline) => db.collection(collectionName).aggregate(pipeline).toArray(),
-                            distinct: (field, query = {}) => db.collection(collectionName).distinct(field, query),
-                            createIndex: (keys, options = {}) => db.collection(collectionName).createIndex(keys, options),
-                            listIndexes: () => db.collection(collectionName).listIndexes().toArray(),
-                            dropIndex: (indexSpec) => db.collection(collectionName).dropIndex(indexSpec),
-                            dropIndexes: () => db.collection(collectionName).dropIndexes(),
-                            drop: () => db.collection(collectionName).drop(),
-                            renameCollection: (newName, options = {}) => db.collection(collectionName).rename(newName, options),
-                            replaceOne: (filter, replacement, options = {}) => db.collection(collectionName).replaceOne(filter, replacement, options),
-                            collMod: (options) => db.command({ collMod: collectionName, ...options })
-                        };
+                        // Handle collection method (alternative to getCollection)
+                        if (propertyName === 'collection') {
+                            return (collectionName) => {
+                                if (typeof collectionName !== 'string') {
+                                    throw new Error('Collection name must be a string');
+                                }
+                                return createCollectionOperations(collectionName);
+                            };
+                        }
+                        
+                        // Handle database-level operations
+                        if (propertyName === 'dropDatabase') {
+                            return () => db.dropDatabase();
+                        }
+                        if (propertyName === 'createCollection') {
+                            return (name, options = {}) => db.createCollection(name, options);
+                        }
+                        if (propertyName === 'runCommand') {
+                            return (command) => db.command(command);
+                        }
+                        if (propertyName === 'command') {
+                            return (command) => db.command(command);
+                        }
+                        if (propertyName === 'listCollections') {
+                            return () => db.listCollections().toArray();
+                        }
+                        if (propertyName === 'stats') {
+                            return () => db.stats();
+                        }
+                        if (propertyName === 'admin') {
+                            return () => ({
+                                ping: () => db.admin().ping(),
+                                command: (cmd) => db.admin().command(cmd),
+                                listDatabases: () => db.admin().listDatabases(),
+                                serverStatus: () => db.admin().command({ serverStatus: 1 })
+                            });
+                        }
+                        
+                        // For direct collection access (db.collectionName syntax)
+                        // Return collection operations for any other property name
+                        if (typeof propertyName === 'string' && propertyName !== 'constructor' && propertyName !== 'prototype') {
+                            return createCollectionOperations(propertyName);
+                        }
+                        
+                        return undefined;
                     }
                 }),
                 ObjectId: require('mongodb').ObjectId,
-                Date: Date
+                Date: Date,
+                // Add additional MongoDB utilities
+                ISODate: (dateString) => dateString ? new Date(dateString) : new Date(),
+                NumberLong: (value) => parseInt(value),
+                NumberInt: (value) => parseInt(value),
+                NumberDecimal: (value) => parseFloat(value)
             };
 
             // Prepare the query for execution
@@ -1181,6 +1330,42 @@ router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) =
                 documentsAffected
             });
             
+            // Enhanced collection name and operation extraction
+            const extractCollectionAndOperation = (queryStr) => {
+                let collectionName = 'unknown';
+                let operation = 'unknown';
+                
+                // Try to extract collection name from different patterns
+                
+                // Pattern 1: db.getCollection('collectionName') or db.getCollection("collectionName")
+                let match = queryStr.match(/db\.getCollection\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/);
+                if (match) {
+                    collectionName = match[1];
+                } else {
+                    // Pattern 2: db.collection('collectionName') or db.collection("collectionName")  
+                    match = queryStr.match(/db\.collection\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/);
+                    if (match) {
+                        collectionName = match[1];
+                    } else {
+                        // Pattern 3: Direct collection access db.collectionName
+                        match = queryStr.match(/db\.([a-zA-Z_][a-zA-Z0-9_]*)\./);
+                        if (match) {
+                            collectionName = match[1];
+                        }
+                    }
+                }
+                
+                // Extract operation (method name)
+                const operationMatch = queryStr.match(/\.([a-zA-Z][a-zA-Z0-9]*)\s*\(/);
+                if (operationMatch) {
+                    operation = operationMatch[1];
+                }
+                
+                return { collectionName, operation };
+            };
+            
+            const { collectionName, operation } = extractCollectionAndOperation(queryString);
+
             const queryHistoryEntry = new QueryHistory({
                 userId,
                 connectionId,
@@ -1192,8 +1377,8 @@ router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) =
                 errorMessage,
                 executionTime,
                 documentsAffected,
-                collectionName: queryString.match(/db\.([a-zA-Z_][a-zA-Z0-9_]*)\./)?.[1] || 'unknown',
-                operation: queryString.match(/\.([a-zA-Z]+)\(/)?.[1] || 'unknown'
+                collectionName,
+                operation
             });
 
             await queryHistoryEntry.save();
@@ -2041,5 +2226,675 @@ router.post('/:id/export', verifyToken, exportLimiter, async (req, res) => {
         }
     }
 });
+
+// Helper function to generate unique database name
+const generateTempDatabaseName = (userId, originalFileName) => {
+    const random = Math.random().toString(36).substring(2, 7);
+    const userSuffix = userId.toString().substring(0, 3);
+    const fileSuffix = originalFileName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4);
+    return `temp_${userSuffix}_${fileSuffix}_${random}`;
+};
+
+// Helper function to create MongoDB URI for temporary database
+const createTempMongoURI = (tempDatabaseName) => {
+    // Use a MongoDB instance for temporary databases
+    // In production, you might want to use a separate MongoDB instance
+    const baseURI = process.env.TEMP_MONGO_URI || process.env.MONGO_URI;
+    const uriParts = baseURI.split('/');
+    uriParts[uriParts.length - 1] = tempDatabaseName;
+    return uriParts.join('/');
+};
+
+// Helper function to restore MongoDB dump (.gz files only)
+const restoreMongoDBDump = async (filePath, tempDatabaseName) => {
+    try {
+        const baseURI = process.env.TEMP_MONGO_URI || process.env.MONGO_URI;
+        const uriWithoutDb = baseURI.substring(0, baseURI.lastIndexOf('/'));
+        
+        // Only support .gz files
+        const fileExtension = path.extname(filePath).toLowerCase();
+        if (fileExtension !== '.gz') {
+            throw new Error('Only .gz format is supported for database uploads');
+        }
+        
+        // Restore command for .gz archive files (mongodump with gzip)
+        const restoreCommand = `mongorestore --uri="${uriWithoutDb}" --archive="${filePath}" --gzip --nsFrom="*" --nsTo="${tempDatabaseName}.*"`;
+        
+        console.log('Executing restore command:', restoreCommand.replace(/mongodb\+srv:\/\/[^:]+:[^@]+@/, 'mongodb+srv://***:***@'));
+        
+        const { stdout, stderr } = await execAsync(restoreCommand);
+        
+        // Check if restoration was successful
+        if (stderr && stderr.includes('0 document(s) restored successfully')) {
+            console.warn('No documents were restored. Trying alternative approach...');
+            
+            // Try without namespace transformation
+            const altCommand = `mongorestore --uri="${uriWithoutDb}/${tempDatabaseName}" --archive="${filePath}" --gzip`;
+            console.log('Trying alternative command:', altCommand.replace(/mongodb\+srv:\/\/[^:]+:[^@]+@/, 'mongodb+srv://***:***@'));
+            
+            const { stdout: altStdout, stderr: altStderr } = await execAsync(altCommand);
+            
+            if (altStderr && !altStderr.includes('done') && !altStderr.includes('successfully')) {
+                console.error('Alternative restore stderr:', altStderr);
+            }
+            
+            console.log('Alternative restore completed:', altStdout);
+            return { success: true, output: altStdout };
+        }
+        
+        if (stderr && !stderr.includes('done') && !stderr.includes('successfully')) {
+            console.error('Restore stderr:', stderr);
+        }
+        
+        console.log('Restore completed:', stdout);
+        return { success: true, output: stdout };
+        
+    } catch (error) {
+        console.error('Restore error:', error);
+        
+        // Try one more fallback approach
+        if (error.message.includes('failed') && path.extname(filePath).toLowerCase() === '.gz') {
+            try {
+                console.log('Attempting fallback restore for .gz file...');
+                const baseURI = process.env.TEMP_MONGO_URI || process.env.MONGO_URI;
+                const uriWithoutDb = baseURI.substring(0, baseURI.lastIndexOf('/'));
+                
+                // Simple restore to specific database
+                const fallbackCommand = `mongorestore --uri="${uriWithoutDb}" --gzip --archive="${filePath}" --drop`;
+                console.log('Fallback command:', fallbackCommand.replace(/mongodb\+srv:\/\/[^:]+:[^@]+@/, 'mongodb+srv://***:***@'));
+                
+                const { stdout, stderr } = await execAsync(fallbackCommand);
+                console.log('Fallback restore completed:', stdout);
+                
+                // Now copy the restored data to our temp database
+                const copyCommand = `mongorestore --uri="${uriWithoutDb}" --drop --nsFrom="*" --nsTo="${tempDatabaseName}.*"`;
+                await execAsync(copyCommand);
+                
+                return { success: true, output: stdout };
+            } catch (fallbackError) {
+                console.error('Fallback restore also failed:', fallbackError);
+                throw new Error(`Failed to restore database: ${error.message}`);
+            }
+        }
+        
+        throw new Error(`Failed to restore database: ${error.message}`);
+    }
+};
+
+// Upload MongoDB dump file and create temporary database
+router.post('/upload', verifyToken, upload.single('dumpFile'), async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { nickname } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+        
+        if (!nickname || !nickname.trim()) {
+            // Clean up uploaded file
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ message: 'Nickname is required' });
+        }
+        
+        // Validate file type - only .gz files allowed
+        const fileExtension = path.extname(req.file.originalname).toLowerCase();
+        if (fileExtension !== '.gz') {
+            // Clean up uploaded file
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ message: 'Only .gz format is supported for database uploads' });
+        }
+        
+        // Check connection limit before creating new connection
+        const limitCheck = await checkConnectionLimit(userId);
+        if (!limitCheck.allowed) {
+            // Clean up uploaded file
+            fs.unlinkSync(req.file.path);
+            return res.status(429).json({ 
+                message: limitCheck.message,
+                currentCount: limitCheck.currentCount,
+                limit: limitCheck.limit
+            });
+        }
+        
+        console.log('File uploaded:', {
+            originalName: req.file.originalname,
+            filename: req.file.filename,
+            size: req.file.size,
+            nickname: nickname
+        });
+        
+        // Generate unique database name
+        const tempDatabaseName = generateTempDatabaseName(userId, req.file.originalname);
+        
+        // Create temporary database connection entry
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+        
+        // For temporary databases, we don't store the actual URI to prevent security issues
+        // The URI will be reconstructed when needed using the tempDatabaseName
+        const connection = new Connection({
+            userId,
+            nickname: nickname.trim(),
+            uri: '', // Empty for temporary databases - will be reconstructed when needed
+            isTemporary: true,
+            tempExpiresAt: expiresAt,
+            originalFileName: req.file.originalname,
+            tempDatabaseName: tempDatabaseName
+        });
+        
+        await connection.save();
+        
+        console.log('Temporary connection created:', {
+            connectionId: connection._id,
+            tempDatabaseName: tempDatabaseName,
+            expiresAt: expiresAt
+        });
+        
+        // Start restoration process in background
+        setImmediate(async () => {
+            try {
+                console.log('Starting restoration process for:', req.file.filename);
+                
+                // Update status to indicate processing
+                await Connection.findByIdAndUpdate(connection._id, {
+                    isActive: false,
+                    isConnected: false,
+                    isAlive: false
+                });
+                
+                const restoreResult = await restoreMongoDBDump(req.file.path, tempDatabaseName);
+                
+                // Verify that data was actually restored by checking the database
+                const tempURI = createTempMongoURI(tempDatabaseName);
+                const testClient = new MongoClient(tempURI);
+                
+                try {
+                    await testClient.connect();
+                    const db = testClient.db();
+                    const collections = await db.listCollections().toArray();
+                    
+                    if (collections.length === 0) {
+                        throw new Error('No collections found in restored database');
+                    }
+                    
+                    console.log(`Database restoration verified: ${collections.length} collections found`);
+                    
+                    // Update connection status to indicate successful restoration
+                    await Connection.findByIdAndUpdate(connection._id, {
+                        isActive: true,
+                        isConnected: true,
+                        isAlive: true
+                    });
+                    
+                } catch (verifyError) {
+                    console.error('Database verification failed:', verifyError);
+                    throw new Error(`Restoration completed but database verification failed: ${verifyError.message}`);
+                } finally {
+                    await testClient.close();
+                }
+                
+                console.log('Database restoration completed successfully for:', tempDatabaseName);
+                
+                // Clean up uploaded file after successful restoration
+                try {
+                    fs.unlinkSync(req.file.path);
+                    console.log('Uploaded file cleaned up:', req.file.filename);
+                } catch (cleanupError) {
+                    console.error('Error cleaning up uploaded file:', cleanupError);
+                }
+                
+            } catch (restoreError) {
+                console.error('Restoration failed:', restoreError);
+                
+                // Mark connection as failed and clean up
+                try {
+                    await Connection.findByIdAndUpdate(connection._id, {
+                        isActive: false,
+                        isConnected: false,
+                        isAlive: false,
+                        // Store error message for debugging
+                        disconnectedAt: new Date()
+                    });
+                    
+                    // Clean up uploaded file
+                    fs.unlinkSync(req.file.path);
+                    
+                    // Also try to clean up any partially created database
+                    try {
+                        const tempURI = createTempMongoURI(tempDatabaseName);
+                        const cleanupClient = new MongoClient(tempURI);
+                        await cleanupClient.connect();
+                        await cleanupClient.db().dropDatabase();
+                        await cleanupClient.close();
+                        console.log('Cleaned up failed database:', tempDatabaseName);
+                    } catch (cleanupDbError) {
+                        console.error('Error cleaning up failed database:', cleanupDbError);
+                    }
+                    
+                } catch (cleanupError) {
+                    console.error('Error during failed restoration cleanup:', cleanupError);
+                }
+            }
+        });
+        
+        res.status(201).json({
+            message: 'File uploaded successfully. Database restoration in progress.',
+            connection: {
+                _id: connection._id,
+                nickname: connection.nickname,
+                lastUsed: connection.lastUsed,
+                isActive: false, // Will be updated when restoration completes
+                isTemporary: true,
+                tempExpiresAt: connection.tempExpiresAt,
+                originalFileName: connection.originalFileName,
+                createdAt: connection.createdAt
+            }
+        });
+        
+    } catch (error) {
+        console.error('Upload error:', error);
+        
+        // Clean up uploaded file on error
+        if (req.file && req.file.path) {
+            try {
+                fs.unlinkSync(req.file.path);
+            } catch (cleanupError) {
+                console.error('Error cleaning up file after upload error:', cleanupError);
+            }
+        }
+        
+        if (error.code === 11000) {
+            return res.status(400).json({ message: 'Connection with this nickname already exists' });
+        }
+        
+        res.status(500).json({ 
+            message: 'Failed to upload and process file',
+            details: error.message 
+        });
+    }
+});
+
+// Test MongoDB tools availability
+router.get('/upload/test-tools', verifyToken, async (req, res) => {
+    try {
+        // Test if mongorestore is available
+        const { stdout } = await execAsync('mongorestore --version');
+        res.json({
+            mongorestore: {
+                available: true,
+                version: stdout.trim()
+            }
+        });
+    } catch (error) {
+        res.json({
+            mongorestore: {
+                available: false,
+                error: error.message
+            }
+        });
+    }
+});
+
+// Debug endpoint to show exact schema sent to Gemini
+router.get('/:id/debug-schema', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const connectionId = req.params.id;
+
+        // Get the connection info from DB
+        const dbConn = await Connection.findOne({ _id: connectionId, userId });
+        if (!dbConn) {
+            return res.status(404).json({ message: 'Connection not found.' });
+        }
+
+        // Get database schema for context (same logic as Gemini generation)
+        let schema = null;
+        try {
+            const db = databaseManager.getDatabase(userId, connectionId);
+            if (db) {
+                const collections = await db.listCollections().toArray();
+                
+                // Get detailed schema information for each collection
+                const detailedCollections = [];
+                for (const col of collections) {
+                    try {
+                        const collection = db.collection(col.name);
+                        
+                        // Get sample documents to understand field structure
+                        const sampleDocs = await collection.find({}).limit(10).toArray();
+                        
+                        // Analyze field types from sample documents
+                        const fieldAnalysis = {};
+                        sampleDocs.forEach(doc => {
+                            const fields = extractFields(doc);
+                            fields.forEach(field => {
+                                if (!fieldAnalysis[field.name]) {
+                                    fieldAnalysis[field.name] = {
+                                        type: field.type,
+                                        examples: new Set(),
+                                        count: 0
+                                    };
+                                }
+                                fieldAnalysis[field.name].count++;
+                                if (field.value !== null && field.value !== undefined) {
+                                    fieldAnalysis[field.name].examples.add(String(field.value).substring(0, 50));
+                                }
+                            });
+                        });
+                        
+                        // Convert to array format
+                        const fields = Object.entries(fieldAnalysis).map(([name, info]) => ({
+                            name,
+                            type: info.type,
+                            examples: Array.from(info.examples).slice(0, 3), // Limit to 3 examples
+                            frequency: info.count
+                        }));
+                        
+                        // Get collection stats
+                        const stats = await collection.estimatedDocumentCount();
+                        
+                        detailedCollections.push({
+                            name: col.name,
+                            type: col.type,
+                            documentCount: stats,
+                            fields: fields,
+                            sampleDocuments: sampleDocs.slice(0, 2) // Include 2 sample docs for context
+                        });
+                    } catch (collectionError) {
+                        console.log(`Could not analyze collection ${col.name}:`, collectionError.message);
+                        // Add basic collection info if detailed analysis fails
+                        detailedCollections.push({
+                            name: col.name,
+                            type: col.type,
+                            documentCount: 0,
+                            fields: [],
+                            sampleDocuments: []
+                        });
+                    }
+                }
+                
+                schema = {
+                    databaseName: db.databaseName,
+                    collections: detailedCollections
+                };
+                
+                console.log('Generated detailed schema for Gemini:', {
+                    databaseName: schema.databaseName,
+                    collectionCount: schema.collections.length,
+                    collections: schema.collections.map(c => ({
+                        name: c.name,
+                        fieldCount: c.fields.length,
+                        documentCount: c.documentCount
+                    }))
+                });
+            }
+        } catch (schemaError) {
+            console.log('Could not fetch detailed schema for context:', schemaError.message);
+            // Fallback to basic schema
+            try {
+                const db = databaseManager.getDatabase(userId, connectionId);
+                if (db) {
+                    const collections = await db.listCollections().toArray();
+                    schema = {
+                        databaseName: db.databaseName,
+                        collections: collections.map(col => ({
+                            name: col.name,
+                            type: col.type,
+                            documentCount: 0,
+                            fields: [],
+                            sampleDocuments: []
+                        }))
+                    };
+                }
+            } catch (fallbackError) {
+                console.log('Could not fetch even basic schema:', fallbackError.message);
+            }
+        }
+
+        // Build the prompt to show exactly what Gemini sees
+        const geminiApi = require('../utils/geminiApi');
+        const prompt = geminiApi.buildPrompt("Find all documents", schema);
+
+        res.json({
+            schema: schema,
+            promptSentToGemini: prompt,
+            collectionNamesWithDots: schema?.collections?.filter(c => c.name.includes('.')).map(c => c.name) || [],
+            totalCollections: schema?.collections?.length || 0,
+            databaseName: schema?.databaseName || 'Unknown'
+        });
+        
+    } catch (error) {
+        console.error('Error getting debug schema:', error);
+        res.status(500).json({ message: 'Failed to get debug schema', error: error.message });
+    }
+});
+
+// Get supported query patterns and examples
+router.get('/:id/query-patterns', verifyToken, async (req, res) => {
+    try {
+        const patterns = {
+            description: "MongoSnap supports multiple MongoDB query patterns for maximum flexibility",
+            supportedPatterns: [
+                {
+                    name: "Direct Collection Access",
+                    pattern: "db.collectionName.operation()",
+                    examples: [
+                        "db.users.find({})",
+                        "db.products.insertOne({name: 'Product 1'})",
+                        "db.orders.aggregate([{$match: {status: 'completed'}}])"
+                    ],
+                    description: "Access collections directly by name (collections with valid JavaScript identifiers)"
+                },
+                {
+                    name: "getCollection Method",
+                    pattern: "db.getCollection('collectionName').operation()",
+                    examples: [
+                        "db.getCollection('user-profiles').find({})",
+                        "db.getCollection('collection with spaces').findOne({})",
+                        "db.getCollection('123numbers').countDocuments({})"
+                    ],
+                    description: "Use getCollection() for collections with special characters, spaces, or starting with numbers"
+                },
+                {
+                    name: "collection Method",
+                    pattern: "db.collection('collectionName').operation()",
+                    examples: [
+                        "db.collection('users').find({})",
+                        "db.collection('my-collection').updateMany({}, {$set: {updated: true}})",
+                        "db.collection('temp_data').deleteMany({})"
+                    ],
+                    description: "Alternative syntax using collection() method"
+                },
+                {
+                    name: "Database Operations",
+                    pattern: "db.operation()",
+                    examples: [
+                        "db.listCollections()",
+                        "db.createCollection('newCollection')",
+                        "db.stats()",
+                        "db.runCommand({ping: 1})"
+                    ],
+                    description: "Database-level operations"
+                }
+            ],
+            supportedMethods: [
+                "find", "findOne", "insertOne", "insertMany", 
+                "updateOne", "updateMany", "deleteOne", "deleteMany",
+                "countDocuments", "estimatedDocumentCount", "aggregate", "distinct",
+                "createIndex", "listIndexes", "dropIndex", "dropIndexes",
+                "findOneAndUpdate", "findOneAndDelete", "findOneAndReplace",
+                "bulkWrite", "replaceOne", "stats", "validate"
+            ],
+            utilities: [
+                "ObjectId('...')", "Date()", "ISODate('...')",
+                "NumberLong(123)", "NumberInt(123)", "NumberDecimal(123.45)"
+            ],
+            tips: [
+                "Use getCollection() when collection names contain special characters or spaces",
+                "All queries are executed asynchronously - no need for await in your query strings",
+                "Query results are automatically converted to JSON for display",
+                "Use ObjectId('id') for ObjectId comparisons in queries",
+                "Complex aggregation pipelines are fully supported"
+            ]
+        };
+
+        res.json(patterns);
+    } catch (error) {
+        console.error('Error getting query patterns:', error);
+        res.status(500).json({ message: 'Failed to get query patterns' });
+    }
+});
+
+// Get status of temporary database restoration
+router.get('/upload/status/:id', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const connectionId = req.params.id;
+        
+        const connection = await Connection.findOne({ 
+            _id: connectionId, 
+            userId, 
+            isTemporary: true 
+        });
+        
+        if (!connection) {
+            return res.status(404).json({ message: 'Temporary connection not found' });
+        }
+        
+        // Check if database actually has collections (for more accurate status)
+        let collectionCount = 0;
+        let statusDetails = 'processing';
+        
+        if (connection.isActive) {
+            try {
+                const tempURI = decrypt(connection.uri);
+                const client = new MongoClient(tempURI);
+                await client.connect();
+                const collections = await client.db().listCollections().toArray();
+                collectionCount = collections.length;
+                await client.close();
+                statusDetails = collectionCount > 0 ? 'ready' : 'empty';
+            } catch (error) {
+                console.error('Error checking collections:', error);
+                statusDetails = 'error';
+            }
+        } else if (connection.disconnectedAt && 
+                   (Date.now() - new Date(connection.disconnectedAt).getTime()) > 5 * 60 * 1000) {
+            // If it's been more than 5 minutes since disconnection, likely failed
+            statusDetails = 'failed';
+        }
+
+        res.json({
+            connectionId: connection._id,
+            nickname: connection.nickname,
+            isActive: connection.isActive,
+            isConnected: connection.isConnected,
+            isAlive: connection.isAlive,
+            tempExpiresAt: connection.tempExpiresAt,
+            originalFileName: connection.originalFileName,
+            status: statusDetails,
+            collectionCount: collectionCount,
+            lastStatusCheck: new Date()
+        });
+        
+    } catch (error) {
+        console.error('Error getting upload status:', error);
+        res.status(500).json({ message: 'Failed to get upload status' });
+    }
+});
+
+// Delete temporary database manually
+router.delete('/temp/:id', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const connectionId = req.params.id;
+        
+        const connection = await Connection.findOne({ 
+            _id: connectionId, 
+            userId, 
+            isTemporary: true 
+        });
+        
+        if (!connection) {
+            return res.status(404).json({ message: 'Temporary connection not found' });
+        }
+        
+        // Disconnect any active connections
+        await databaseManager.disconnect(userId, connectionId);
+        
+        // Drop the temporary database
+        try {
+            const tempURI = decrypt(connection.uri);
+            const client = new MongoClient(tempURI);
+            await client.connect();
+            await client.db().dropDatabase();
+            await client.close();
+            console.log('Temporary database dropped:', connection.tempDatabaseName);
+        } catch (dropError) {
+            console.error('Error dropping temporary database:', dropError);
+            // Continue with connection deletion even if database drop fails
+        }
+        
+        // Delete the connection record
+        await Connection.findByIdAndDelete(connectionId);
+        
+        res.json({ message: 'Temporary database deleted successfully' });
+        
+    } catch (error) {
+        console.error('Error deleting temporary database:', error);
+        res.status(500).json({ message: 'Failed to delete temporary database' });
+    }
+});
+
+// Cleanup expired temporary databases (called periodically)
+const cleanupExpiredTempDatabases = async () => {
+    try {
+        console.log('Starting cleanup of expired temporary databases...');
+        
+        const expiredConnections = await Connection.find({
+            isTemporary: true,
+            tempExpiresAt: { $lte: new Date() }
+        });
+        
+        console.log(`Found ${expiredConnections.length} expired temporary databases`);
+        
+        for (const connection of expiredConnections) {
+            try {
+                console.log('Cleaning up expired database:', connection.tempDatabaseName);
+                
+                // Disconnect any active connections
+                await databaseManager.disconnect(connection.userId, connection._id.toString());
+                
+                // Drop the temporary database
+                try {
+                    const tempURI = decrypt(connection.uri);
+                    const client = new MongoClient(tempURI);
+                    await client.connect();
+                    await client.db().dropDatabase();
+                    await client.close();
+                    console.log('Expired database dropped:', connection.tempDatabaseName);
+                } catch (dropError) {
+                    console.error('Error dropping expired database:', dropError);
+                }
+                
+                // Delete the connection record
+                await Connection.findByIdAndDelete(connection._id);
+                console.log('Expired connection record deleted:', connection._id);
+                
+            } catch (cleanupError) {
+                console.error('Error cleaning up expired connection:', cleanupError);
+            }
+        }
+        
+        console.log('Temporary database cleanup completed');
+        
+    } catch (error) {
+        console.error('Error during temporary database cleanup:', error);
+    }
+};
+
+// Export the cleanup function so it can be called from the main server
+router.cleanupExpiredTempDatabases = cleanupExpiredTempDatabases;
 
 module.exports = router;

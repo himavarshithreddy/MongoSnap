@@ -155,6 +155,13 @@ ADVANCED QUERIES:
 - "Find with array element match" → db.products.find({"reviews": {"$elemMatch": {"rating": {"$gte": 4}, "verified": true}}})
 
 IMPORTANT:
+- Use the actual field names and types from the schema above when generating queries. 
+- **CRITICAL FOR COLLECTIONS WITH DOTS**: If a collection name contains dots (.), spaces, or special characters, you MUST use db.getCollection("collection.name").operation() syntax
+- Examples for collections with dots: 
+  * db.getCollection("olddb.collection").find({})
+  * db.getCollection("user.profiles").findOne({})
+  * db.getCollection("temp.data").countDocuments({})
+- For regular collection names without dots, use: db.collectionName.operation()
 - Use double quotes for strings: "value" not 'value'
 - Use proper MongoDB operators: $gt, $gte, $lt, $lte, $in, $nin, $exists, $and, $or, $not, $regex, $size, $elemMatch
 - For ObjectIds, use: ObjectId("...")
@@ -174,8 +181,19 @@ IMPORTANT:
             prompt += `\nDatabase Schema Context:\n`;
             prompt += `Database: ${schema.databaseName || 'Unknown'}\n\n`;
             
+            // Check for collections with dots and add special warning
+            const collectionsWithDots = schema.collections.filter(c => c.name.includes('.'));
+            if (collectionsWithDots.length > 0) {
+                prompt += `⚠️  IMPORTANT: The following collections contain dots in their names and MUST use db.getCollection() syntax:\n`;
+                collectionsWithDots.forEach(c => {
+                    prompt += `   - "${c.name}" → Use: db.getCollection("${c.name}").operation()\n`;
+                });
+                prompt += `\n`;
+            }
+            
             schema.collections.forEach(collection => {
-                prompt += `Collection: ${collection.name}\n`;
+                const needsGetCollection = collection.name.includes('.');
+                prompt += `Collection: ${collection.name}${needsGetCollection ? ' (REQUIRES getCollection)' : ''}\n`;
                 prompt += `Document Count: ${collection.documentCount || 'Unknown'}\n`;
                 
                 if (collection.fields && collection.fields.length > 0) {

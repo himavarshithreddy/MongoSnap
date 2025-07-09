@@ -127,4 +127,14 @@ setInterval(async () => {
   }
 }, 60 * 60 * 1000); // 1 hour instead of 15 minutes
 
+// Start periodic temporary database cleanup (every 6 hours)
+setInterval(async () => {
+  try {
+    await connectionRoutes.cleanupExpiredTempDatabases();
+  } catch (error) {
+    console.error('❌ Error during temporary database cleanup:', error);
+  }
+}, 6 * 60 * 60 * 1000); // 6 hours
+
 console.log('🧹 Connection cleanup scheduled (every hour)');
+console.log('🗑️ Temporary database cleanup scheduled (every 6 hours)');

@@ -43,9 +43,26 @@ const connectionSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    isTemporary: {
+        type: Boolean,
+        default: false,
+    },
+    tempExpiresAt: {
+        type: Date,
+        default: null,
+    },
+    originalFileName: {
+        type: String,
+        default: null,
+    },
+    tempDatabaseName: {
+        type: String,
+        default: null,
+    },
 });
 
 connectionSchema.index({ userId: 1, nickname: 1 }, { unique: true });
+connectionSchema.index({ tempExpiresAt: 1 }, { sparse: true }); // For cleanup queries
 const Connection = mongoose.model('Connection', connectionSchema);
 
 module.exports = Connection;

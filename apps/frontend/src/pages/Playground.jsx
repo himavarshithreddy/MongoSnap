@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Database, CheckCircle, Clock, Calendar, Server, Home, ArrowLeft, Wifi, WifiOff, Power, RefreshCw, WifiIcon, ChevronDown, ChevronRight, FileText, Hash, LogOut, Settings, BarChart3, Download } from 'lucide-react';
+import { Database, CheckCircle, Clock, Calendar, Server, Home, ArrowLeft, Wifi, WifiOff, Power, RefreshCw, WifiIcon, ChevronDown, ChevronRight, FileText, Hash, LogOut, Settings, BarChart3, Download, Star } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 import QueryInterface from '../components/QueryInterface';
@@ -1017,7 +1017,7 @@ function Playground() {
         <div className="min-h-screen w-full flex">
         {/* Mobile View - Show message to use desktop */}
         <div className="md:hidden min-h-screen w-full bg-brand-primary flex flex-col items-center justify-center px-6 text-center">
-            <div className='flex items-center mb-8'>
+            <div className='flex items-center mb-8 cursor-pointer hover:scale-105 transition-transform duration-200' onClick={() => navigate('/')}>
                 <Logo size="large" />
                 <h1 className='text-3xl font-bold text-white tracking-wide'>Mongo<span className='text-brand-quaternary'>Snap</span></h1>
             </div>
@@ -1051,7 +1051,7 @@ function Playground() {
         {/* Desktop View - Original content */}
         <div className="hidden md:flex min-h-screen w-full">
           <div className="w-[20%] min-h-screen flex flex-col bg-brand-secondary">
-            <div className='flex items-center mb-6 p-4 border-b border-brand-tertiary'>
+            <div className='flex items-center mb-6 p-4 border-b border-brand-tertiary cursor-pointer hover:bg-brand-tertiary/50 transition-colors duration-200' onClick={() => navigate('/')}>
                 <Logo size="default" />
                 <h1 className='md:text-3xl text-3xl font-bold text-white tracking-wide'>Mongo<span className='text-brand-quaternary'>Snap</span></h1>
             </div>

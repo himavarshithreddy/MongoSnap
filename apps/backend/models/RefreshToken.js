@@ -4,39 +4,32 @@ const refreshTokenSchema = new mongoose.Schema({
     token: {
         type: String,
         required: true,
-        unique: true,
-        index: true
+        unique: true
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
-        index: true
+        required: true
     },
     family: {
         type: String,
-        required: true,
-        index: true
+        required: true
     },
     isUsed: {
         type: Boolean,
-        default: false,
-        index: true
+        default: false
     },
     isRevoked: {
         type: Boolean,
-        default: false,
-        index: true
+        default: false
     },
     expiresAt: {
         type: Date,
-        required: true,
-        index: { expireAfterSeconds: 0 }
+        required: true
     },
     createdAt: {
         type: Date,
-        default: Date.now,
-        index: true
+        default: Date.now
     },
     lastUsedAt: {
         type: Date,
