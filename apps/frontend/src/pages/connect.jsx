@@ -629,10 +629,10 @@ function Connect() {
                 return;
             }
             
-            // Validate file type - only .gz files allowed
+            // Validate file type - .gz and .zip files allowed
             const fileName = file.name.toLowerCase();
-            if (!fileName.endsWith('.gz')) {
-                setUploadError('Invalid file type. Please upload a MongoDB dump file in .gz format only');
+            if (!fileName.endsWith('.gz') && !fileName.endsWith('.zip')) {
+                setUploadError('Invalid file type. Please upload a MongoDB dump file (.gz) or a zip file containing JSON collections (.zip)');
                 e.target.value = '';
                 return;
             }
@@ -831,17 +831,18 @@ function Connect() {
                                             type='file'
                                             id='uploadFile'
                                             onChange={handleFileChange}
-                                            accept='.gz'
+                                            accept='.gz,.zip'
                                             className='w-full text-sm text-gray-300 file:mr-3 file:py-2.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-brand-quaternary/70 file:text-white hover:file:bg-brand-quaternary file:cursor-pointer file:transition-all file:duration-200 bg-brand-secondary border border-gray-500/30 rounded-md h-10'
                                             disabled={uploading}
                                         />
                                     </div>
                                     <div className='bg-gray-600/20 rounded-md p-3 border border-gray-500/20'>
-                                        <p className='text-gray-300 text-sm font-medium mb-2'>Supported Format:</p>
+                                        <p className='text-gray-300 text-sm font-medium mb-2'>Supported Formats:</p>
                                         <div className='flex flex-wrap gap-2 text-sm mb-2'>
                                             <span className='bg-gray-600/30 text-gray-300 px-2 py-1 rounded'>.gz</span>
+                                            <span className='bg-gray-600/30 text-gray-300 px-2 py-1 rounded'>.zip</span>
                                         </div>
-                                        <p className='text-gray-400 text-xs'>Maximum file size: 100MB • MongoDB dump archive format only</p>
+                                        <p className='text-gray-400 text-xs'>Maximum file size: 100MB • MongoDB dump (.gz) or zip file with JSON collections (.zip)</p>
                                     </div>
                                 </div>
                                 
@@ -1388,7 +1389,7 @@ function Connect() {
                                 <div className="w-8 h-8 bg-brand-quaternary/20 rounded-full flex items-center justify-center">
                                     <HelpCircle size={16} className="text-brand-quaternary" />
                                 </div>
-                                <h2 className="text-white text-xl font-bold">How to Create .gz Dump Files</h2>
+                                <h2 className="text-white text-xl font-bold">How to Create Database Files</h2>
                             </div>
                             <button
                                 onClick={() => setShowUploadInfoModal(false)}
@@ -1403,9 +1404,38 @@ function Connect() {
                             {/* Introduction */}
                             <div className="bg-brand-tertiary/50 rounded-lg p-4 border border-gray-500/20">
                                 <p className="text-gray-300 text-sm leading-relaxed">
-                                    MongoDB dump files in .gz format are compressed archives containing your database data. 
-                                    Here's how to create them using MongoDB's built-in tools.
+                                    MongoSnap supports two database formats: MongoDB dump files (.gz) and zip files containing JSON collections (.zip). 
+                                    Choose the format that best suits your needs.
                                 </p>
+                            </div>
+                            
+                            {/* Format Options */}
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-600/30">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="w-6 h-6 bg-brand-quaternary/20 rounded-full flex items-center justify-center text-brand-quaternary text-sm">📦</span>
+                                        <h4 className="text-white font-semibold">.gz Format</h4>
+                                    </div>
+                                    <p className="text-gray-300 text-sm mb-2">MongoDB's native dump format</p>
+                                    <ul className="text-gray-400 text-xs space-y-1">
+                                        <li>• Preserves indexes and metadata</li>
+                                        <li>• Smaller file sizes</li>
+                                        <li>• Requires mongodump tool</li>
+                                    </ul>
+                                </div>
+                                
+                                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-600/30">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 text-sm">📁</span>
+                                        <h4 className="text-white font-semibold">.zip Format</h4>
+                                    </div>
+                                    <p className="text-gray-300 text-sm mb-2">Zip file with JSON collections</p>
+                                    <ul className="text-gray-400 text-xs space-y-1">
+                                        <li>• Easy to create and edit</li>
+                                        <li>• Human-readable JSON</li>
+                                        <li>• No special tools required</li>
+                                    </ul>
+                                </div>
                             </div>
                             
                             {/* Method 1: mongodump command */}
@@ -1434,11 +1464,88 @@ function Connect() {
                                 </div>
                             </div>
                             
-                            {/* Method 2: MongoDB Compass */}
+                            {/* Method 2: Creating Zip Files with JSON Collections */}
                             <div className="space-y-4">
                                 <h3 className="text-white text-lg font-semibold flex items-center gap-2">
-                                    <span className="w-6 h-6 bg-brand-quaternary/20 rounded-full flex items-center justify-center text-brand-quaternary text-sm">2</span>
-                                    Using MongoDB Compass (GUI Method)
+                                    <span className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 text-sm">2</span>
+                                    Creating Zip Files with JSON Collections
+                                </h3>
+                                
+                                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-600/30">
+                                    <h4 className="text-white font-medium mb-3">Step 1: Export Collections as JSON</h4>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <p className="text-gray-300 text-sm mb-2">Using <strong>mongoexport</strong> command:</p>
+                                            <code className="block bg-gray-900 text-green-400 p-3 rounded text-sm font-mono overflow-x-auto">
+                                                mongoexport --uri="mongodb+srv://username:password@cluster.mongodb.net/database" --collection=users --out=users.json
+                                            </code>
+                                        </div>
+                                        
+                                        <div>
+                                            <p className="text-gray-300 text-sm mb-2">Using <strong>MongoDB Compass</strong>:</p>
+                                            <ol className="text-gray-300 text-sm space-y-1 list-decimal list-inside ml-4">
+                                                <li>Select a collection → Export Data → JSON format</li>
+                                                <li>Choose "Export Full Collection" or apply filters</li>
+                                                <li>Save as {'{'}collection_name{'}'}.json</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-600/30">
+                                    <h4 className="text-white font-medium mb-3">Step 2: Create Zip File</h4>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <p className="text-gray-300 text-sm mb-2">Organize your JSON files and create a zip:</p>
+                                            <div className="bg-gray-900 text-gray-300 p-3 rounded text-sm font-mono">
+                                                <div>📁 my-database.zip</div>
+                                                <div className="ml-4">├── users.json</div>
+                                                <div className="ml-4">├── products.json</div>
+                                                <div className="ml-4">├── orders.json</div>
+                                                <div className="ml-4">└── categories.json</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid gap-3">
+                                            <div>
+                                                <p className="text-white text-sm font-medium mb-1">Windows:</p>
+                                                <p className="text-gray-300 text-sm">Right-click files → Send to → Compressed folder</p>
+                                            </div>
+                                            
+                                            <div>
+                                                <p className="text-white text-sm font-medium mb-1">macOS:</p>
+                                                <p className="text-gray-300 text-sm">Select files → Right-click → Compress items</p>
+                                            </div>
+                                            
+                                            <div>
+                                                <p className="text-white text-sm font-medium mb-1">Linux:</p>
+                                                <code className="block bg-gray-900 text-green-400 p-2 rounded text-xs font-mono">
+                                                    zip my-database.zip *.json
+                                                </code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-green-900/20 border border-green-700/30 rounded-lg p-4">
+                                    <h4 className="text-green-200 font-medium mb-2 flex items-center gap-2">
+                                        <span className="text-green-400">✓</span>
+                                        JSON Format Requirements
+                                    </h4>
+                                    <ul className="text-green-300 text-sm space-y-1">
+                                        <li>• Each .json file becomes a collection</li>
+                                        <li>• File name (without .json) becomes collection name</li>
+                                        <li>• Must contain valid JSON array or single object</li>
+                                        <li>• Supports MongoDB Extended JSON (ObjectId, Date, etc.)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            {/* Method 3: MongoDB Compass (for .gz) */}
+                            <div className="space-y-4">
+                                <h3 className="text-white text-lg font-semibold flex items-center gap-2">
+                                    <span className="w-6 h-6 bg-brand-quaternary/20 rounded-full flex items-center justify-center text-brand-quaternary text-sm">3</span>
+                                    Using MongoDB Compass (GUI Method for .gz)
                                 </h3>
                                 
                                 <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-600/30">
@@ -1466,7 +1573,7 @@ function Connect() {
                                 
                                 <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-600/30">
                                     <p className="text-gray-300 text-sm mb-3">
-                                        If you don't have <code className="bg-gray-900 px-1 rounded text-green-400">mongodump</code>, install MongoDB Database Tools:
+                                        If you need <code className="bg-gray-900 px-1 rounded text-green-400">mongodump</code> or <code className="bg-gray-900 px-1 rounded text-green-400">mongoexport</code>, install MongoDB Database Tools:
                                     </p>
                                     
                                     <div className="space-y-3">
@@ -1526,12 +1633,33 @@ function Connect() {
                                     <span className="text-brand-quaternary">💡</span>
                                     Pro Tips
                                 </h4>
-                                <ul className="text-gray-300 text-sm space-y-2">
-                                    <li>• Always test your dump file by restoring it to a local MongoDB instance first</li>
-                                    <li>• For large databases, consider using <code className="bg-gray-900 px-1 rounded text-green-400">--numParallelCollections</code> to speed up the process</li>
-                                    <li>• Check the file size before uploading - our limit is 100MB</li>
-                                    <li>• Include the database name in your connection URI for complete dumps</li>
-                                </ul>
+                                <div className="space-y-3">
+                                    <div>
+                                        <h5 className="text-white text-sm font-medium mb-1">For .gz files:</h5>
+                                        <ul className="text-gray-300 text-sm space-y-1 ml-4">
+                                            <li>• Always test your dump file by restoring it to a local MongoDB instance first</li>
+                                            <li>• For large databases, consider using <code className="bg-gray-900 px-1 rounded text-green-400">--numParallelCollections</code> to speed up the process</li>
+                                            <li>• Include the database name in your connection URI for complete dumps</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h5 className="text-white text-sm font-medium mb-1">For .zip files:</h5>
+                                        <ul className="text-gray-300 text-sm space-y-1 ml-4">
+                                            <li>• Use descriptive filenames (e.g., users.json, products.json)</li>
+                                            <li>• Ensure JSON files contain arrays of documents or single objects</li>
+                                            <li>• Test JSON validity before zipping (use online JSON validators)</li>
+                                            <li>• Avoid special characters in collection names (filenames)</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h5 className="text-white text-sm font-medium mb-1">General:</h5>
+                                        <ul className="text-gray-300 text-sm space-y-1 ml-4">
+                                            <li>• Check the file size before uploading - our limit is 100MB</li>
+                                            <li>• Zip format is great for small to medium datasets and learning</li>
+                                            <li>• .gz format is recommended for production data and large datasets</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         

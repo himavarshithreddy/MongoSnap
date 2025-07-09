@@ -12,7 +12,10 @@ const connectionSchema = new mongoose.Schema({
     },
     uri: {
         type: String,
-        required: true,
+        required: function() {
+            // URI is required only for non-temporary connections
+            return !this.isTemporary;
+        },
         encrypted: true,
     },
     lastUsed: {

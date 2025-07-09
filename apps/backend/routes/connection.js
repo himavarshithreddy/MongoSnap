@@ -17,6 +17,9 @@ const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
 const util = require('util');
+const yauzl = require('yauzl-promise');
+const StreamValues = require('stream-json/streamers/StreamValues');
+const parser = require('stream-json');
 dotenv.config();
 
 // Rate limiters for database operations
@@ -147,24 +150,22 @@ const upload = multer({
         fileSize: 100 * 1024 * 1024, // 100MB limit
     },
     fileFilter: (req, file, cb) => {
-        // Accept various MongoDB dump formats
+        // Accept MongoDB dump formats and zip files with JSON collections
         const allowedTypes = [
             'application/gzip',
             'application/x-gzip',
-            'application/tar+gzip',
-            'application/octet-stream',
             'application/zip',
-            'application/x-tar',
-            'application/tar'
+            'application/x-zip-compressed',
+            'application/octet-stream'
         ];
         
-        const allowedExtensions = ['.gz', '.tar', '.tar.gz', '.zip', '.bson', '.json'];
+        const allowedExtensions = ['.gz', '.zip'];
         const fileExtension = path.extname(file.originalname).toLowerCase();
         
         if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(fileExtension)) {
             cb(null, true);
         } else {
-            cb(new Error('Invalid file type. Please upload a MongoDB dump file (.gz, .tar, .tar.gz, .zip, .bson, or .json)'));
+            cb(new Error('Invalid file type. Please upload a MongoDB dump file (.gz) or a zip file containing JSON collections (.zip)'));
         }
     }
 });
@@ -508,16 +509,55 @@ router.get('/:id', verifyToken, async (req, res) => {
 router.delete('/:id', verifyToken, async (req, res) => {
     try {
         const userId = req.userId;
-        console.log('Deleting connection:', req.params.id, 'for user:', userId);
+        const connectionId = req.params.id;
+        console.log('Deleting connection:', connectionId, 'for user:', userId);
         
-        const connection = await Connection.findOneAndDelete({ _id: req.params.id, userId });
+        // First, find the connection to check if it's temporary
+        const connection = await Connection.findOne({ _id: connectionId, userId });
         if (!connection) {
             console.log('Connection not found for deletion');
             return res.status(404).json({ message: 'Connection not found' });
         }
         
+        // If it's a temporary database, clean up the actual database first
+        if (connection.isTemporary) {
+            console.log('Deleting temporary database:', connection.tempDatabaseName);
+            
+            try {
+                // Disconnect any active connections first
+                await databaseManager.disconnect(userId, connectionId);
+                
+                // Drop the temporary database
+                const tempURI = createTempMongoURI(connection.tempDatabaseName);
+                const client = new MongoClient(tempURI);
+                await client.connect();
+                await client.db().dropDatabase();
+                await client.close();
+                console.log('Temporary database dropped successfully:', connection.tempDatabaseName);
+            } catch (dbError) {
+                console.error('Error dropping temporary database:', dbError);
+                // Continue with connection deletion even if database drop fails
+                // This ensures the connection record is still removed from our system
+            }
+        } else {
+            // For regular connections, just disconnect if active
+            try {
+                await databaseManager.disconnect(userId, connectionId);
+            } catch (disconnectError) {
+                console.error('Error disconnecting regular connection:', disconnectError);
+                // Continue with deletion
+            }
+        }
+        
+        // Delete the connection record
+        await Connection.findByIdAndDelete(connectionId);
+        
         console.log('Connection deleted successfully');
-        res.status(200).json({ message: 'Connection deleted successfully' });
+        res.status(200).json({ 
+            message: connection.isTemporary 
+                ? 'Temporary database and connection deleted successfully' 
+                : 'Connection deleted successfully' 
+        });
     } catch (error) {
         console.error('Error deleting connection:', error);
         res.status(500).json({ message: 'Failed to delete connection' });
@@ -926,14 +966,21 @@ router.post('/:id/reconnect', verifyToken, async (req, res) => {
             return res.status(404).json({ message: 'Connection not found' });
         }
         
-        // Get the decrypted URI
-        const decryptedUri = decrypt(connection.uri);
+        // Get the appropriate URI for connection
+        let connectionUri;
+        if (connection.isTemporary) {
+            // For temporary databases, construct URI using temp database name
+            connectionUri = createTempMongoURI(connection.tempDatabaseName);
+        } else {
+            // For regular connections, decrypt the stored URI
+            connectionUri = decrypt(connection.uri);
+        }
         
         // Reconnect using the database manager
         const connectionResult = await databaseManager.connect(
             userId, 
             connection._id.toString(), 
-            decryptedUri, 
+            connectionUri, 
             connection.nickname
         );
         
@@ -1068,10 +1115,20 @@ router.get('/active', verifyToken, async (req, res) => {
         const connectionInfo = databaseManager.getConnectionInfo(userId, activeConnection._id.toString());
         
         // Extract database info from URI
-        const decryptedUri = decrypt(activeConnection.uri);
-        const uriMatch = decryptedUri.match(/mongodb(?:\+srv)?:\/\/[^@]+@([^\/]+)\/([^?]+)/);
-        const host = uriMatch ? uriMatch[1] : 'Unknown';
-        const databaseName = uriMatch ? uriMatch[2] : 'Unknown';
+        let host = 'Unknown';
+        let databaseName = 'Unknown';
+        
+        if (activeConnection.isTemporary) {
+            // For temporary databases, extract info from temp database name
+            host = 'Temporary Database';
+            databaseName = activeConnection.tempDatabaseName || 'Unknown';
+        } else {
+            // For regular connections, decrypt URI and extract info
+            const decryptedUri = decrypt(activeConnection.uri);
+            const uriMatch = decryptedUri.match(/mongodb(?:\+srv)?:\/\/[^@]+@([^\/]+)\/([^?]+)/);
+            host = uriMatch ? uriMatch[1] : 'Unknown';
+            databaseName = uriMatch ? uriMatch[2] : 'Unknown';
+        }
         
         return res.status(200).json({
             connection: {
@@ -2251,10 +2308,10 @@ const restoreMongoDBDump = async (filePath, tempDatabaseName) => {
         const baseURI = process.env.TEMP_MONGO_URI || process.env.MONGO_URI;
         const uriWithoutDb = baseURI.substring(0, baseURI.lastIndexOf('/'));
         
-        // Only support .gz files
+        // This function only handles .gz files (MongoDB dumps)
         const fileExtension = path.extname(filePath).toLowerCase();
         if (fileExtension !== '.gz') {
-            throw new Error('Only .gz format is supported for database uploads');
+            throw new Error('This function only supports .gz MongoDB dump files');
         }
         
         // Restore command for .gz archive files (mongodump with gzip)
@@ -2321,6 +2378,181 @@ const restoreMongoDBDump = async (filePath, tempDatabaseName) => {
     }
 };
 
+// Extract and process zip file containing JSON collections
+const extractAndImportZipFile = async (filePath, tempDatabaseName) => {
+    try {
+        console.log('Starting zip file extraction:', filePath);
+        
+        const tempURI = createTempMongoURI(tempDatabaseName);
+        const client = new MongoClient(tempURI);
+        await client.connect();
+        const db = client.db();
+        
+        let importedCollections = 0;
+        let totalDocuments = 0;
+        
+        try {
+            // Open the zip file
+            const zipFile = await yauzl.open(filePath);
+            
+            // Process each entry in the zip file
+            const entries = await zipFile.readEntries();
+            
+            for (const entry of entries) {
+                // Skip directories and non-JSON files
+                if (entry.filename.endsWith('/') || !entry.filename.toLowerCase().endsWith('.json')) {
+                    console.log(`Skipping non-JSON entry: ${entry.filename}`);
+                    continue;
+                }
+                
+                // Extract collection name from filename (remove .json extension and directory path)
+                const baseName = path.basename(entry.filename, '.json');
+                const collectionName = baseName.replace(/[^a-zA-Z0-9_]/g, '_'); // Sanitize collection name
+                
+                if (!collectionName) {
+                    console.log(`Skipping entry with invalid collection name: ${entry.filename}`);
+                    continue;
+                }
+                
+                console.log(`Processing JSON file: ${entry.filename} -> collection: ${collectionName}`);
+                
+                try {
+                    // Read the JSON file content
+                    const readStream = await entry.openReadStream();
+                    const content = await streamToString(readStream);
+                    
+                    if (!content.trim()) {
+                        console.log(`Skipping empty file: ${entry.filename}`);
+                        continue;
+                    }
+                    
+                    // Parse JSON content
+                    let jsonData;
+                    try {
+                        jsonData = JSON.parse(content);
+                    } catch (parseError) {
+                        console.error(`Invalid JSON in file ${entry.filename}:`, parseError.message);
+                        continue;
+                    }
+                    
+                    // Ensure data is an array
+                    if (!Array.isArray(jsonData)) {
+                        // If it's a single object, wrap it in an array
+                        jsonData = [jsonData];
+                    }
+                    
+                    if (jsonData.length === 0) {
+                        console.log(`No documents to import from: ${entry.filename}`);
+                        continue;
+                    }
+                    
+                    // Process ObjectId fields and other MongoDB-specific types
+                    const processedData = jsonData.map(doc => processMongoDBTypes(doc));
+                    
+                    // Import documents into collection
+                    const collection = db.collection(collectionName);
+                    const result = await collection.insertMany(processedData, { ordered: false });
+                    
+                    console.log(`Imported ${result.insertedCount} documents into collection: ${collectionName}`);
+                    importedCollections++;
+                    totalDocuments += result.insertedCount;
+                    
+                } catch (fileError) {
+                    console.error(`Error processing file ${entry.filename}:`, fileError.message);
+                    // Continue with other files
+                }
+            }
+            
+            await zipFile.close();
+            
+        } finally {
+            await client.close();
+        }
+        
+        if (importedCollections === 0) {
+            throw new Error('No valid JSON collections found in the zip file');
+        }
+        
+        console.log(`Zip import completed: ${importedCollections} collections, ${totalDocuments} total documents`);
+        return { 
+            success: true, 
+            output: `Successfully imported ${importedCollections} collections with ${totalDocuments} total documents`,
+            collections: importedCollections,
+            documents: totalDocuments
+        };
+        
+    } catch (error) {
+        console.error('Zip extraction error:', error);
+        throw new Error(`Failed to extract and import zip file: ${error.message}`);
+    }
+};
+
+// Helper function to convert stream to string
+const streamToString = (stream) => {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', chunk => chunks.push(chunk));
+        stream.on('error', reject);
+        stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    });
+};
+
+// Process MongoDB-specific types in JSON documents
+const processMongoDBTypes = (obj) => {
+    if (obj === null || obj === undefined) {
+        return obj;
+    }
+    
+    if (Array.isArray(obj)) {
+        return obj.map(item => processMongoDBTypes(item));
+    }
+    
+    if (typeof obj === 'object') {
+        // Handle MongoDB ObjectId
+        if (obj.$oid && typeof obj.$oid === 'string') {
+            try {
+                return new ObjectId(obj.$oid);
+            } catch (error) {
+                console.warn('Invalid ObjectId format:', obj.$oid);
+                return obj;
+            }
+        }
+        
+        // Handle MongoDB Date
+        if (obj.$date) {
+            if (typeof obj.$date === 'string') {
+                return new Date(obj.$date);
+            } else if (obj.$date.$numberLong) {
+                return new Date(parseInt(obj.$date.$numberLong));
+            }
+        }
+        
+        // Handle MongoDB NumberLong
+        if (obj.$numberLong && typeof obj.$numberLong === 'string') {
+            return parseInt(obj.$numberLong);
+        }
+        
+        // Handle MongoDB NumberInt
+        if (obj.$numberInt && typeof obj.$numberInt === 'string') {
+            return parseInt(obj.$numberInt);
+        }
+        
+        // Handle MongoDB NumberDecimal
+        if (obj.$numberDecimal && typeof obj.$numberDecimal === 'string') {
+            return parseFloat(obj.$numberDecimal);
+        }
+        
+        // Recursively process nested objects
+        const processed = {};
+        for (const [key, value] of Object.entries(obj)) {
+            processed[key] = processMongoDBTypes(value);
+        }
+        return processed;
+    }
+    
+    return obj;
+};
+
 // Upload MongoDB dump file and create temporary database
 router.post('/upload', verifyToken, upload.single('dumpFile'), async (req, res) => {
     try {
@@ -2337,12 +2569,12 @@ router.post('/upload', verifyToken, upload.single('dumpFile'), async (req, res) 
             return res.status(400).json({ message: 'Nickname is required' });
         }
         
-        // Validate file type - only .gz files allowed
+        // Validate file type - .gz and .zip files allowed
         const fileExtension = path.extname(req.file.originalname).toLowerCase();
-        if (fileExtension !== '.gz') {
+        if (fileExtension !== '.gz' && fileExtension !== '.zip') {
             // Clean up uploaded file
             fs.unlinkSync(req.file.path);
-            return res.status(400).json({ message: 'Only .gz format is supported for database uploads' });
+            return res.status(400).json({ message: 'Only .gz and .zip formats are supported for database uploads' });
         }
         
         // Check connection limit before creating new connection
@@ -2376,8 +2608,8 @@ router.post('/upload', verifyToken, upload.single('dumpFile'), async (req, res) 
         const connection = new Connection({
             userId,
             nickname: nickname.trim(),
+            isTemporary: true, // Set this first so validation works correctly
             uri: '', // Empty for temporary databases - will be reconstructed when needed
-            isTemporary: true,
             tempExpiresAt: expiresAt,
             originalFileName: req.file.originalname,
             tempDatabaseName: tempDatabaseName
@@ -2403,7 +2635,17 @@ router.post('/upload', verifyToken, upload.single('dumpFile'), async (req, res) 
                     isAlive: false
                 });
                 
-                const restoreResult = await restoreMongoDBDump(req.file.path, tempDatabaseName);
+                // Determine which restoration method to use based on file extension
+                const fileExtension = path.extname(req.file.originalname).toLowerCase();
+                let restoreResult;
+                
+                if (fileExtension === '.gz') {
+                    restoreResult = await restoreMongoDBDump(req.file.path, tempDatabaseName);
+                } else if (fileExtension === '.zip') {
+                    restoreResult = await extractAndImportZipFile(req.file.path, tempDatabaseName);
+                } else {
+                    throw new Error('Unsupported file format');
+                }
                 
                 // Verify that data was actually restored by checking the database
                 const tempURI = createTempMongoURI(tempDatabaseName);
@@ -2768,7 +3010,8 @@ router.get('/upload/status/:id', verifyToken, async (req, res) => {
         
         if (connection.isActive) {
             try {
-                const tempURI = decrypt(connection.uri);
+                // For temporary databases, use the temp database name to create URI
+                const tempURI = createTempMongoURI(connection.tempDatabaseName);
                 const client = new MongoClient(tempURI);
                 await client.connect();
                 const collections = await client.db().listCollections().toArray();
@@ -2825,7 +3068,8 @@ router.delete('/temp/:id', verifyToken, async (req, res) => {
         
         // Drop the temporary database
         try {
-            const tempURI = decrypt(connection.uri);
+            // For temporary databases, use the temp database name to create URI
+            const tempURI = createTempMongoURI(connection.tempDatabaseName);
             const client = new MongoClient(tempURI);
             await client.connect();
             await client.db().dropDatabase();
@@ -2868,7 +3112,8 @@ const cleanupExpiredTempDatabases = async () => {
                 
                 // Drop the temporary database
                 try {
-                    const tempURI = decrypt(connection.uri);
+                    // For temporary databases, use the temp database name to create URI
+                    const tempURI = createTempMongoURI(connection.tempDatabaseName);
                     const client = new MongoClient(tempURI);
                     await client.connect();
                     await client.db().dropDatabase();

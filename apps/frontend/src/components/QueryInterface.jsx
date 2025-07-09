@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Save, Check, AlertCircle, MessageSquare, Code, Play, Sparkles, RefreshCw, Copy } from 'lucide-react';
 import InlineConfirmation from './InlineConfirmation';
 import { analyzeDangerousOperation } from '../utils/dangerousOperations';
@@ -26,6 +26,29 @@ function QueryInterface({
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [pendingQuery, setPendingQuery] = useState(null);
     const [dangerousOperation, setDangerousOperation] = useState(null);
+    
+    // Ref for textarea auto-resize
+    const textareaRef = useRef(null);
+
+    // Auto-resize textarea function
+    const autoResizeTextarea = () => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+            // Reset height to auto to get the scroll height
+            textarea.style.height = 'auto';
+            
+            // Calculate the new height based on scroll height
+            const newHeight = Math.max(128, Math.min(textarea.scrollHeight, 400)); // Min 128px (h-32), Max 400px
+            
+            // Set the new height
+            textarea.style.height = `${newHeight}px`;
+        }
+    };
+
+    // Auto-resize on mount and when queryInput changes
+    useEffect(() => {
+        autoResizeTextarea();
+    }, [queryInput]);
 
     const handleSaveClick = () => {
         if (!queryInput.trim()) {
@@ -283,6 +306,11 @@ function QueryInterface({
             setGeneratedQuery('');
             setQueryExplanation('');
         }
+        
+        // Auto-resize textarea after a short delay to ensure the value is updated
+        setTimeout(() => {
+            autoResizeTextarea();
+        }, 0);
     };
 
     return (
@@ -322,7 +350,10 @@ function QueryInterface({
                 
                 <div className="relative">
                     <textarea 
-                        className="w-full px-3 py-2 pr-20 rounded bg-[#2d4c38] text-white border border-brand-tertiary font-mono text-md h-32 resize-none cursor-text" 
+                        spellCheck={false}
+                        ref={textareaRef}
+                        className="w-full px-3 py-2 outline-none pr-20 rounded bg-[#2d4c38] text-white border border-brand-tertiary font-mono text-md resize-none cursor-text overflow-hidden transition-all duration-200" 
+                        style={{ minHeight: '128px', maxHeight: '400px' }}
                         value={queryInput} 
                         onChange={handleInputChange} 
                         placeholder={getPlaceholder()}
