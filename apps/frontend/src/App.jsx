@@ -9,6 +9,7 @@ import OAuthPopup from './pages/OAuthPopup'
 import Connect from './pages/connect.jsx'
 import Playground from './pages/Playground.jsx'
 import SettingsPage from './pages/Settings.jsx'
+import Pricing from './pages/Pricing.jsx'
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
         <Route path="/playground" element={<ProtectedRoute><Playground /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/change-password/:token" element={<ResetPassword />} />

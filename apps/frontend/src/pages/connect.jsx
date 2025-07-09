@@ -1,5 +1,5 @@
 import {React, useEffect, useState} from 'react'
-import { Eye, EyeOff, Plus, Trash2, Database, Clock, Info, LogOut, Settings } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2, Database, Clock, Info, LogOut, Settings, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
@@ -693,6 +693,16 @@ function Connect() {
                                     >
                                         <Settings size={16} />
                                         <span className="text-sm">Settings</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowProfileModal(false);
+                                            navigate('/pricing');
+                                        }}
+                                        className="w-full flex items-center gap-2 text-gray-300 cursor-pointer transition-colors p-2 rounded-md hover:bg-brand-tertiary"
+                                    >
+                                        <Star size={16} />
+                                        <span className="text-sm">Pricing</span>
                                     </button>
                                     <button
                                         onClick={handleLogout}

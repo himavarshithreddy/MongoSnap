@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 
@@ -7,6 +8,7 @@ function Home() {
         document.title = "MongoSnap - Home";
     }, []);
 
+    const navigate = useNavigate();
     // Use cached user data from context
     const { user, loading, error, logout } = useUser();
 
@@ -69,12 +71,20 @@ function Home() {
                             <Logo size="default" />
                             <h1 className="text-3xl font-bold text-gray-900">Welcome, {user.name}!</h1>
                         </div>
-                        <button 
-                            onClick={logout}
-                            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                        >
-                            Logout
-                        </button>
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => navigate('/pricing')}
+                                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                            >
+                                Pricing
+                            </button>
+                            <button 
+                                onClick={logout}
+                                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                            >
+                                Logout
+                            </button>
+                        </div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -19,7 +19,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 // Helper functions are now imported from utils/tokengeneration.js
 
 // Helper function to get login details from request
-const getLoginDetails = (req) => {
+const getLoginDetails = (req, user = null) => {
   const userAgent = req.get('User-Agent') || 'Unknown Device';
   const ipAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
     (req.connection.socket ? req.connection.socket.remoteAddress : null) || 'Unknown IP';
@@ -50,7 +50,9 @@ const getLoginDetails = (req) => {
     timestamp: new Date(),
     ipAddress: ipAddress,
     userAgent: deviceInfo,
-    location: null // We could integrate with a geolocation service here
+    location: null, // We could integrate with a geolocation service here
+    email: user ? user.email : null,
+    loginMethod: user ? (user.oauthProvider ? `${user.oauthProvider.charAt(0).toUpperCase() + user.oauthProvider.slice(1)} OAuth` : 'Email/Password') : 'Email/Password'
   };
 };
 
@@ -58,7 +60,7 @@ const getLoginDetails = (req) => {
 const sendLoginNotification = async (user, req) => {
   try {
     if (user.loginNotificationsEnabled) {
-      const loginDetails = getLoginDetails(req);
+      const loginDetails = getLoginDetails(req, user);
       await sendLoginNotificationEmail(user.email, loginDetails);
     }
   } catch (error) {

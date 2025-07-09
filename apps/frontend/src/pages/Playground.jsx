@@ -1434,6 +1434,16 @@ function Playground() {
                                         <span className="text-sm">Settings</span>
                                     </button>
                                     <button
+                                        onClick={() => {
+                                            setShowProfileModal(false);
+                                            navigate('/pricing');
+                                        }}
+                                        className="w-full flex items-center gap-2 text-gray-300 cursor-pointer transition-colors p-2 rounded-md hover:bg-brand-tertiary"
+                                    >
+                                        <Star size={16} />
+                                        <span className="text-sm">Pricing</span>
+                                    </button>
+                                    <button
                                         onClick={handleLogout}
                                         className="w-full flex items-center gap-2 text-gray-300 hover:text-red-400 cursor-pointer transition-colors p-2 rounded-md hover:bg-brand-tertiary"
                                     >

@@ -23,9 +23,10 @@ const createBaseTemplate = (content, title) => {
         <title>${title}</title>
         <style>
             body {
-                font-family: Arial, sans-serif;
+                font-family: 'Inter', Arial, sans-serif;
                 line-height: 1.6;
-                color: #333;
+                color: #ffffff;
+                background-color: #101813;
                 max-width: 600px;
                 margin: 0 auto;
                 padding: 20px;
@@ -33,50 +34,80 @@ const createBaseTemplate = (content, title) => {
             .header {
                 text-align: center;
                 margin-bottom: 30px;
-                border-bottom: 2px solid #4CAF50;
+                border-bottom: 2px solid #3CBC6B;
                 padding-bottom: 20px;
             }
             .title {
-                color: #4CAF50;
+                color: #3CBC6B;
                 font-size: 24px;
                 margin: 0;
+                font-weight: 700;
             }
             .button {
                 display: inline-block;
-                background-color: #4CAF50;
+                background-color: #3CBC6B;
                 color: white;
                 text-decoration: none;
                 padding: 12px 24px;
-                border-radius: 4px;
+                border-radius: 8px;
                 margin: 20px 0;
+                font-weight: 600;
+                transition: all 0.3s ease;
+            }
+            .button:hover {
+                background-color: #0da850;
+                transform: scale(1.02);
             }
             .code {
-                background-color: #f5f5f5;
-                border: 2px solid #4CAF50;
-                border-radius: 4px;
+                background-color: #17211b;
+                border: 2px solid #3CBC6B;
+                border-radius: 8px;
                 padding: 15px;
                 text-align: center;
                 font-size: 24px;
                 font-weight: bold;
-                color: #4CAF50;
+                color: #3CBC6B;
                 margin: 20px 0;
                 letter-spacing: 2px;
             }
             .footer {
                 text-align: center;
-                color: #666;
+                color: #9ca3af;
                 font-size: 12px;
                 margin-top: 30px;
-                border-top: 1px solid #ddd;
+                border-top: 1px solid #374151;
                 padding-top: 20px;
             }
             .warning {
-                background-color: #fff3cd;
-                border: 1px solid #ffeaa7;
-                border-radius: 4px;
+                background-color: #1f2937;
+                border: 1px solid #374151;
+                border-radius: 8px;
                 padding: 12px;
                 margin: 20px 0;
-                color: #856404;
+                color: #fbbf24;
+            }
+            .info-box {
+                background-color: #17211b;
+                border: 1px solid #374151;
+                border-radius: 8px;
+                padding: 15px;
+                margin: 20px 0;
+                color: #d1d5db;
+            }
+            .info-box p {
+                margin: 8px 0;
+            }
+            .info-box strong {
+                color: #3CBC6B;
+            }
+            h2 {
+                color: #ffffff;
+                font-weight: 600;
+                margin-bottom: 15px;
+            }
+            p {
+                color: #d1d5db;
+                margin-bottom: 15px;
             }
         </style>
     </head>
@@ -166,7 +197,7 @@ const createTwoFactorEnabledTemplate = () => {
 // 2FA disabled template
 const createTwoFactorDisabledTemplate = () => {
   const content = `
-    <h2 style="color: #d32f2f;">Two-Factor Authentication Disabled</h2>
+    <h2 style="color: #ef4444;">Two-Factor Authentication Disabled</h2>
     <p>Your account security has been reduced. We recommend re-enabling 2FA.</p>
     
     <div style="text-align: center;">
@@ -179,14 +210,16 @@ const createTwoFactorDisabledTemplate = () => {
 
 // Login notification template
 const createLoginNotificationTemplate = (loginDetails) => {
-  const { timestamp, ipAddress, userAgent, location } = loginDetails;
+  const { timestamp, ipAddress, userAgent, location, email, loginMethod } = loginDetails;
   const formattedTime = new Date(timestamp).toLocaleString();
 
   const content = `
     <h2>New Login to Your Account</h2>
     <p>We noticed a new login to your MongoSnap account. Here are the details:</p>
     
-    <div style="background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 15px; margin: 20px 0;">
+    <div class="info-box">
+      <p><strong>Email:</strong> ${email || 'Not provided'}</p>
+      <p><strong>Login Method:</strong> ${loginMethod || 'Email/Password'}</p>
       <p><strong>Time:</strong> ${formattedTime}</p>
       ${ipAddress ? `<p><strong>IP Address:</strong> ${ipAddress}</p>` : ''}
       ${location ? `<p><strong>Location:</strong> ${location}</p>` : ''}
