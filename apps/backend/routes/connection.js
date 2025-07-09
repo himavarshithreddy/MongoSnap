@@ -20,6 +20,7 @@ const util = require('util');
 const yauzl = require('yauzl-promise');
 const StreamValues = require('stream-json/streamers/StreamValues');
 const parser = require('stream-json');
+const execa = require('execa');
 dotenv.config();
 
 // Rate limiters for database operations
@@ -2289,7 +2290,16 @@ const generateTempDatabaseName = (userId, originalFileName) => {
     const random = Math.random().toString(36).substring(2, 7);
     const userSuffix = userId.toString().substring(0, 3);
     const fileSuffix = originalFileName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4);
-    return `temp_${userSuffix}_${fileSuffix}_${random}`;
+    const databaseName = `temp_${userSuffix}_${fileSuffix}_${random}`;
+    
+    // Additional validation: ensure the database name only contains safe characters
+    // MongoDB database names can contain letters, numbers, and underscores
+    const safeDbName = databaseName.replace(/[^a-zA-Z0-9_]/g, '_');
+    
+    // Ensure it doesn't start with a number or special character
+    const finalDbName = /^[a-zA-Z_]/.test(safeDbName) ? safeDbName : `temp_${safeDbName}`;
+    
+    return finalDbName;
 };
 
 // Helper function to create MongoDB URI for temporary database
@@ -2305,6 +2315,20 @@ const createTempMongoURI = (tempDatabaseName) => {
 // Helper function to restore MongoDB dump (.gz files only)
 const restoreMongoDBDump = async (filePath, tempDatabaseName) => {
     try {
+        // Validate inputs to prevent command injection
+        if (!tempDatabaseName || typeof tempDatabaseName !== 'string') {
+            throw new Error('Invalid database name provided');
+        }
+        
+        // Ensure tempDatabaseName only contains safe characters
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tempDatabaseName)) {
+            throw new Error('Database name contains invalid characters');
+        }
+        
+        if (!filePath || typeof filePath !== 'string') {
+            throw new Error('Invalid file path provided');
+        }
+        
         const baseURI = process.env.TEMP_MONGO_URI || process.env.MONGO_URI;
         const uriWithoutDb = baseURI.substring(0, baseURI.lastIndexOf('/'));
         
@@ -2314,22 +2338,36 @@ const restoreMongoDBDump = async (filePath, tempDatabaseName) => {
             throw new Error('This function only supports .gz MongoDB dump files');
         }
         
-        // Restore command for .gz archive files (mongodump with gzip)
-        const restoreCommand = `mongorestore --uri="${uriWithoutDb}" --archive="${filePath}" --gzip --nsFrom="*" --nsTo="${tempDatabaseName}.*"`;
+        // Restore command for .gz archive files (mongodump with gzip) - using secure argument passing
+        const restoreArgs = [
+            '--uri', uriWithoutDb,
+            '--archive', filePath,
+            '--gzip',
+            '--nsFrom', '*',
+            '--nsTo', `${tempDatabaseName}.*`
+        ];
         
-        console.log('Executing restore command:', restoreCommand.replace(/mongodb\+srv:\/\/[^:]+:[^@]+@/, 'mongodb+srv://***:***@'));
+        console.log('Executing restore command with args:', ['mongorestore', ...restoreArgs.map(arg => 
+            arg.includes('mongodb') ? arg.replace(/mongodb\+srv:\/\/[^:]+:[^@]+@/, 'mongodb+srv://***:***@') : arg
+        )]);
         
-        const { stdout, stderr } = await execAsync(restoreCommand);
+        const { stdout, stderr } = await execa('mongorestore', restoreArgs);
         
         // Check if restoration was successful
         if (stderr && stderr.includes('0 document(s) restored successfully')) {
             console.warn('No documents were restored. Trying alternative approach...');
             
-            // Try without namespace transformation
-            const altCommand = `mongorestore --uri="${uriWithoutDb}/${tempDatabaseName}" --archive="${filePath}" --gzip`;
-            console.log('Trying alternative command:', altCommand.replace(/mongodb\+srv:\/\/[^:]+:[^@]+@/, 'mongodb+srv://***:***@'));
+            // Try without namespace transformation - using secure argument passing
+            const altArgs = [
+                '--uri', `${uriWithoutDb}/${tempDatabaseName}`,
+                '--archive', filePath,
+                '--gzip'
+            ];
+            console.log('Trying alternative command with args:', ['mongorestore', ...altArgs.map(arg => 
+                arg.includes('mongodb') ? arg.replace(/mongodb\+srv:\/\/[^:]+:[^@]+@/, 'mongodb+srv://***:***@') : arg
+            )]);
             
-            const { stdout: altStdout, stderr: altStderr } = await execAsync(altCommand);
+            const { stdout: altStdout, stderr: altStderr } = await execa('mongorestore', altArgs);
             
             if (altStderr && !altStderr.includes('done') && !altStderr.includes('successfully')) {
                 console.error('Alternative restore stderr:', altStderr);
@@ -2356,16 +2394,28 @@ const restoreMongoDBDump = async (filePath, tempDatabaseName) => {
                 const baseURI = process.env.TEMP_MONGO_URI || process.env.MONGO_URI;
                 const uriWithoutDb = baseURI.substring(0, baseURI.lastIndexOf('/'));
                 
-                // Simple restore to specific database
-                const fallbackCommand = `mongorestore --uri="${uriWithoutDb}" --gzip --archive="${filePath}" --drop`;
-                console.log('Fallback command:', fallbackCommand.replace(/mongodb\+srv:\/\/[^:]+:[^@]+@/, 'mongodb+srv://***:***@'));
+                // Simple restore to specific database - using secure argument passing
+                const fallbackArgs = [
+                    '--uri', uriWithoutDb,
+                    '--gzip',
+                    '--archive', filePath,
+                    '--drop'
+                ];
+                console.log('Fallback command with args:', ['mongorestore', ...fallbackArgs.map(arg => 
+                    arg.includes('mongodb') ? arg.replace(/mongodb\+srv:\/\/[^:]+:[^@]+@/, 'mongodb+srv://***:***@') : arg
+                )]);
                 
-                const { stdout, stderr } = await execAsync(fallbackCommand);
+                const { stdout, stderr } = await execa('mongorestore', fallbackArgs);
                 console.log('Fallback restore completed:', stdout);
                 
-                // Now copy the restored data to our temp database
-                const copyCommand = `mongorestore --uri="${uriWithoutDb}" --drop --nsFrom="*" --nsTo="${tempDatabaseName}.*"`;
-                await execAsync(copyCommand);
+                // Now copy the restored data to our temp database - using secure argument passing
+                const copyArgs = [
+                    '--uri', uriWithoutDb,
+                    '--drop',
+                    '--nsFrom', '*',
+                    '--nsTo', `${tempDatabaseName}.*`
+                ];
+                await execa('mongorestore', copyArgs);
                 
                 return { success: true, output: stdout };
             } catch (fallbackError) {
@@ -2381,6 +2431,20 @@ const restoreMongoDBDump = async (filePath, tempDatabaseName) => {
 // Extract and process zip file containing JSON collections
 const extractAndImportZipFile = async (filePath, tempDatabaseName) => {
     try {
+        // Validate inputs to prevent command injection
+        if (!tempDatabaseName || typeof tempDatabaseName !== 'string') {
+            throw new Error('Invalid database name provided');
+        }
+        
+        // Ensure tempDatabaseName only contains safe characters
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tempDatabaseName)) {
+            throw new Error('Database name contains invalid characters');
+        }
+        
+        if (!filePath || typeof filePath !== 'string') {
+            throw new Error('Invalid file path provided');
+        }
+        
         console.log('Starting zip file extraction:', filePath);
         
         const tempURI = createTempMongoURI(tempDatabaseName);
@@ -2529,7 +2593,12 @@ const processMongoDBTypes = (obj) => {
         
         // Handle MongoDB NumberLong
         if (obj.$numberLong && typeof obj.$numberLong === 'string') {
-            return parseInt(obj.$numberLong);
+            const value = BigInt(obj.$numberLong);
+            // Return as BigInt if outside safe integer range
+            if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER) {
+                return value;
+            }
+            return Number(value);
         }
         
         // Handle MongoDB NumberInt
@@ -2760,8 +2829,8 @@ router.post('/upload', verifyToken, upload.single('dumpFile'), async (req, res) 
 // Test MongoDB tools availability
 router.get('/upload/test-tools', verifyToken, async (req, res) => {
     try {
-        // Test if mongorestore is available
-        const { stdout } = await execAsync('mongorestore --version');
+        // Test if mongorestore is available - using secure argument passing
+        const { stdout } = await execa('mongorestore', ['--version']);
         res.json({
             mongorestore: {
                 available: true,
