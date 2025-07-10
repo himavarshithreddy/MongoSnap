@@ -92,11 +92,17 @@ Requirements:
 7. Use proper data types (strings, numbers, dates, ObjectIds)
 8. Format the output exactly as shown in examples below
 9. NEVER use MongoDB shell-specific functions like getCollectionNames(), listCollections(), or similar
-10. For multi-collection operations, ALWAYS use aggregation pipelines with $lookup - NEVER use nested find().map()
-11. CRITICAL: db.collection.find().map() does NOT work in Node.js MongoDB driver - use aggregation instead
+10. **CRITICAL: ALWAYS PREFER AGGREGATION PIPELINES OVER NESTED LOOPS**
+11. **NEVER use nested find().map() or complex async loops - use aggregation with $lookup, $group, $match instead**
+12. **For ANY multi-collection operations, bulk processing, or data transformation - use aggregation pipelines**
+13. **db.collection.find().map() does NOT work in Node.js MongoDB driver - use aggregation instead**
+14. **Complex operations requiring multiple steps should use single aggregation pipeline rather than multiple separate queries**
 
 OUTPUT FORMAT:
 Return ONLY the MongoDB query, no explanations, no markdown, no code blocks.
+
+**FOR COMPLEX OPERATIONS**: Always generate a SINGLE aggregation pipeline rather than multiple separate operations.
+**PERFORMANCE PRIORITY**: Aggregation pipelines are processed on the database server and are much faster than multiple round-trips.
 
 Examples:
 
@@ -122,19 +128,48 @@ AGGREGATION PIPELINES:
 - "Find products by price range" → db.products.aggregate([{"$bucket": {"groupBy": "$price", "boundaries": [0, 50, 100, 200, 500], "default": "500+", "output": {"count": {"$sum": 1}, "products": {"$push": "$name"}}}}])
 - "Get customer purchase history" → db.orders.aggregate([{"$match": {"customerId": ObjectId("...")}}, {"$lookup": {"from": "products", "localField": "productId", "foreignField": "_id", "as": "product"}}, {"$unwind": "$product"}, {"$project": {"date": 1, "productName": "$product.name", "amount": 1}}])
 
-MULTI-COLLECTION OPERATIONS (USE AGGREGATION WITH $LOOKUP):
+PREFERRED: AGGREGATION PIPELINES (USE THESE PATTERNS):
 - "Find orders with customer names" → db.orders.aggregate([{"$lookup": {"from": "users", "localField": "userId", "foreignField": "_id", "as": "user"}}, {"$unwind": "$user"}, {"$project": {"orderDate": 1, "amount": 1, "customerName": "$user.name"}}])
 - "Find saved queries of users without oauth" → db.savedqueries.aggregate([{"$lookup": {"from": "users", "localField": "userId", "foreignField": "_id", "as": "user"}}, {"$match": {"user.oauthProvider": null}}, {"$project": {"query": 1, "description": 1, "userName": "$user.name", "userEmail": "$user.email"}}])
 - "Find products with their category details" → db.products.aggregate([{"$lookup": {"from": "categories", "localField": "categoryId", "foreignField": "_id", "as": "category"}}, {"$unwind": "$category"}, {"$project": {"name": 1, "price": 1, "categoryName": "$category.name"}}])
 - "Find users with their order count" → db.users.aggregate([{"$lookup": {"from": "orders", "localField": "_id", "foreignField": "userId", "as": "userOrders"}}, {"$project": {"name": 1, "email": 1, "orderCount": {"$size": "$userOrders"}}}])
 - "Find posts with author information" → db.posts.aggregate([{"$lookup": {"from": "users", "localField": "authorId", "foreignField": "_id", "as": "author"}}, {"$unwind": "$author"}, {"$project": {"title": 1, "content": 1, "authorName": "$author.name", "publishDate": 1}}])
 
-IMPORTANT FOR MULTI-COLLECTION QUERIES:
-- NEVER use nested db.collection.find().map() syntax - this will NOT work
-- ALWAYS use aggregation pipelines with $lookup for cross-collection queries
-- Use $unwind after $lookup if you expect single matching documents
-- Use $match after $lookup to filter based on joined collection fields
-- Use $project to shape the final output and include fields from both collections
+BULK OPERATIONS WITH AGGREGATION (ALWAYS PREFER THESE):
+- "Reset daily usage for all Outlook users" → db.users.aggregate([{"$match": {"email": {"$regex": "@outlook\\.com$"}}}, {"$lookup": {"from": "userusages", "localField": "_id", "foreignField": "userId", "as": "usage"}}, {"$unwind": "$usage"}, {"$merge": {"into": "userusages", "on": "_id", "whenMatched": [{"$set": {"aiGeneration.daily.count": 0}}]}}])
+- "Update all orders for specific users" → db.users.aggregate([{"$match": {"status": "premium"}}, {"$lookup": {"from": "orders", "localField": "_id", "foreignField": "userId", "as": "orders"}}, {"$unwind": "$orders"}, {"$merge": {"into": "orders", "on": "_id", "whenMatched": [{"$set": {"priority": "high"}}]}}])
+- "Copy active users to new collection" → db.users.aggregate([{"$match": {"status": "active"}}, {"$project": {"name": 1, "email": 1, "joinDate": "$createdAt"}}, {"$out": "activeUsers"}])
+- "Generate user statistics" → db.users.aggregate([{"$lookup": {"from": "orders", "localField": "_id", "foreignField": "userId", "as": "orders"}}, {"$addFields": {"orderCount": {"$size": "$orders"}, "totalSpent": {"$sum": "$orders.amount"}}}, {"$group": {"_id": null, "avgOrders": {"$avg": "$orderCount"}, "totalUsers": {"$sum": 1}, "totalRevenue": {"$sum": "$totalSpent"}}}])
+- "Find and process related data" → db.products.aggregate([{"$lookup": {"from": "reviews", "localField": "_id", "foreignField": "productId", "as": "reviews"}}, {"$addFields": {"avgRating": {"$avg": "$reviews.rating"}, "reviewCount": {"$size": "$reviews"}}}, {"$match": {"avgRating": {"$gte": 4.0}}}, {"$sort": {"avgRating": -1}}])
+
+ADVANCED AGGREGATION PATTERNS:
+- "Complex data transformation" → db.orders.aggregate([{"$lookup": {"from": "users", "localField": "userId", "foreignField": "_id", "as": "customer"}}, {"$lookup": {"from": "products", "localField": "items.productId", "foreignField": "_id", "as": "products"}}, {"$unwind": "$customer"}, {"$addFields": {"totalValue": {"$sum": "$items.price"}, "customerName": "$customer.name"}}, {"$group": {"_id": "$customer.segment", "totalOrders": {"$sum": 1}, "avgOrderValue": {"$avg": "$totalValue"}}}, {"$sort": {"avgOrderValue": -1}}])
+- "Multi-stage data processing" → db.events.aggregate([{"$match": {"date": {"$gte": new Date("2024-01-01")}}}, {"$lookup": {"from": "users", "localField": "userId", "foreignField": "_id", "as": "user"}}, {"$unwind": "$user"}, {"$group": {"_id": {"userId": "$userId", "month": {"$month": "$date"}}, "eventCount": {"$sum": 1}, "userName": {"$first": "$user.name"}}}, {"$sort": {"eventCount": -1}}, {"$limit": 100}])
+- "Conditional updates with aggregation" → db.products.aggregate([{"$match": {"category": "electronics"}}, {"$lookup": {"from": "inventory", "localField": "_id", "foreignField": "productId", "as": "stock"}}, {"$unwind": "$stock"}, {"$addFields": {"newPrice": {"$cond": [{"$lt": ["$stock.quantity", 10]}, {"$multiply": ["$price", 1.1]}, "$price"]}}}, {"$merge": {"into": "products", "on": "_id", "whenMatched": [{"$set": {"price": "$newPrice"}}]}}])
+
+**WRONG PATTERNS TO AVOID**:
+❌ NEVER USE: Multiple separate queries with async loops
+❌ NEVER USE: db.collection.find().map() chains  
+❌ NEVER USE: Complex nested Promise.all() with multiple collections
+❌ NEVER USE: Sequential database calls when aggregation can do it in one operation
+
+**ALWAYS USE INSTEAD**: Single aggregation pipeline with $lookup, $group, $match, $project, $merge, $out
+
+**CRITICAL AGGREGATION RULES**:
+- ⚠️  NEVER use nested db.collection.find().map() syntax - this will NOT work in Node.js
+- ✅  ALWAYS use aggregation pipelines with $lookup for cross-collection queries
+- ✅  Use $merge or $out for bulk updates instead of multiple updateMany calls
+- ✅  Use $addFields and $group for complex calculations instead of JavaScript loops
+- ✅  Use $match early in pipeline to reduce processing load
+- ✅  Use $unwind after $lookup if you expect single matching documents
+- ✅  Use $project to shape the final output and include fields from both collections
+- ✅  For bulk operations on related data, start with the primary collection and $lookup related data
+- ✅  Use $cond, $switch, and other aggregation operators for conditional logic instead of if/else in code
+
+**SPECIFIC PATTERN FOR BULK USER OPERATIONS**:
+- To update usage for users matching criteria → db.users.aggregate([{"$match": {criteria}}, {"$lookup": {"from": "userusages", ...}}, {"$merge": {...}}])
+- To process orders for specific users → db.users.aggregate([{"$match": {criteria}}, {"$lookup": {"from": "orders", ...}}, {"$merge": {...}}])
+- To generate reports across collections → db.primaryCollection.aggregate([{"$lookup": ...}, {"$group": ...}, {"$project": ...}])
 
 INDEX OPERATIONS:
 - "Create index on email field" → db.users.createIndex({"email": 1})
@@ -221,7 +256,16 @@ IMPORTANT:
             prompt += `Use realistic values based on the examples provided.\n\n`;
         }
 
-        prompt += `\nGenerate the MongoDB query for: "${naturalLanguage}"\n\nQuery:`;
+        prompt += `
+**REMINDER BEFORE GENERATING**:
+- If the request involves finding users and then updating related records, use aggregation with $lookup and $merge
+- If the request involves processing multiple collections, use a single aggregation pipeline
+- If the request involves bulk operations based on criteria, start with $match and use $merge for updates
+- NEVER generate db.collection.find().map() patterns - they will fail in Node.js environment
+
+Generate the MongoDB query for: "${naturalLanguage}"
+
+Query:`;
 
         return prompt;
     }

@@ -8,6 +8,8 @@ const UserUsage = require('../models/UserUsage');
 const databaseManager = require('../utils/databaseManager');
 const crypto = require('crypto');
 const dotenv = require('dotenv');
+// Import enhanced query execution utilities
+const { extractQueryMetadata, executeAsyncQuery, validateQuerySecurity } = require('../utils/queryExecutor');
 const { MongoClient, ObjectId } = require('mongodb');
 const geminiApi = require('../utils/geminiApi');
 const rateLimit = require('express-rate-limit');
@@ -1194,7 +1196,9 @@ const convertExtendedJSON = (obj) => {
     return obj;
 };
 
-// Execute a raw MongoDB query string directly (bypass parsing)
+
+
+// Execute a raw MongoDB query string directly with enhanced async support
 router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) => {
     try {
         const userId = req.userId;
@@ -1203,6 +1207,15 @@ router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) =
 
         if (!queryString) {
             return res.status(400).json({ message: 'Query string is required.' });
+        }
+
+        // Enhanced security validation
+        const securityCheck = validateQuerySecurity(queryString);
+        if (!securityCheck.isValid) {
+            return res.status(403).json({ 
+                message: 'Query contains potentially dangerous operations',
+                violations: securityCheck.violations
+            });
         }
 
         // Prevent dangerous operations
@@ -1229,131 +1242,22 @@ router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) =
         let status = 'success';
         let errorMessage = null;
 
+        // Extract metadata from query
+        const queryMetadata = extractQueryMetadata(queryString);
+
         // Record start time
         const startTime = Date.now();
 
         try {
-            // Helper function to create collection operations
-            const createCollectionOperations = (collectionName) => ({
-                find: (query = {}, options = {}) => db.collection(collectionName).find(query, options).toArray(),
-                findOne: (query = {}, options = {}) => db.collection(collectionName).findOne(query, options),
-                insertOne: (doc) => db.collection(collectionName).insertOne(doc),
-                insertMany: (docs) => db.collection(collectionName).insertMany(docs),
-                updateOne: (filter, update, options = {}) => db.collection(collectionName).updateOne(filter, update, options),
-                updateMany: (filter, update, options = {}) => db.collection(collectionName).updateMany(filter, update, options),
-                deleteOne: (filter, options = {}) => db.collection(collectionName).deleteOne(filter, options),
-                deleteMany: (filter, options = {}) => db.collection(collectionName).deleteMany(filter, options),
-                countDocuments: (query = {}) => db.collection(collectionName).countDocuments(query),
-                estimatedDocumentCount: () => db.collection(collectionName).estimatedDocumentCount(),
-                aggregate: (pipeline) => db.collection(collectionName).aggregate(pipeline).toArray(),
-                distinct: (field, query = {}) => db.collection(collectionName).distinct(field, query),
-                createIndex: (keys, options = {}) => db.collection(collectionName).createIndex(keys, options),
-                listIndexes: () => db.collection(collectionName).listIndexes().toArray(),
-                dropIndex: (indexSpec) => db.collection(collectionName).dropIndex(indexSpec),
-                dropIndexes: () => db.collection(collectionName).dropIndexes(),
-                drop: () => db.collection(collectionName).drop(),
-                renameCollection: (newName, options = {}) => db.collection(collectionName).rename(newName, options),
-                replaceOne: (filter, replacement, options = {}) => db.collection(collectionName).replaceOne(filter, replacement, options),
-                collMod: (options) => db.command({ collMod: collectionName, ...options }),
-                // Add additional methods for completeness
-                findAndModify: (options) => db.collection(collectionName).findAndModify(options.query || {}, options.sort || {}, options.update || {}, options),
-                findOneAndUpdate: (filter, update, options = {}) => db.collection(collectionName).findOneAndUpdate(filter, update, options),
-                findOneAndDelete: (filter, options = {}) => db.collection(collectionName).findOneAndDelete(filter, options),
-                findOneAndReplace: (filter, replacement, options = {}) => db.collection(collectionName).findOneAndReplace(filter, replacement, options),
-                bulkWrite: (operations, options = {}) => db.collection(collectionName).bulkWrite(operations, options),
-                watch: (pipeline = [], options = {}) => db.collection(collectionName).watch(pipeline, options),
-                stats: () => db.command({ collStats: collectionName }),
-                validate: (options = {}) => db.command({ validate: collectionName, ...options })
+            console.log('Executing enhanced async query:', {
+                connectionId,
+                collections: queryMetadata.collections,
+                operations: queryMetadata.operations,
+                hasMultipleCollections: queryMetadata.hasMultipleCollections
             });
 
-            // Create a safe execution context with MongoDB operations
-            const executionContext = {
-                db: new Proxy({}, {
-                    get: function(target, propertyName) {
-                        // Handle getCollection method specifically
-                        if (propertyName === 'getCollection') {
-                            return (collectionName) => {
-                                if (typeof collectionName !== 'string') {
-                                    throw new Error('Collection name must be a string');
-                                }
-                                return createCollectionOperations(collectionName);
-                            };
-                        }
-                        
-                        // Handle collection method (alternative to getCollection)
-                        if (propertyName === 'collection') {
-                            return (collectionName) => {
-                                if (typeof collectionName !== 'string') {
-                                    throw new Error('Collection name must be a string');
-                                }
-                                return createCollectionOperations(collectionName);
-                            };
-                        }
-                        
-                        // Handle database-level operations
-                        if (propertyName === 'dropDatabase') {
-                            return () => db.dropDatabase();
-                        }
-                        if (propertyName === 'createCollection') {
-                            return (name, options = {}) => db.createCollection(name, options);
-                        }
-                        if (propertyName === 'runCommand') {
-                            return (command) => db.command(command);
-                        }
-                        if (propertyName === 'command') {
-                            return (command) => db.command(command);
-                        }
-                        if (propertyName === 'listCollections') {
-                            return () => db.listCollections().toArray();
-                        }
-                        if (propertyName === 'stats') {
-                            return () => db.stats();
-                        }
-                        if (propertyName === 'admin') {
-                            return () => ({
-                                ping: () => db.admin().ping(),
-                                command: (cmd) => db.admin().command(cmd),
-                                listDatabases: () => db.admin().listDatabases(),
-                                serverStatus: () => db.admin().command({ serverStatus: 1 })
-                            });
-                        }
-                        
-                        // For direct collection access (db.collectionName syntax)
-                        // Return collection operations for any other property name
-                        if (typeof propertyName === 'string' && propertyName !== 'constructor' && propertyName !== 'prototype') {
-                            return createCollectionOperations(propertyName);
-                        }
-                        
-                        return undefined;
-                    }
-                }),
-                ObjectId: require('mongodb').ObjectId,
-                Date: Date,
-                // Add additional MongoDB utilities
-                ISODate: (dateString) => dateString ? new Date(dateString) : new Date(),
-                NumberLong: (value) => parseInt(value),
-                NumberInt: (value) => parseInt(value),
-                NumberDecimal: (value) => parseFloat(value)
-            };
-
-            // Prepare the query for execution
-            let executableQuery = queryString.trim();
-            
-
-            
-            // Execute the query in the safe context
-            const executeQuery = new Function('db', 'ObjectId', 'Date', `
-                return (async function() {
-                    return ${executableQuery};
-                })();
-            `);
-
-            result = await executeQuery(executionContext.db, executionContext.ObjectId, executionContext.Date);
-
-            // Handle the result (it's already processed since we made operations async)
-            if (result && typeof result.then === 'function') {
-                result = await result;
-            }
+            // Execute the query using enhanced async execution
+            result = await executeAsyncQuery(queryString, db, 30000); // 30 second timeout
 
             // Calculate documents affected
             if (Array.isArray(result)) {
@@ -1375,9 +1279,9 @@ router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) =
             throw queryError;
         }
 
-        // Save query to history
+        // Save query to history with enhanced metadata
         try {
-            console.log('Saving raw query to history:', {
+            console.log('Saving enhanced query to history:', {
                 userId,
                 connectionId,
                 query: queryString,
@@ -1385,44 +1289,10 @@ router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) =
                 generatedQuery,
                 status,
                 executionTime,
-                documentsAffected
+                documentsAffected,
+                collections: queryMetadata.collections,
+                operations: queryMetadata.operations
             });
-            
-            // Enhanced collection name and operation extraction
-            const extractCollectionAndOperation = (queryStr) => {
-                let collectionName = 'unknown';
-                let operation = 'unknown';
-                
-                // Try to extract collection name from different patterns
-                
-                // Pattern 1: db.getCollection('collectionName') or db.getCollection("collectionName")
-                let match = queryStr.match(/db\.getCollection\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/);
-                if (match) {
-                    collectionName = match[1];
-                } else {
-                    // Pattern 2: db.collection('collectionName') or db.collection("collectionName")  
-                    match = queryStr.match(/db\.collection\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/);
-                    if (match) {
-                        collectionName = match[1];
-                    } else {
-                        // Pattern 3: Direct collection access db.collectionName
-                        match = queryStr.match(/db\.([a-zA-Z_][a-zA-Z0-9_]*)\./);
-                        if (match) {
-                            collectionName = match[1];
-                        }
-                    }
-                }
-                
-                // Extract operation (method name)
-                const operationMatch = queryStr.match(/\.([a-zA-Z][a-zA-Z0-9]*)\s*\(/);
-                if (operationMatch) {
-                    operation = operationMatch[1];
-                }
-                
-                return { collectionName, operation };
-            };
-            
-            const { collectionName, operation } = extractCollectionAndOperation(queryString);
 
             const queryHistoryEntry = new QueryHistory({
                 userId,
@@ -1435,26 +1305,43 @@ router.post('/:id/execute-raw', verifyToken, checkQueryUsage, async (req, res) =
                 errorMessage,
                 executionTime,
                 documentsAffected,
-                collectionName,
-                operation
+                collectionName: queryMetadata.primaryCollection,
+                operation: queryMetadata.primaryOperation,
+                // Enhanced metadata
+                metadata: {
+                    allCollections: queryMetadata.collections,
+                    allOperations: queryMetadata.operations,
+                    hasMultipleCollections: queryMetadata.hasMultipleCollections,
+                    hasMultipleOperations: queryMetadata.hasMultipleOperations
+                }
             });
 
             await queryHistoryEntry.save();
-            console.log('Raw query saved to history successfully, ID:', queryHistoryEntry._id);
+            console.log('Enhanced query saved to history successfully, ID:', queryHistoryEntry._id);
         } catch (historyError) {
-            console.error('Error saving raw query to history:', historyError);
+            console.error('Error saving enhanced query to history:', historyError);
             // Don't fail the main query if history saving fails
         }
 
         // Track successful query execution
         await req.userUsage.incrementQueryExecution(
-            queryString.match(/\.([a-zA-Z]+)\(/)?.[1] || 'unknown',
+            queryMetadata.primaryOperation,
             connectionId
         );
 
-        return res.status(200).json({ result });
+        return res.status(200).json({ 
+            result,
+            metadata: {
+                executionTime,
+                documentsAffected,
+                collections: queryMetadata.collections,
+                operations: queryMetadata.operations,
+                hasMultipleCollections: queryMetadata.hasMultipleCollections,
+                hasMultipleOperations: queryMetadata.hasMultipleOperations
+            }
+        });
     } catch (error) {
-        console.error('Error executing raw query:', error);
+        console.error('Error executing enhanced raw query:', error);
         return res.status(500).json({ 
             message: 'Failed to execute query', 
             details: error.message 
