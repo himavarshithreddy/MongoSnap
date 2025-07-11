@@ -45,7 +45,8 @@ const AdminBugReports = ({ isOpen, onClose }) => {
             } else {
                 setFeedback({ message: 'Failed to fetch bug reports.', type: 'error' });
             }
-        } catch {
+        } catch (error) {
+            console.error('Error fetching bug reports:', error);
             setFeedback({ message: 'Error fetching bug reports.', type: 'error' });
         } finally {
             setLoading(false);
@@ -62,7 +63,8 @@ const AdminBugReports = ({ isOpen, onClose }) => {
             } else {
                 setFeedback({ message: 'Failed to fetch statistics.', type: 'error' });
             }
-        } catch {
+        } catch (error) {
+            console.error('Error fetching statistics:', error);
             setFeedback({ message: 'Error fetching statistics.', type: 'error' });
         }
     }, [fetchWithAuth]);
@@ -102,7 +104,7 @@ const AdminBugReports = ({ isOpen, onClose }) => {
                 setFeedback({ message: 'Status updated successfully.', type: 'success' });
                 fetchReports();
                 fetchStats();
-                if (selectedReport && selectedReport.id === reportId) {
+                if (showDetails && selectedReport && selectedReport.id === reportId) {
                     setSelectedReport(prev => ({
                         ...prev,
                         status: newStatus,
@@ -112,7 +114,8 @@ const AdminBugReports = ({ isOpen, onClose }) => {
             } else {
                 setFeedback({ message: 'Failed to update status.', type: 'error' });
             }
-        } catch {
+        } catch (error) {
+            console.error('Error updating status:', error);
             setFeedback({ message: 'Error updating status.', type: 'error' });
         } finally {
             setActionLoading(false);
@@ -435,7 +438,7 @@ const AdminBugReports = ({ isOpen, onClose }) => {
                     <div className="p-6 border-t border-brand-tertiary bg-brand-tertiary/10">
                         <div className="flex items-center justify-between">
                             <div className="text-gray-400 text-sm">
-                                Showing {((pagination.currentPage - 1) * filters.limit) + 1} to {Math.min(pagination.currentPage * filters.limit, pagination.totalReports)} of {pagination.totalReports} reports
+                                Showing {((pagination.currentPage - 1) * Math.max(filters.limit, 1)) + 1} to {Math.min(pagination.currentPage * Math.max(filters.limit, 1), pagination.totalReports)} of {pagination.totalReports} reports
                             </div>
                             
                             <div className="flex items-center gap-2">
@@ -466,7 +469,7 @@ const AdminBugReports = ({ isOpen, onClose }) => {
 
             {/* Report Details Modal */}
             {showDetails && selectedReport && (
-                <div className="absolute inset-0 bg-black/80 flex items-center justify-center p-4 z-10">
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
                     <div className="bg-brand-secondary rounded-lg border border-brand-tertiary shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <div className="p-6 border-b border-brand-tertiary">
                             <div className="flex items-center justify-between">

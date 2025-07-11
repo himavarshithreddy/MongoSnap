@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
+const sanitizeHtml = require('sanitize-html');
 const BugReport = require('../models/BugReport');
 const Connection = require('../models/Connection');
 const User = require('../models/User');
@@ -112,6 +113,33 @@ const extractBrowserInfo = (userAgent) => {
     };
 };
 
+// Helper function to anonymize IP addresses for privacy compliance
+const anonymizeIP = (ipAddress) => {
+    if (!ipAddress || ipAddress === 'Unknown') {
+        return 'Unknown';
+    }
+    
+    // Handle IPv4 addresses
+    if (ipAddress.includes('.')) {
+        const parts = ipAddress.split('.');
+        if (parts.length === 4) {
+            return `${parts[0]}.${parts[1]}.${parts[2]}.xxx`;
+        }
+    }
+    
+    // Handle IPv6 addresses (mask last 64 bits)
+    if (ipAddress.includes(':')) {
+        const parts = ipAddress.split(':');
+        if (parts.length >= 4) {
+            // Keep first 4 segments, mask the rest
+            return `${parts[0]}:${parts[1]}:${parts[2]}:${parts[3]}::xxx`;
+        }
+    }
+    
+    // Fallback for unknown formats
+    return 'Unknown';
+};
+
 // GET /categories - Get predefined bug report categories
 router.get('/categories', generalBugReportLimiter, (req, res) => {
     try {
@@ -186,10 +214,7 @@ router.post('/submit', bugReportLimiter, verifyTokenAndValidateCSRF, async (req,
             });
         }
 
-        // Get user information
-        const User = require('../models/User');
-        const user = await User.findById(userId).select('name email');
-        if (!user) {
+        const user = await User.findById(userId).select('name email');        if (!user) {
             return res.status(404).json({
                 success: false,
                 message: 'User not found'
@@ -226,20 +251,27 @@ router.post('/submit', bugReportLimiter, verifyTokenAndValidateCSRF, async (req,
             }
         }
 
+        // Sanitize user input fields to prevent XSS attacks
+        const sanitizeOptions = {
+            allowedTags: [], // No HTML tags allowed
+            allowedAttributes: {}, // No attributes allowed
+            allowedIframeHostnames: [] // No iframes allowed
+        };
+
         // Create the bug report
         const bugReport = new BugReport({
             userId: userId,
             userEmail: user.email,
             userName: user.name,
             category: category,
-            customCategory: category === 'other' ? customCategory.trim() : undefined,
-            title: title.trim(),
-            description: description.trim(),
-            page: page,
-            problematicQuery: problematicQuery ? problematicQuery.trim() : undefined,
+            customCategory: category === 'other' ? sanitizeHtml(customCategory.trim(), sanitizeOptions) : undefined,
+            title: sanitizeHtml(title.trim(), sanitizeOptions),
+            description: sanitizeHtml(description.trim(), sanitizeOptions),
+            page: sanitizeHtml(page, sanitizeOptions),
+            problematicQuery: problematicQuery ? sanitizeHtml(problematicQuery.trim(), sanitizeOptions) : undefined,
             browserInfo: browserInfo,
             connectionContext: Object.keys(connectionContext).length > 0 ? connectionContext : undefined,
-            ipAddress: req.ip || req.connection.remoteAddress || 'Unknown'
+            ipAddress: anonymizeIP(req.ip || req.connection.remoteAddress || 'Unknown')
         });
 
         // Auto-assign priority based on category
@@ -415,9 +447,10 @@ const verifyAdmin = async (req, res, next) => {
         
         // Check if user is admin (you can adjust this logic based on your admin system)
         // For now, I'll check if the user's email is in an admin list or has an admin flag
-        const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',') : [];
-        const isAdmin = user.isAdmin || adminEmails.includes(user.email);
-        
+        const adminEmails = process.env.ADMIN_EMAILS 
+            ? process.env.ADMIN_EMAILS.split(',').map(email => email.trim().toLowerCase()) 
+            : [];
+        const isAdmin = user.isAdmin || adminEmails.includes(user.email.toLowerCase());        
         if (!isAdmin) {
             return res.status(403).json({
                 success: false,
@@ -619,10 +652,17 @@ router.put('/admin/reports/:id/status', generalBugReportLimiter, verifyTokenAndV
             });
         }
 
+        // Sanitize resolution to prevent XSS attacks
+        const sanitizeOptions = {
+            allowedTags: [], // No HTML tags allowed
+            allowedAttributes: {}, // No attributes allowed
+            allowedIframeHostnames: [] // No iframes allowed
+        };
+
         // Update fields
         report.status = status;
         if (resolution) {
-            report.resolution = resolution;
+            report.resolution = sanitizeHtml(resolution, sanitizeOptions);
         }
         if (assignedTo) {
             report.assignedTo = assignedTo;
@@ -677,9 +717,16 @@ router.post('/admin/reports/:id/notes', generalBugReportLimiter, verifyTokenAndV
             });
         }
 
+        // Sanitize admin note to prevent XSS attacks
+        const sanitizeOptions = {
+            allowedTags: [], // No HTML tags allowed
+            allowedAttributes: {}, // No attributes allowed
+            allowedIframeHostnames: [] // No iframes allowed
+        };
+
         // Add admin note
         report.adminNotes.push({
-            note: note.trim(),
+            note: sanitizeHtml(note.trim(), sanitizeOptions),
             addedBy: adminId,
             addedAt: new Date()
         });

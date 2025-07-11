@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bug, X, AlertCircle, CheckCircle, Send, ChevronDown } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 
@@ -11,6 +11,7 @@ const BugReport = ({
     collectionName = ''
 }) => {
     const { fetchWithAuth } = useUser();
+    const descriptionTextareaRef = useRef(null);
     
     const [formData, setFormData] = useState({
         category: '',
@@ -26,6 +27,14 @@ const BugReport = ({
     const [submitType, setSubmitType] = useState(''); // 'success' or 'error'
     const [errors, setErrors] = useState({});
     const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
+    // Reusable function to adjust textarea height
+    const adjustTextareaHeight = (textareaRef) => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    };
 
     // Fetch categories when component mounts
     useEffect(() => {
@@ -62,12 +71,10 @@ const BugReport = ({
         }
     }, [isOpen, problematicQuery]);
 
-    // Auto-expand description textarea
+    // Auto-expand description textarea using ref
     useEffect(() => {
-        const textarea = document.querySelector('textarea[name="description"]');
-        if (textarea && formData.description) {
-            textarea.style.height = 'auto';
-            textarea.style.height = textarea.scrollHeight + 'px';
+        if (formData.description) {
+            adjustTextareaHeight(descriptionTextareaRef);
         }
     }, [formData.description]);
 
@@ -360,6 +367,7 @@ const BugReport = ({
                                 <span className="text-orange-400">*</span>
                             </label>
                             <textarea
+                                ref={descriptionTextareaRef}
                                 name="description"
                                 value={formData.description}
                                 onChange={(e) => handleInputChange('description', e.target.value)}
@@ -370,14 +378,9 @@ const BugReport = ({
                                 disabled={isSubmitting}
                                 maxLength={2000}
                                 style={{
-                                    height: 'auto',
                                     minHeight: '8rem'
                                 }}
                                 rows={4}
-                                onInput={(e) => {
-                                    e.target.style.height = 'auto';
-                                    e.target.style.height = e.target.scrollHeight + 'px';
-                                }}
                             />
                             <div className="flex justify-between items-center">
                                 {errors.description && <span className="text-orange-400 text-xs">{errors.description}</span>}
