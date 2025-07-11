@@ -11,7 +11,7 @@ import {
     Github,
     Linkedin
 } from 'lucide-react';
-import { useAuthActionButton } from '../hooks/useAuthActionButton';
+import { useAuthActionButton } from '../hooks/useAuthActionButton.jsx';
 import PublicLayout from '../components/PublicLayout';
 
 const About = () => {

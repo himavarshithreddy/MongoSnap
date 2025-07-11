@@ -19,7 +19,7 @@ import AdminBugReports from './components/AdminBugReports.jsx'
 
 // Component to handle conditional redirect for root path
 const ConditionalHome = () => {
-  const { isAuthenticated, loading } = useContext(UserContext);
+  const { loading } = useContext(UserContext);
   
   // Show loading state while checking authentication
   if (loading) {
@@ -27,9 +27,7 @@ const ConditionalHome = () => {
   }
   
   // Redirect authenticated users to /me, otherwise show PublicHome
-  if (isAuthenticated) {
-    return <Navigate to="/me" replace />;
-  }
+  
   
   return <PublicHome />;
 };

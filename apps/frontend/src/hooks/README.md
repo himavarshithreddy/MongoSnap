@@ -9,7 +9,7 @@ A custom hook that provides a configurable authentication action button with con
 ### Usage
 
 ```jsx
-import { useAuthActionButton } from '../hooks/useAuthActionButton';
+import { useAuthActionButton } from '../hooks/useAuthActionButton.jsx';
 
 const MyComponent = () => {
     // Use with default configuration
@@ -68,7 +68,7 @@ This hook was created to eliminate the duplicated `getActionButton` function tha
 
 To migrate existing components:
 
-1. Import the hook: `import { useAuthActionButton } from '../hooks/useAuthActionButton';`
+1. Import the hook: `import { useAuthActionButton } from '../hooks/useAuthActionButton.jsx';`
 2. Replace the local `getActionButton` function: `const getActionButton = useAuthActionButton();`
 3. Remove the old function definition
 4. Remove unused imports (`ArrowRight`, `useUser` if not needed elsewhere) 

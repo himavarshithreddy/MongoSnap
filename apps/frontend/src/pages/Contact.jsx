@@ -12,7 +12,7 @@ import {
     Users,
     Headphones
 } from 'lucide-react';
-import { useAuthActionButton } from '../hooks/useAuthActionButton';
+import { useAuthActionButton } from '../hooks/useAuthActionButton.jsx';
 import { useUser } from '../hooks/useUser';
 import PublicLayout from '../components/PublicLayout';
 
