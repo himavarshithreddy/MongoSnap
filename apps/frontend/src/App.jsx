@@ -1,5 +1,7 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { UserProvider } from './contexts/UserContext'
+import { useContext } from 'react'
+import { UserContext } from './contexts/UserContext'
 import Home from './pages/Home'
 import PublicHome from './pages/PublicHome'
 import About from './pages/About'
@@ -15,6 +17,22 @@ import SettingsPage from './pages/Settings.jsx'
 import Pricing from './pages/Pricing.jsx'
 import AdminBugReports from './components/AdminBugReports.jsx'
 
+// Component to handle conditional redirect for root path
+const ConditionalHome = () => {
+  const { isAuthenticated, loading } = useContext(UserContext);
+  
+  // Show loading state while checking authentication
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+  
+  // Redirect authenticated users to /me, otherwise show PublicHome
+  if (isAuthenticated) {
+    return <Navigate to="/me" replace />;
+  }
+  
+  return <PublicHome />;
+};
 
 function App() {
   return (
@@ -22,7 +40,7 @@ function App() {
       <UserProvider>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<PublicHome />} />
+        <Route path="/" element={<ConditionalHome />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/pricing" element={<Pricing />} />

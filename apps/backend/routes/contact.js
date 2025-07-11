@@ -101,8 +101,7 @@ router.post('/submit', async (req, res) => {
         const sanitizedMessage = sanitizeHtml(message.trim());
         
         // Get IP address
-        const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
-        const anonymizedIP = anonymizeIP(ipAddress);
+        const ipAddress = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || req.connection.remoteAddress;        const anonymizedIP = anonymizeIP(ipAddress);
         
         // Check if user is logged in
         let userId = null;
@@ -170,7 +169,7 @@ router.get('/admin/contacts', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const {
             page = 1,
-            limit = 1000,
+            limit = 50,
             search = '',
             status = 'all',
             category = 'all',

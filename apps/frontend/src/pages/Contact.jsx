@@ -10,15 +10,16 @@ import {
     AlertCircle,
     MessageSquare,
     Users,
-    Headphones,
-    ArrowRight
+    Headphones
 } from 'lucide-react';
+import { useAuthActionButton } from '../hooks/useAuthActionButton';
 import { useUser } from '../hooks/useUser';
 import PublicLayout from '../components/PublicLayout';
 
 const Contact = () => {
     const navigate = useNavigate();
-    const { user, loading } = useUser();
+    const getActionButton = useAuthActionButton();
+    const { user } = useUser();
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -130,39 +131,7 @@ const Contact = () => {
         }
     };
 
-    // Dynamic button based on authentication status
-    const getActionButton = () => {
-        if (loading) {
-            return (
-                <button className="px-8 py-4 bg-brand-quaternary/50 text-white rounded-lg font-semibold text-lg flex items-center justify-center gap-3 cursor-not-allowed">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Loading...
-                </button>
-            );
-        }
 
-        if (user) {
-            return (
-                <button
-                    onClick={() => navigate('/connect')}
-                    className="px-8 py-4 bg-brand-quaternary text-white rounded-lg hover:bg-brand-quaternary/90 transition-all duration-200 font-semibold text-lg flex items-center justify-center gap-3 group cursor-pointer"
-                >
-                    Go to Dashboard
-                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-                </button>
-            );
-        }
-
-        return (
-            <button
-                onClick={() => navigate('/login')}
-                className="px-8 py-4 bg-brand-quaternary text-white rounded-lg hover:bg-brand-quaternary/90 transition-all duration-200 font-semibold text-lg flex items-center justify-center gap-3 group cursor-pointer"
-            >
-                Get Started
-                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-        );
-    };
 
     return (
         <PublicLayout>
