@@ -10,6 +10,8 @@ import Connect from './pages/connect.jsx'
 import Playground from './pages/Playground.jsx'
 import SettingsPage from './pages/Settings.jsx'
 import Pricing from './pages/Pricing.jsx'
+import AdminBugReports from './components/AdminBugReports.jsx'
+
 
 function App() {
   return (
@@ -27,6 +29,7 @@ function App() {
         <Route path="/change-password/:token" element={<ResetPassword />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />
         <Route path="/oauth-popup" element={<OAuthPopup />} />
+        <Route path="/admin/bug-reports" element={<ProtectedRoute><AdminBugReports /></ProtectedRoute>} />
       </Routes>
       </UserProvider>
     </BrowserRouter>

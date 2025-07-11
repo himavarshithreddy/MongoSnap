@@ -36,6 +36,8 @@ const userSchema = new mongoose.Schema({
         usedAt: { type: Date, default: null }
     }],
     loginNotificationsEnabled: { type: Boolean, default: true },
+    // Admin privileges
+    isAdmin: { type: Boolean, default: false },
     // CSRF Protection
     csrfToken: { type: String, default: null },
     csrfTokenExpiresAt: { type: Date, default: null },

@@ -12,6 +12,7 @@ const verifyRoutes = require('./routes/verify');
 const oauthRoutes = require('./routes/oauth');
 const connectionRoutes = require('./routes/connection');
 const queryHistoryRoutes = require('./routes/queryHistory');
+const bugReportRoutes = require('./routes/bugReport');
 const databaseManager = require('./utils/databaseManager');
 const twoFactorRoutes = require('./routes/twofactor');
 const path = require('path');
@@ -83,6 +84,7 @@ app.use('/api/auth', publicLimiter, oauthRoutes); // OAuth routes are also publi
 app.use('/api', authRoutes); // Mount auth routes at /api for protected endpoints like /api/me
 app.use('/api/connection', connectionRoutes);
 app.use('/api/query', queryHistoryRoutes);
+app.use('/api/bug-report', bugReportRoutes);
 app.use('/api/twofactor', twoFactorRoutes);
 app.use('/api/test', testRoutes);
 console.log('✅ All routes registered successfully');

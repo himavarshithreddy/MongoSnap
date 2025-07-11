@@ -81,18 +81,21 @@ const executeAsyncQuery = async (queryString, db, timeoutMs = 30000) => {
             // Enhanced query wrapper that properly handles async operations
             const wrappedQuery = `
                 (async function executeQuery() {
+                    const queryStartTime = Date.now(); // Capture start time at execution
                     try {
                         // User's query - fully async supported
                         const result = await (async function() {
                             return ${queryString};
                         })();
                         
+                        const queryEndTime = Date.now(); // Capture end time after execution
                         return {
                             success: true,
                             result: result,
-                            executionTime: ${Date.now()} - ${startTime}
+                            executionTime: queryEndTime - queryStartTime
                         };
                     } catch (error) {
+                        const queryEndTime = Date.now(); // Capture end time even on error
                         return {
                             success: false,
                             error: {
@@ -100,7 +103,7 @@ const executeAsyncQuery = async (queryString, db, timeoutMs = 30000) => {
                                 name: error.name,
                                 stack: error.stack
                             },
-                            executionTime: ${Date.now()} - ${startTime}
+                            executionTime: queryEndTime - queryStartTime
                         };
                     }
                 })()

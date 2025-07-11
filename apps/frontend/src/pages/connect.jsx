@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 import SettingsModal from '../components/Settings';
+import FloatingBugReport from '../components/FloatingBugReport';
 
 function Connect() {
     useEffect(() => {
@@ -1681,6 +1682,13 @@ function Connect() {
         <SettingsModal 
             isOpen={showSettingsModal} 
             onClose={() => setShowSettingsModal(false)} 
+        />
+        
+        {/* Floating Bug Report Button */}
+        <FloatingBugReport 
+            page="connect"
+            connectionId={loadedConnection?._id}
+            problematicQuery=""
         />
         </div>
     )

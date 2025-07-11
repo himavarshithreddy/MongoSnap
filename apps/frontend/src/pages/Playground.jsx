@@ -7,6 +7,7 @@ import QueryInterface from '../components/QueryInterface';
 import SchemaExplorer from '../components/SchemaExplorer';
 import QueryHistory from '../components/QueryHistory';
 import SettingsModal from '../components/Settings';
+import FloatingBugReport from '../components/FloatingBugReport';
 
 function Playground() {
     useEffect(() => {
@@ -1565,6 +1566,13 @@ function Playground() {
         <SettingsModal 
             isOpen={showSettingsModal} 
             onClose={() => setShowSettingsModal(false)} 
+        />
+        
+        {/* Floating Bug Report Button */}
+        <FloatingBugReport 
+            page="playground"
+            connectionId={connectionIdRef.current}
+            problematicQuery={queryInput}
         />
         </div>
     );
