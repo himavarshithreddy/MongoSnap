@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, ChevronDown, ChevronUp, Calendar, User, Bug, AlertCircle, CheckCircle, Clock, X, Eye, Edit } from 'lucide-react';
+import { Search, Filter, ChevronDown, ChevronUp, Calendar, User, Bug, AlertCircle, CheckCircle, Clock, X, Eye, Edit, MessageSquare } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
 import { useNavigate } from 'react-router-dom';
+import AdminContactSubmissions from './AdminContactSubmissions';
 
 const AdminBugReports = ({ isOpen, onClose }) => {
     const { fetchWithAuth } = useUser();
@@ -29,6 +30,7 @@ const AdminBugReports = ({ isOpen, onClose }) => {
     const [showDetails, setShowDetails] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [feedback, setFeedback] = useState({ message: '', type: '' }); // type: 'success' | 'error'
+    const [activeTab, setActiveTab] = useState('bugReports'); // 'bugReports' | 'contacts'
 
     // Fetch reports
     const fetchReports = useCallback(async () => {
@@ -228,7 +230,7 @@ const AdminBugReports = ({ isOpen, onClose }) => {
                         <div className="w-8 h-8 bg-brand-quaternary/20 rounded-full flex items-center justify-center">
                             <Bug size={16} className="text-brand-quaternary" />
                         </div>
-                        <h2 className="text-white text-xl font-bold">Bug Reports Administration</h2>
+                        <h2 className="text-white text-xl font-bold">Admin Panel</h2>
                     </div>
                     <button
                         onClick={handleClose}
@@ -238,232 +240,265 @@ const AdminBugReports = ({ isOpen, onClose }) => {
                     </button>
                 </div>
 
-                {/* Stats Overview */}
-                {stats && (
-                    <div className="p-6 border-b border-brand-tertiary bg-brand-tertiary/20">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-brand-secondary rounded-lg p-4 border border-brand-tertiary">
-                                <div className="text-2xl font-bold text-white">{stats.overview.totalReports}</div>
-                                <div className="text-gray-400 text-sm">Total Reports</div>
-                            </div>
-                            <div className="bg-brand-secondary rounded-lg p-4 border border-brand-tertiary">
-                                <div className="text-2xl font-bold text-blue-400">{stats.overview.recentReports}</div>
-                                <div className="text-gray-400 text-sm">Recent ({stats.overview.timeframe})</div>
-                            </div>
-                            <div className="bg-brand-secondary rounded-lg p-4 border border-brand-tertiary">
-                                <div className="text-2xl font-bold text-brand-quaternary">
-                                    {stats.breakdowns.status.find(s => s._id === 'resolved')?.count || 0}
-                                </div>
-                                <div className="text-gray-400 text-sm">Resolved</div>
-                            </div>
-                            <div className="bg-brand-secondary rounded-lg p-4 border border-brand-tertiary">
-                                <div className="text-2xl font-bold text-orange-400">
-                                    {stats.breakdowns.status.find(s => s._id === 'open')?.count || 0}
-                                </div>
-                                <div className="text-gray-400 text-sm">Open</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Filters */}
-                <div className="p-6 border-b border-brand-tertiary bg-brand-tertiary/10">
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        {/* Search */}
-                        <div className="relative">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search reports..."
-                                value={filters.search}
-                                onChange={(e) => handleFilterChange('search', e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white placeholder-gray-500 focus:outline-none focus:border-brand-quaternary"
-                            />
-                        </div>
-
-                        {/* Status Filter */}
-                        <select
-                            value={filters.status}
-                            onChange={(e) => handleFilterChange('status', e.target.value)}
-                            className="w-full px-3 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white focus:outline-none focus:border-brand-quaternary"
-                        >
-                            <option value="all">All Status</option>
-                            <option value="open">Open</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="resolved">Resolved</option>
-                            <option value="closed">Closed</option>
-                            <option value="duplicate">Duplicate</option>
-                        </select>
-
-                        {/* Category Filter */}
-                        <select
-                            value={filters.category}
-                            onChange={(e) => handleFilterChange('category', e.target.value)}
-                            className="w-full px-3 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white focus:outline-none focus:border-brand-quaternary"
-                        >
-                            <option value="all">All Categories</option>
-                            <option value="query_not_executing">Query Not Executing</option>
-                            <option value="query_generation_failed">AI Generation Failed</option>
-                            <option value="connection_issues">Connection Issues</option>
-                            <option value="ui_bug">UI Bug</option>
-                            <option value="performance_issue">Performance Issue</option>
-                            <option value="feature_request">Feature Request</option>
-                            <option value="data_display_error">Data Display Error</option>
-                            <option value="authentication_problem">Auth Problem</option>
-                            <option value="export_functionality">Export Issue</option>
-                            <option value="schema_explorer_issue">Schema Explorer</option>
-                            <option value="other">Other</option>
-                        </select>
-
-                        {/* Priority Filter */}
-                        <select
-                            value={filters.priority}
-                            onChange={(e) => handleFilterChange('priority', e.target.value)}
-                            className="w-full px-3 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white focus:outline-none focus:border-brand-quaternary"
-                        >
-                            <option value="all">All Priorities</option>
-                            <option value="urgent">Urgent</option>
-                            <option value="high">High</option>
-                            <option value="medium">Medium</option>
-                            <option value="low">Low</option>
-                        </select>
-
-                        {/* Sort */}
-                        <select
-                            value={`${filters.sortBy}-${filters.sortOrder}`}
-                            onChange={(e) => {
-                                const [sortBy, sortOrder] = e.target.value.split('-');
-                                handleFilterChange('sortBy', sortBy);
-                                handleFilterChange('sortOrder', sortOrder);
-                            }}
-                            className="w-full px-3 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white focus:outline-none focus:border-brand-quaternary"
-                        >
-                            <option value="createdAt-desc">Newest First</option>
-                            <option value="createdAt-asc">Oldest First</option>
-                            <option value="updatedAt-desc">Recently Updated</option>
-                            <option value="priority-desc">High Priority First</option>
-                            <option value="status-asc">Status A-Z</option>
-                        </select>
-                    </div>
+                {/* Tabs */}
+                <div className="flex border-b border-brand-tertiary">
+                    <button
+                        onClick={() => setActiveTab('bugReports')}
+                        className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors cursor-pointer ${
+                            activeTab === 'bugReports'
+                                ? 'text-brand-quaternary border-b-2 border-brand-quaternary'
+                                : 'text-gray-400 hover:text-white'
+                        }`}
+                    >
+                        <Bug size={20} />
+                        Bug Reports
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('contacts')}
+                        className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors cursor-pointer ${
+                            activeTab === 'contacts'
+                                ? 'text-brand-quaternary border-b-2 border-brand-quaternary'
+                                : 'text-gray-400 hover:text-white'
+                        }`}
+                    >
+                        <MessageSquare size={20} />
+                        Contact Submissions
+                    </button>
                 </div>
 
-                {/* Reports List */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    {loading ? (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-quaternary"></div>
-                            <span className="ml-3 text-gray-400">Loading reports...</span>
-                        </div>
-                    ) : reports.length === 0 ? (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="text-center">
-                                <Bug size={48} className="text-gray-500 mx-auto mb-4" />
-                                <p className="text-gray-400">No bug reports found</p>
+                {/* Content based on active tab */}
+                {activeTab === 'bugReports' ? (
+                    <>
+                        {/* Stats Overview */}
+                        {stats && (
+                            <div className="p-6 border-b border-brand-tertiary bg-brand-tertiary/20">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-brand-secondary rounded-lg p-4 border border-brand-tertiary">
+                                        <div className="text-2xl font-bold text-white">{stats.overview.totalReports}</div>
+                                        <div className="text-gray-400 text-sm">Total Reports</div>
+                                    </div>
+                                    <div className="bg-brand-secondary rounded-lg p-4 border border-brand-tertiary">
+                                        <div className="text-2xl font-bold text-blue-400">{stats.overview.recentReports}</div>
+                                        <div className="text-gray-400 text-sm">Recent ({stats.overview.timeframe})</div>
+                                    </div>
+                                    <div className="bg-brand-secondary rounded-lg p-4 border border-brand-tertiary">
+                                        <div className="text-2xl font-bold text-brand-quaternary">
+                                            {stats.breakdowns.status.find(s => s._id === 'resolved')?.count || 0}
+                                        </div>
+                                        <div className="text-gray-400 text-sm">Resolved</div>
+                                    </div>
+                                    <div className="bg-brand-secondary rounded-lg p-4 border border-brand-tertiary">
+                                        <div className="text-2xl font-bold text-orange-400">
+                                            {stats.breakdowns.status.find(s => s._id === 'open')?.count || 0}
+                                        </div>
+                                        <div className="text-gray-400 text-sm">Open</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Filters */}
+                        <div className="p-6 border-b border-brand-tertiary bg-brand-tertiary/10">
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                {/* Search */}
+                                <div className="relative">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search reports..."
+                                        value={filters.search}
+                                        onChange={(e) => handleFilterChange('search', e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white placeholder-gray-500 focus:outline-none focus:border-brand-quaternary"
+                                    />
+                                </div>
+
+                                {/* Status Filter */}
+                                <select
+                                    value={filters.status}
+                                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                                    className="w-full px-3 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white focus:outline-none focus:border-brand-quaternary"
+                                >
+                                    <option value="all">All Status</option>
+                                    <option value="open">Open</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="resolved">Resolved</option>
+                                    <option value="closed">Closed</option>
+                                    <option value="duplicate">Duplicate</option>
+                                </select>
+
+                                {/* Category Filter */}
+                                <select
+                                    value={filters.category}
+                                    onChange={(e) => handleFilterChange('category', e.target.value)}
+                                    className="w-full px-3 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white focus:outline-none focus:border-brand-quaternary"
+                                >
+                                    <option value="all">All Categories</option>
+                                    <option value="query_not_executing">Query Not Executing</option>
+                                    <option value="query_generation_failed">AI Generation Failed</option>
+                                    <option value="connection_issues">Connection Issues</option>
+                                    <option value="ui_bug">UI Bug</option>
+                                    <option value="performance_issue">Performance Issue</option>
+                                    <option value="feature_request">Feature Request</option>
+                                    <option value="data_display_error">Data Display Error</option>
+                                    <option value="authentication_problem">Auth Problem</option>
+                                    <option value="export_functionality">Export Issue</option>
+                                    <option value="schema_explorer_issue">Schema Explorer</option>
+                                    <option value="other">Other</option>
+                                </select>
+
+                                {/* Priority Filter */}
+                                <select
+                                    value={filters.priority}
+                                    onChange={(e) => handleFilterChange('priority', e.target.value)}
+                                    className="w-full px-3 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white focus:outline-none focus:border-brand-quaternary"
+                                >
+                                    <option value="all">All Priorities</option>
+                                    <option value="urgent">Urgent</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+
+                                {/* Sort */}
+                                <select
+                                    value={`${filters.sortBy}-${filters.sortOrder}`}
+                                    onChange={(e) => {
+                                        const [sortBy, sortOrder] = e.target.value.split('-');
+                                        handleFilterChange('sortBy', sortBy);
+                                        handleFilterChange('sortOrder', sortOrder);
+                                    }}
+                                    className="w-full px-3 py-2 bg-brand-tertiary border border-gray-500/30 rounded-md text-white focus:outline-none focus:border-brand-quaternary"
+                                >
+                                    <option value="createdAt-desc">Newest First</option>
+                                    <option value="createdAt-asc">Oldest First</option>
+                                    <option value="updatedAt-desc">Recently Updated</option>
+                                    <option value="priority-desc">High Priority First</option>
+                                    <option value="status-asc">Status A-Z</option>
+                                </select>
                             </div>
                         </div>
-                    ) : (
-                        <div className="divide-y divide-brand-tertiary">
-                            {reports.map((report) => (
-                                <div key={report.id} className="p-6 hover:bg-brand-tertiary/20 transition-colors duration-200">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                            <div className="flex items-start gap-4">
+
+                        {/* Reports List */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            {loading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-quaternary"></div>
+                                    <span className="ml-3 text-gray-400">Loading reports...</span>
+                                </div>
+                            ) : reports.length === 0 ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <div className="text-center">
+                                        <Bug size={48} className="text-gray-500 mx-auto mb-4" />
+                                        <p className="text-gray-400">No bug reports found</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-brand-tertiary">
+                                    {reports.map((report) => (
+                                        <div key={report.id} className="p-6 hover:bg-brand-tertiary/20 transition-colors duration-200">
+                                            <div className="flex items-start justify-between">
                                                 <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <h3 className="text-white font-medium text-lg">{report.title}</h3>
-                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(report.status)}`}>
-                                                            {report.status.replace('_', ' ')}
-                                                        </span>
-                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(report.priority)}`}>
-                                                            {report.priority}
-                                                        </span>
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <h3 className="text-white font-medium text-lg">{report.title}</h3>
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(report.status)}`}>
+                                                                    {report.status.replace('_', ' ')}
+                                                                </span>
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(report.priority)}`}>
+                                                                    {report.priority}
+                                                                </span>
+                                                            </div>
+                                                            
+                                                            <p className="text-gray-300 text-sm mb-3 line-clamp-2">{report.description}</p>
+                                                            
+                                                            <div className="flex items-center gap-4 text-xs text-gray-400">
+                                                                <span className="flex items-center gap-1">
+                                                                    <User size={12} />
+                                                                    {report.userInfo.name} ({report.userInfo.email})
+                                                                </span>
+                                                                <span className="flex items-center gap-1">
+                                                                    <Calendar size={12} />
+                                                                    {formatDate(report.createdAt)}
+                                                                </span>
+                                                                <span className="capitalize">{report.category.replace('_', ' ')}</span>
+                                                                <span className="capitalize">{report.page}</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => viewReportDetails(report.id)}
+                                                                className="p-2 text-gray-400 hover:text-brand-quaternary transition-colors duration-200 cursor-pointer"
+                                                                title="View Details"
+                                                            >
+                                                                <Eye size={16} />
+                                                            </button>
+                                                            
+                                                            {report.status === 'open' && (
+                                                                <button
+                                                                    onClick={() => handleStatusUpdate(report.id, 'in_progress')}
+                                                                    disabled={actionLoading}
+                                                                    className="px-3 py-1 bg-blue-500 text-white text-xs rounded-md hover:bg-blue-600 transition-colors duration-200 cursor-pointer disabled:opacity-50"
+                                                                >
+                                                                    Start Work
+                                                                </button>
+                                                            )}
+                                                            
+                                                            {(report.status === 'open' || report.status === 'in_progress') && (
+                                                                <button
+                                                                    onClick={() => handleStatusUpdate(report.id, 'resolved', 'Issue resolved')}
+                                                                    disabled={actionLoading}
+                                                                    className="px-3 py-1 bg-brand-quaternary text-white text-xs rounded-md hover:bg-brand-quaternary/80 transition-colors duration-200 cursor-pointer disabled:opacity-50"
+                                                                >
+                                                                    Resolve
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    
-                                                    <p className="text-gray-300 text-sm mb-3 line-clamp-2">{report.description}</p>
-                                                    
-                                                    <div className="flex items-center gap-4 text-xs text-gray-400">
-                                                        <span className="flex items-center gap-1">
-                                                            <User size={12} />
-                                                            {report.userInfo.name} ({report.userInfo.email})
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <Calendar size={12} />
-                                                            {formatDate(report.createdAt)}
-                                                        </span>
-                                                        <span className="capitalize">{report.category.replace('_', ' ')}</span>
-                                                        <span className="capitalize">{report.page}</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => viewReportDetails(report.id)}
-                                                        className="p-2 text-gray-400 hover:text-brand-quaternary transition-colors duration-200 cursor-pointer"
-                                                        title="View Details"
-                                                    >
-                                                        <Eye size={16} />
-                                                    </button>
-                                                    
-                                                    {report.status === 'open' && (
-                                                        <button
-                                                            onClick={() => handleStatusUpdate(report.id, 'in_progress')}
-                                                            disabled={actionLoading}
-                                                            className="px-3 py-1 bg-blue-500 text-white text-xs rounded-md hover:bg-blue-600 transition-colors duration-200 cursor-pointer disabled:opacity-50"
-                                                        >
-                                                            Start Work
-                                                        </button>
-                                                    )}
-                                                    
-                                                    {(report.status === 'open' || report.status === 'in_progress') && (
-                                                        <button
-                                                            onClick={() => handleStatusUpdate(report.id, 'resolved', 'Issue resolved')}
-                                                            disabled={actionLoading}
-                                                            className="px-3 py-1 bg-brand-quaternary text-white text-xs rounded-md hover:bg-brand-quaternary/80 transition-colors duration-200 cursor-pointer disabled:opacity-50"
-                                                        >
-                                                            Resolve
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </div>
                                         </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Pagination */}
+                        {pagination.totalPages > 1 && (
+                            <div className="p-6 border-t border-brand-tertiary bg-brand-tertiary/10">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-gray-400 text-sm">
+                                        Showing {((pagination.currentPage - 1) * Math.max(filters.limit, 1)) + 1} to {Math.min(pagination.currentPage * Math.max(filters.limit, 1), pagination.totalReports)} of {pagination.totalReports} reports
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => handleFilterChange('page', pagination.currentPage - 1)}
+                                            disabled={!pagination.hasPrevPage}
+                                            className="px-3 py-2 bg-brand-tertiary text-white rounded-md hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
+                                        >
+                                            Previous
+                                        </button>
+                                        
+                                        <span className="text-white px-4 py-2">
+                                            Page {pagination.currentPage} of {pagination.totalPages}
+                                        </span>
+                                        
+                                        <button
+                                            onClick={() => handleFilterChange('page', pagination.currentPage + 1)}
+                                            disabled={!pagination.hasNextPage}
+                                            className="px-3 py-2 bg-brand-tertiary text-white rounded-md hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
+                                        >
+                                            Next
+                                        </button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Pagination */}
-                {pagination.totalPages > 1 && (
-                    <div className="p-6 border-t border-brand-tertiary bg-brand-tertiary/10">
-                        <div className="flex items-center justify-between">
-                            <div className="text-gray-400 text-sm">
-                                Showing {((pagination.currentPage - 1) * Math.max(filters.limit, 1)) + 1} to {Math.min(pagination.currentPage * Math.max(filters.limit, 1), pagination.totalReports)} of {pagination.totalReports} reports
                             </div>
-                            
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handleFilterChange('page', pagination.currentPage - 1)}
-                                    disabled={!pagination.hasPrevPage}
-                                    className="px-3 py-2 bg-brand-tertiary text-white rounded-md hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
-                                >
-                                    Previous
-                                </button>
-                                
-                                <span className="text-white px-4 py-2">
-                                    Page {pagination.currentPage} of {pagination.totalPages}
-                                </span>
-                                
-                                <button
-                                    onClick={() => handleFilterChange('page', pagination.currentPage + 1)}
-                                    disabled={!pagination.hasNextPage}
-                                    className="px-3 py-2 bg-brand-tertiary text-white rounded-md hover:bg-opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
-                                >
-                                    Next
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                        )}
+                    </>
+                ) : (
+                    <AdminContactSubmissions />
                 )}
             </div>
 

@@ -13,6 +13,7 @@ const oauthRoutes = require('./routes/oauth');
 const connectionRoutes = require('./routes/connection');
 const queryHistoryRoutes = require('./routes/queryHistory');
 const bugReportRoutes = require('./routes/bugReport');
+const contactRoutes = require('./routes/contact');
 const databaseManager = require('./utils/databaseManager');
 const twoFactorRoutes = require('./routes/twofactor');
 const path = require('path');
@@ -85,6 +86,7 @@ app.use('/api', authRoutes); // Mount auth routes at /api for protected endpoint
 app.use('/api/connection', connectionRoutes);
 app.use('/api/query', queryHistoryRoutes);
 app.use('/api/bug-report', bugReportRoutes);
+app.use('/api/contact', contactRoutes);
 app.use('/api/twofactor', twoFactorRoutes);
 app.use('/api/test', testRoutes);
 console.log('✅ All routes registered successfully');

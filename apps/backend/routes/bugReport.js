@@ -475,7 +475,7 @@ router.get('/admin/reports', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { 
             page = 1, 
-            limit = 20, 
+            limit = 1000, 
             status, 
             category, 
             priority, 
@@ -630,7 +630,7 @@ router.get('/admin/reports/:id', verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // PUT /admin/reports/:id/status - Update bug report status (admin only)
-router.put('/admin/reports/:id/status', generalBugReportLimiter, verifyTokenAndValidateCSRF, verifyAdmin, async (req, res) => {
+router.put('/admin/reports/:id/status', verifyTokenAndValidateCSRF, verifyAdmin, async (req, res) => {
     const { id } = req.params;
     const { status, resolution, assignedTo } = req.body;
     const adminId = req.userId;
@@ -696,7 +696,7 @@ router.put('/admin/reports/:id/status', generalBugReportLimiter, verifyTokenAndV
 });
 
 // POST /admin/reports/:id/notes - Add admin note to bug report (admin only)
-router.post('/admin/reports/:id/notes', generalBugReportLimiter, verifyTokenAndValidateCSRF, verifyAdmin, async (req, res) => {
+router.post('/admin/reports/:id/notes', verifyTokenAndValidateCSRF, verifyAdmin, async (req, res) => {
     const { id } = req.params;
     const { note } = req.body;
     const adminId = req.userId;
@@ -752,7 +752,7 @@ router.post('/admin/reports/:id/notes', generalBugReportLimiter, verifyTokenAndV
 });
 
 // GET /admin/stats - Get bug report statistics (admin only)
-router.get('/admin/stats', generalBugReportLimiter, verifyToken, verifyAdmin, async (req, res) => {
+router.get('/admin/stats', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { timeframe = '30d' } = req.query;
         
