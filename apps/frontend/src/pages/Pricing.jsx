@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Zap, Database, Shield, Users, Clock, Globe, Download, Server, BarChart3, Key, Mail } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useAuthActionButton } from '../hooks/useAuthActionButton.jsx';
 import PublicLayout from '../components/PublicLayout';
 
@@ -14,22 +14,26 @@ const Pricing = () => {
 
     const features = {
         free: [
-            { name: 'Natural Language Queries', icon: Zap },
-            { name: 'MongoDB Query Generation', icon: Database },
-            { name: 'Schema Explorer', icon: Database },
-            { name: 'Query History (50 queries)', icon: Clock },
-            { name: 'Basic Security & 2FA', icon: Shield },
-            { name: 'Sample Database', icon: Database },
+            'MongoDB Query Generation',
+            'Schema Explorer',
+            'Query History (50 queries)',
+            '2 Database Connections',
+            '20 Executions/day (400/month)',
+            '5 AI Generations/day (100/month)',
+            'PC Version',
+            'Sample Database Access',
         ],
         pro: [
-            { name: 'Everything in Free', icon: Check },
-            { name: 'Unlimited Queries', icon: Zap },
-            { name: 'Advanced AI Generation', icon: Database },
-            { name: 'Unlimited Query History', icon: Clock },
-            { name: 'Saved Queries', icon: Check },
-            { name: 'Multiple Database Connections', icon: Server },
-            { name: 'Unlimited Exports', icon: Download },
-            { name: 'Priority Support', icon: Globe },
+            'Everything in Snap Plan',
+            'Unlimited Query History',
+            'Save & Organize Queries',
+            'Unlimited Database Connections',
+            'Unlimited Executions',
+            '100 AI Generations/day (2,500/month)',
+            'Enhanced AI Generation',
+            'Export Database Schemas',
+            'Upload Your Database',
+            'Priority Support',
         ]
     };
 
@@ -62,24 +66,22 @@ const Pricing = () => {
             {/* Pricing Cards Section */}
             <section id="pricing-cards" className="py-20 bg-brand-secondary/50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                    <div className="grid md:grid-cols-2 gap-20 max-w-5xl mx-auto">
                         {/* Free Tier */}
-                        <div className="bg-brand-secondary rounded-2xl p-8 border border-brand-tertiary relative hover:border-brand-quaternary/50 transition-all duration-300">
-                            <div className="text-center mb-8">
-                                <h3 className="text-2xl font-bold text-white mb-2">Snap</h3>
-                                <div className="text-4xl font-bold text-white mb-2">$0</div>
-                                <p className="text-gray-400">Perfect for getting started</p>
+                        <div className="bg-brand-secondary rounded-2xl p-8 border border-brand-tertiary relative hover:border-brand-quaternary/50 transition-all duration-300 group cursor-pointer">
+                            <div className="text-center mb-10">
+                                <h3 className="text-3xl font-bold text-white mb-3">Snap</h3>
+                                <div className="text-5xl font-bold text-white mb-3">₹0</div>
+                                <p className="text-gray-400 text-lg">Perfect for getting started</p>
                             </div>
 
                             {/* Features */}
-                            <div className="mb-8">
-                                <div className="space-y-4">
+                            <div className="mb-10">
+                                <div className="space-y-5">
                                     {features.free.map((feature, index) => (
-                                        <div key={index} className="flex items-center gap-3">
-                                            <div className="p-1 bg-brand-quaternary/20 rounded-lg">
-                                                <feature.icon size={16} className="text-brand-quaternary" />
-                                            </div>
-                                            <span className="text-white font-medium">{feature.name}</span>
+                                        <div key={index} className="flex items-center gap-4">
+                                            <div className="w-2 h-2 bg-brand-quaternary rounded-full flex-shrink-0"></div>
+                                            <span className="text-white font-medium text-lg leading-relaxed">{feature}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -87,36 +89,34 @@ const Pricing = () => {
 
                             <button
                                 onClick={() => navigate('/playground')}
-                                className="w-full py-3 bg-brand-quaternary/20 text-brand-quaternary rounded-lg hover:bg-brand-quaternary hover:text-white transition-all duration-200 font-medium"
+                                className="w-full py-4 bg-brand-quaternary/20 text-brand-quaternary rounded-xl hover:bg-brand-quaternary hover:text-white transition-all duration-300 font-semibold text-lg group-hover:scale-105 cursor-pointer"
                             >
                                 Get Started Free
                             </button>
                         </div>
 
                         {/* Pro Tier */}
-                        <div className="bg-gradient-to-br from-brand-secondary to-brand-tertiary/20 rounded-2xl p-8 border-2 border-brand-quaternary relative hover:border-brand-quaternary/80 transition-all duration-300">
+                        <div className="bg-gradient-to-br from-brand-secondary to-brand-tertiary/20 rounded-2xl p-8 border-2 border-brand-quaternary relative hover:border-brand-quaternary/80 transition-all duration-300 group cursor-pointer">
                             {/* Popular Badge */}
                             <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                                <div className="bg-brand-quaternary text-white px-4 py-1 rounded-full text-sm font-medium">
-                                    Most Popular
+                                <div className="bg-brand-quaternary text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg">
+                                    Recommended
                                 </div>
                             </div>
 
-                            <div className="text-center mb-8">
-                                <h3 className="text-2xl font-bold text-white mb-2">SnapX</h3>
-                                <div className="text-4xl font-bold text-white mb-2">$29</div>
-                                <p className="text-gray-400">per month</p>
+                            <div className="text-center mb-10">
+                                <h3 className="text-3xl font-bold text-white mb-3">SnapX</h3>
+                                <div className="text-5xl font-bold text-white mb-3">₹359</div>
+                                <p className="text-gray-400 text-lg">per month</p>
                             </div>
 
                             {/* Features */}
-                            <div className="mb-8">
-                                <div className="space-y-4">
+                            <div className="mb-10">
+                                <div className="space-y-5">
                                     {features.pro.map((feature, index) => (
-                                        <div key={index} className="flex items-center gap-3">
-                                            <div className="p-1 bg-brand-quaternary/20 rounded-lg">
-                                                <feature.icon size={16} className="text-brand-quaternary" />
-                                            </div>
-                                            <span className="text-white font-medium">{feature.name}</span>
+                                        <div key={index} className="flex items-center gap-4">
+                                            <div className="w-2 h-2 bg-brand-quaternary rounded-full flex-shrink-0"></div>
+                                            <span className="text-white font-medium text-lg leading-relaxed">{feature}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -124,43 +124,16 @@ const Pricing = () => {
 
                             <button
                                 onClick={() => navigate('/playground')}
-                                className="w-full py-3 bg-brand-quaternary text-white rounded-lg hover:bg-brand-quaternary/90 transition-all duration-200 font-medium"
+                                className="w-full py-4 bg-brand-quaternary text-white rounded-xl hover:bg-brand-quaternary/90 transition-all duration-300 font-semibold text-lg group-hover:scale-105 shadow-lg cursor-pointer"
                             >
-                                Start Pro Trial
+                                Upgrade to SnapX
                             </button>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* Simple FAQ Section */}
-            <section className="py-20">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center mb-16">
-                        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                            Questions?
-                        </h2>
-                        <p className="text-xl text-gray-300">
-                            We're here to help
-                        </p>
-                    </div>
 
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div className="bg-brand-secondary rounded-xl p-6 border border-brand-tertiary">
-                            <h4 className="text-lg font-semibold text-white mb-2">Can I upgrade anytime?</h4>
-                            <p className="text-gray-400">
-                                Yes, upgrade from Free to Pro whenever you need more features.
-                            </p>
-                        </div>
-                        <div className="bg-brand-secondary rounded-xl p-6 border border-brand-tertiary">
-                            <h4 className="text-lg font-semibold text-white mb-2">Is my data secure?</h4>
-                            <p className="text-gray-400">
-                                Absolutely. Enterprise-grade security with JWT tokens and 2FA support.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
 
             {/* CTA Section */}
             <section className="py-20">

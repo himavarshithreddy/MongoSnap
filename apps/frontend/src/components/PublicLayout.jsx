@@ -65,9 +65,9 @@ const PublicLayout = ({ children }) => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center py-6">
                         {/* Logo */}
-                        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
+                        <Link to="/" className="flex items-center hover:opacity-80 transition-opacity cursor-pointer">
                             <Logo size="default" />
-                            <h1 className="text-2xl font-bold text-white tracking-wide">
+                            <h1 className="text-4xl font-bold text-white tracking-wide">
                                 Mongo<span className="text-brand-quaternary">Snap</span>
                             </h1>
                         </Link>
@@ -142,7 +142,7 @@ const PublicLayout = ({ children }) => {
                         {/* Brand Column */}
                         <div className="md:col-span-1">
                             <div className="flex items-center gap-3 mb-4">
-                                <Logo size="default" />
+                                <Logo size="large" />
                                 <h3 className="text-xl font-bold text-white">
                                     Mongo<span className="text-brand-quaternary">Snap</span>
                                 </h3>

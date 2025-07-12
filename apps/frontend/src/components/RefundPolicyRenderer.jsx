@@ -12,7 +12,7 @@ const RefundPolicyRenderer = ({ content }) => {
 
     const renderEmailLink = (text) => {
         const emailRegex = /(support@mongosnap\.live)/g;
-        if (emailRegex.test(text)) {
+        if (text.includes('support@mongosnap.live')) {
             const parts = text.split(emailRegex);
             return parts.map((part, index) =>
                 part === 'support@mongosnap.live' ? (
@@ -26,8 +26,7 @@ const RefundPolicyRenderer = ({ content }) => {
                 ) : (
                     part
                 )
-            );
-        }
+            );        }
         return text;
     };
     const renderScenarios = (scenarios, type) => {
