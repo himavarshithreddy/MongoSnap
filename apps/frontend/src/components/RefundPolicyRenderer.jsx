@@ -11,21 +11,25 @@ const RefundPolicyRenderer = ({ content }) => {
     };
 
     const renderEmailLink = (text) => {
-        if (text.includes('support@mongosnap.live')) {
-            const parts = text.split('support@mongosnap.live');
-            return (
-                <>
-                    {parts[0]}
-                    <a href="mailto:support@mongosnap.live" className="text-brand-quaternary hover:text-white transition-colors">
+        const emailRegex = /(support@mongosnap\.live)/g;
+        if (emailRegex.test(text)) {
+            const parts = text.split(emailRegex);
+            return parts.map((part, index) =>
+                part === 'support@mongosnap.live' ? (
+                    <a
+                        key={index}
+                        href="mailto:support@mongosnap.live"
+                        className="text-brand-quaternary hover:text-white transition-colors"
+                    >
                         support@mongosnap.live
                     </a>
-                    {parts[1]}
-                </>
+                ) : (
+                    part
+                )
             );
         }
         return text;
     };
-
     const renderScenarios = (scenarios, type) => {
         const bgClass = type === 'granted' 
             ? 'bg-brand-tertiary/30 rounded-lg p-6 mb-6' 

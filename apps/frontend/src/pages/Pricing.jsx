@@ -40,7 +40,7 @@ const Pricing = () => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center max-w-4xl mx-auto">
                         <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-                            Simple <span className="text-brand-quaternary">Pricing</span>
+                            <span className="text-brand-quaternary">Pricing</span>
                         </h1>
                         <p className="text-xl text-gray-300 leading-relaxed mb-8">
                             Start free and upgrade when you need more power. 
@@ -66,7 +66,7 @@ const Pricing = () => {
                         {/* Free Tier */}
                         <div className="bg-brand-secondary rounded-2xl p-8 border border-brand-tertiary relative hover:border-brand-quaternary/50 transition-all duration-300">
                             <div className="text-center mb-8">
-                                <h3 className="text-2xl font-bold text-white mb-2">Free</h3>
+                                <h3 className="text-2xl font-bold text-white mb-2">Snap</h3>
                                 <div className="text-4xl font-bold text-white mb-2">$0</div>
                                 <p className="text-gray-400">Perfect for getting started</p>
                             </div>
@@ -103,7 +103,7 @@ const Pricing = () => {
                             </div>
 
                             <div className="text-center mb-8">
-                                <h3 className="text-2xl font-bold text-white mb-2">Pro</h3>
+                                <h3 className="text-2xl font-bold text-white mb-2">SnapX</h3>
                                 <div className="text-4xl font-bold text-white mb-2">$29</div>
                                 <p className="text-gray-400">per month</p>
                             </div>
