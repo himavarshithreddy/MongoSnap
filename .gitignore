@@ -48,7 +48,7 @@ coverage/
 .env.*.backup
 
 # Local server DBs or logs
-**/data/
+
 **/tmp/
 node_modules
 node_modules
