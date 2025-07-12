@@ -2,11 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     Target, 
-    Users, 
     Lightbulb, 
-    Shield, 
-    Brain,
-    Heart,
     CheckCircle,
     Github,
     Linkedin
@@ -22,28 +18,12 @@ const About = () => {
         document.title = "About Us - MongoSnap";
     }, []);
 
-    const values = [
-        {
-            icon: Brain,
-            title: "Innovation",
-            description: "Pushing boundaries with AI and database technology."
-        },
-        {
-            icon: Users,
-            title: "Developer-First",
-            description: "Building tools that make complex tasks simple."
-        },
-        {
-            icon: Shield,
-            title: "Security",
-            description: "Your data security is our top priority."
-        }
-    ];
+
 
     const developer = {
         name: "Himavarshith Reddy",
         role: "Founder & Developer",
-        bio: "Passionate full-stack developer with expertise in AI, database technologies, and building developer tools. Committed to making database interactions more intuitive and accessible through innovative AI solutions.",
+        bio: "Full-stack developer passionate about AI and database technologies.",
         expertise: ["Full-Stack Development", "AI/ML", "Database Systems", "DevOps", "Product Development"],
         github: "https://github.com/himavarshithreddy",
         linkedin: "https://www.linkedin.com/in/himavarshithreddygundam/"
@@ -124,38 +104,7 @@ const About = () => {
                 </div>
             </section>
 
-            {/* Values Section */}
-            <section className="py-20">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center mb-16">
-                        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                            Our Core Values
-                        </h2>
-                        <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                            Core principles that drive our development and user experience.
-                        </p>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {values.map((value, index) => (
-                            <div 
-                                key={index}
-                                className="bg-brand-secondary rounded-xl p-6 border border-brand-tertiary hover:border-brand-quaternary/50 transition-all duration-300"
-                            >
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 bg-brand-quaternary/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <value.icon className="text-brand-quaternary" size={24} />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-semibold text-white mb-3">{value.title}</h3>
-                                        <p className="text-gray-400 leading-relaxed">{value.description}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
 
             {/* Developer Section */}
             <section className="py-20 bg-brand-secondary/50">

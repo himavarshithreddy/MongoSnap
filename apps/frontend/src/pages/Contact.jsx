@@ -10,7 +10,8 @@ import {
     AlertCircle,
     MessageSquare,
     Users,
-    Headphones
+    Headphones,
+    ArrowRight
 } from 'lucide-react';
 import { useAuthActionButton } from '../hooks/useAuthActionButton.jsx';
 import { useUser } from '../hooks/useUser';

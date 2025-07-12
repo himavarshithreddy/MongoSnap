@@ -61,9 +61,9 @@ const PublicLayout = ({ children }) => {
     return (
         <div className="min-h-screen bg-brand-primary">
             {/* Header */}
-            <header className="bg-brand-secondary/80 backdrop-blur-sm border-b border-brand-tertiary/50 sticky top-0 z-50">
+            <header className="bg-brand-secondary/90 backdrop-blur-md border-b border-brand-tertiary/50 sticky top-0 z-50 shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center py-4">
+                    <div className="flex justify-between items-center py-6">
                         {/* Logo */}
                         <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
                             <Logo size="default" />
@@ -73,15 +73,15 @@ const PublicLayout = ({ children }) => {
                         </Link>
 
                         {/* Desktop Navigation */}
-                        <nav className="hidden md:flex items-center space-x-8">
+                        <nav className="hidden md:flex items-center space-x-2">
                             {navItems.map((item) => (
                                 <Link
                                     key={item.name}
                                     to={item.path}
-                                    className={`text-sm font-medium transition-colors duration-200 cursor-pointer ${
+                                    className={`px-8 py-3 text-lg font-semibold transition-all duration-300 cursor-pointer rounded-lg ${
                                         isActiveRoute(item.path, item.exact)
-                                            ? 'text-brand-quaternary'
-                                            : 'text-gray-300 hover:text-white'
+                                            ? 'text-brand-quaternary bg-brand-quaternary/10 border border-brand-quaternary/20'
+                                            : 'text-gray-300 hover:text-white hover:bg-brand-tertiary/30'
                                     }`}
                                 >
                                     {item.name}
@@ -96,33 +96,33 @@ const PublicLayout = ({ children }) => {
 
                         {/* Mobile menu button */}
                         <button
-                            className="md:hidden text-gray-300 hover:text-white cursor-pointer"
+                            className="md:hidden text-gray-300 hover:text-white cursor-pointer p-2 hover:bg-brand-tertiary/30 rounded-lg transition-all duration-200"
                             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         >
-                            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                            {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
                         </button>
                     </div>
                 </div>
 
                 {/* Mobile Navigation */}
                 {mobileMenuOpen && (
-                    <div className="md:hidden bg-brand-secondary border-t border-brand-tertiary/50">
-                        <div className="px-4 py-6 space-y-4">
+                    <div className="md:hidden bg-brand-secondary/95 backdrop-blur-md border-t border-brand-tertiary/50 shadow-lg">
+                        <div className="px-6 py-8 space-y-2">
                             {navItems.map((item) => (
                                 <Link
                                     key={item.name}
                                     to={item.path}
-                                    className={`block text-base font-medium transition-colors duration-200 cursor-pointer ${
+                                    className={`block px-4 py-4 text-lg font-semibold transition-all duration-300 cursor-pointer rounded-lg ${
                                         isActiveRoute(item.path, item.exact)
-                                            ? 'text-brand-quaternary'
-                                            : 'text-gray-300 hover:text-white'
+                                            ? 'text-brand-quaternary bg-brand-quaternary/10 border border-brand-quaternary/20'
+                                            : 'text-gray-300 hover:text-white hover:bg-brand-tertiary/30'
                                     }`}
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
                                     {item.name}
                                 </Link>
                             ))}
-                            <div className="pt-4 border-t border-brand-tertiary/50">
+                            <div className="pt-6 border-t border-brand-tertiary/50 mt-6">
                                 {getActionButton()}
                             </div>
                         </div>
@@ -219,18 +219,24 @@ const PublicLayout = ({ children }) => {
                                 © 2025 MongoSnap. All rights reserved.
                             </p>
                             <div className="flex space-x-6 mt-4 md:mt-0">
-                                <a
-                                    href="#"
+                                <Link
+                                    to="/privacy-policy"
                                     className="text-gray-400 hover:text-brand-quaternary text-sm transition-colors duration-200 cursor-pointer"
                                 >
                                     Privacy Policy
-                                </a>
-                                <a
-                                    href="#"
+                                </Link>
+                                <Link
+                                    to="/terms-of-service"
                                     className="text-gray-400 hover:text-brand-quaternary text-sm transition-colors duration-200 cursor-pointer"
                                 >
                                     Terms of Service
-                                </a>
+                                </Link>
+                                <Link
+                                    to="/refund-policy"
+                                    className="text-gray-400 hover:text-brand-quaternary text-sm transition-colors duration-200 cursor-pointer"
+                                >
+                                    Refund Policy
+                                </Link>
                             </div>
                         </div>
                     </div>
