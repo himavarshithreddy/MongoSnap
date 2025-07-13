@@ -22,7 +22,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: ['https://mongosnap.mp:5173','https://mongosnap.live'],
+  origin: ['http://localhost:5173','https://mongosnap.live'],
   credentials: true,
   sameSite: 'lax'
 }));

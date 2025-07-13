@@ -128,7 +128,7 @@ const executeAsyncQuery = async (queryString, db, timeoutMs = 30000) => {
                 global: undefined,
                 Buffer: undefined,
                 // Add specific allowed globals
-                Date: (...args) => args.length > 0 ? new Date(...args) : new Date(),
+                Date: Date,
                 JSON: JSON,
                 Math: Math,
                 parseInt: parseInt,
@@ -356,7 +356,7 @@ const createEnhancedExecutionContext = (db) => {
                 throw new Error(`Invalid ObjectId: ${id}. ObjectId must be a 24-character hex string.`);
             }
         },
-        Date: (...args) => args.length > 0 ? new Date(...args) : new Date(),
+        Date: Date,
         ISODate: (dateString) => dateString ? new Date(dateString) : new Date(),
         NumberLong: (value) => parseInt(value),
         NumberInt: (value) => parseInt(value),
