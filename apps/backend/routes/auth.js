@@ -325,7 +325,7 @@ router.post('/request-password-change', passwordResetLimiter, verifyTokenAndVali
     await user.save();
 
     // Send email with password change link
-    const changeLink = `${process.env.FRONTEND_URL || 'https://mongosnap.mp:5173'}/change-password/${changeToken}`;
+    const changeLink = `${process.env.FRONTEND_URL || 'https://mongosnap.live'}/change-password/${changeToken}`;
     await sendResetPasswordEmail(user.email, changeLink);
 
     console.log(`Password change link sent to user: ${user.email}`);

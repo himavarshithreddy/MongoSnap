@@ -129,7 +129,7 @@ const createBaseTemplate = (content, title) => {
 
 // Email verification template
 const createVerificationTemplate = (token) => {
-  const verificationLink = `https://mongosnap.mp:5173/api/verify-email/${token}`;
+  const verificationLink = `https://mongosnap.live/api/verify-email/${token}`;
   const content = `
     <h2>Welcome to MongoSnap!</h2>
     <p>Please verify your email address to complete your registration.</p>
@@ -187,7 +187,7 @@ const createTwoFactorEnabledTemplate = () => {
     <p>Your account is now protected with an additional layer of security.</p>
     
     <div style="text-align: center;">
-      <a href="https://mongosnap.mp:5173" class="button">Go to MongoSnap</a>
+      <a href="https://mongosnap.live" class="button">Go to MongoSnap</a>
     </div>
   `;
   
@@ -201,7 +201,7 @@ const createTwoFactorDisabledTemplate = () => {
     <p>Your account security has been reduced. We recommend re-enabling 2FA.</p>
     
     <div style="text-align: center;">
-      <a href="https://mongosnap.mp:5173/settings" class="button">Re-enable 2FA</a>
+      <a href="https://mongosnap.live/settings" class="button">Re-enable 2FA</a>
     </div>
   `;
   
@@ -229,7 +229,7 @@ const createLoginNotificationTemplate = (loginDetails) => {
     <p>If this was you, no action is required.</p>
     
     <div style="text-align: center;">
-      <a href="https://mongosnap.mp:5173/settings" class="button">Review Security Settings</a>
+      <a href="https://mongosnap.live/settings" class="button">Review Security Settings</a>
     </div>
     
     <div class="warning">

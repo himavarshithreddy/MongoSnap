@@ -33,7 +33,7 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
          
             await user.save();
 
-            const resetLink = `https://mongosnap.mp:5173/reset-password/${resetToken}`;
+            const resetLink = `https://mongosnap.live/reset-password/${resetToken}`;
             await sendResetPasswordEmail(user.email, resetLink);
         }
 
