@@ -3,10 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { useAuthActionButton } from '../hooks/useAuthActionButton.jsx';
 import PublicLayout from '../components/PublicLayout';
+import { useUser } from '../hooks/useUser';
+import { useSubscription } from '../hooks/useUser';
+import { useContext } from 'react';
+import { UserContext } from '../contexts/UserContext';
+import { useState } from 'react';
 
 const Pricing = () => {
     const navigate = useNavigate();
     const getActionButton = useAuthActionButton();
+    const { user } = useUser();
+    const { fetchWithAuth, refreshUser } = useContext(UserContext);
+    const subscription = useSubscription();
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [paymentSuccess, setPaymentSuccess] = useState(false);
+    const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+    const [isProcessingCancel, setIsProcessingCancel] = useState(false);
 
     useEffect(() => {
         document.title = "Pricing - MongoSnap";
@@ -37,6 +50,83 @@ const Pricing = () => {
         ]
     };
 
+    const handleUpgradeClick = () => {
+        setShowPaymentModal(true);
+    };
+
+    const handleConfirmPayment = async () => {
+        try {
+            setIsProcessingPayment(true);
+            
+            // Call backend to update subscription
+            const response = await fetchWithAuth('/api/auth/update-subscription', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    subscriptionPlan: 'snapx',
+                    subscriptionStatus: 'active'
+                })
+            });
+
+            if (response.ok) {
+                await response.json();
+                setShowPaymentModal(false);
+                setPaymentSuccess(true);
+                
+                // Refresh user data from backend to get updated subscription info
+                await refreshUser();
+                
+                setTimeout(() => setPaymentSuccess(false), 3000);
+            } else {
+                const errorData = await response.json();
+                console.error('Failed to update subscription:', errorData);
+                alert('Failed to upgrade subscription. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error updating subscription:', error);
+            alert('Failed to upgrade subscription. Please try again.');
+        } finally {
+            setIsProcessingPayment(false);
+        }
+    };
+
+    const handleCancelSubscription = async () => {
+        try {
+            setIsProcessingCancel(true);
+            
+            const response = await fetchWithAuth('/api/auth/cancel-subscription', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                await response.json();
+                setShowCancelModal(false);
+                setPaymentSuccess(true);
+                
+                // Refresh user data from backend to get updated subscription info
+                await refreshUser();
+                
+                setTimeout(() => setPaymentSuccess(false), 3000);
+            } else {
+                const errorData = await response.json();
+                console.error('Failed to cancel subscription:', errorData);
+                alert('Failed to cancel subscription. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error cancelling subscription:', error);
+            alert('Failed to cancel subscription. Please try again.');
+        } finally {
+            setIsProcessingCancel(false);
+        }
+    };
+
+
+
     return (
         <PublicLayout>
             {/* Hero Section */}
@@ -46,19 +136,46 @@ const Pricing = () => {
                         <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
                             <span className="text-brand-quaternary">Pricing</span>
                         </h1>
-                        <p className="text-xl text-gray-300 leading-relaxed mb-8">
-                            Start free and upgrade when you need more power. 
-                            No hidden fees, no surprises.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            {getActionButton()}
-                            <button
-                                onClick={() => document.getElementById('pricing-cards').scrollIntoView({ behavior: 'smooth' })}
-                                className="px-8 py-4 border-2 border-brand-quaternary text-brand-quaternary rounded-lg hover:bg-brand-quaternary hover:text-white transition-all duration-200 font-semibold text-lg cursor-pointer"
-                            >
-                                View Plans
-                            </button>
-                        </div>
+                        {user ? (
+                            <>
+                                <p className="text-xl text-gray-300 leading-relaxed mb-8">
+                                    {subscription.isSnapXUser 
+                                        ? `You're currently on the ${subscription.planName} plan. Manage your subscription below.`
+                                        : `You're currently on the ${subscription.planName} plan. Upgrade to unlock premium features.`
+                                    }
+                                </p>
+                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                    <button
+                                        onClick={() => navigate('/connect')}
+                                        className="px-8 py-4 bg-brand-quaternary text-white rounded-lg hover:bg-brand-quaternary/90 transition-all duration-200 font-semibold text-lg cursor-pointer"
+                                    >
+                                        Go to Dashboard
+                                    </button>
+                                    <button
+                                        onClick={() => document.getElementById('pricing-cards').scrollIntoView({ behavior: 'smooth' })}
+                                        className="px-8 py-4 border-2 border-brand-quaternary text-brand-quaternary rounded-lg hover:bg-brand-quaternary hover:text-white transition-all duration-200 font-semibold text-lg cursor-pointer"
+                                    >
+                                        Manage Subscription
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-xl text-gray-300 leading-relaxed mb-8">
+                                    Start free and upgrade when you need more power. 
+                                    No hidden fees, no surprises.
+                                </p>
+                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                    {getActionButton()}
+                                    <button
+                                        onClick={() => document.getElementById('pricing-cards').scrollIntoView({ behavior: 'smooth' })}
+                                        className="px-8 py-4 border-2 border-brand-quaternary text-brand-quaternary rounded-lg hover:bg-brand-quaternary hover:text-white transition-all duration-200 font-semibold text-lg cursor-pointer"
+                                    >
+                                        View Plans
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </section>
@@ -66,9 +183,20 @@ const Pricing = () => {
             {/* Pricing Cards Section */}
             <section id="pricing-cards" className="py-20 bg-brand-secondary/50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
                     <div className="grid md:grid-cols-2 gap-20 max-w-5xl mx-auto">
                         {/* Free Tier */}
-                        <div className="bg-brand-secondary rounded-2xl p-8 border border-brand-tertiary relative hover:border-brand-quaternary/50 transition-all duration-300 group cursor-pointer">
+                        <div className={`bg-brand-secondary rounded-2xl p-8 border relative transition-all duration-300 group cursor-pointer ${
+                            subscription.isSnapUser ? 'border-brand-quaternary' : 'border-brand-tertiary hover:border-brand-quaternary/50'
+                        }`}>
+                            {subscription.isSnapUser && (
+                                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                                    <div className="bg-green-600 text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg">
+                                        Current Plan
+                                    </div>
+                                </div>
+                            )}
+                            
                             <div className="text-center mb-10">
                                 <h3 className="text-3xl font-bold text-white mb-3">Snap</h3>
                                 <div className="text-5xl font-bold text-white mb-3">₹0</div>
@@ -88,19 +216,23 @@ const Pricing = () => {
                             </div>
 
                             <button
-                                onClick={() => navigate('/playground')}
+                                onClick={() => navigate('/connect')}
                                 className="w-full py-4 bg-brand-quaternary/20 text-brand-quaternary rounded-xl hover:bg-brand-quaternary hover:text-white transition-all duration-300 font-semibold text-lg group-hover:scale-105 cursor-pointer"
                             >
-                                Get Started Free
+                                {subscription.isSnapUser ? 'Current Plan' : 'Get Started Free'}
                             </button>
                         </div>
 
                         {/* Pro Tier */}
-                        <div className="bg-gradient-to-br from-brand-secondary to-brand-tertiary/20 rounded-2xl p-8 border-2 border-brand-quaternary relative hover:border-brand-quaternary/80 transition-all duration-300 group cursor-pointer">
-                            {/* Popular Badge */}
+                        <div className={`bg-gradient-to-br from-brand-secondary to-brand-tertiary/20 rounded-2xl p-8 border-2 relative transition-all duration-300 group cursor-pointer ${
+                            subscription.isSnapXUser ? 'border-green-500' : 'border-brand-quaternary hover:border-brand-quaternary/80'
+                        }`}>
+                            {/* Badge */}
                             <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                                <div className="bg-brand-quaternary text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg">
-                                    Recommended
+                                <div className={`px-6 py-2 rounded-full text-sm font-semibold shadow-lg ${
+                                    subscription.isSnapXUser ? 'bg-green-600 text-white' : 'bg-brand-quaternary text-white'
+                                }`}>
+                                    {subscription.isSnapXUser ? 'Current Plan' : 'Recommended'}
                                 </div>
                             </div>
 
@@ -123,17 +255,92 @@ const Pricing = () => {
                             </div>
 
                             <button
-                                onClick={() => navigate('/playground')}
+                                onClick={subscription.isSnapUser ? handleUpgradeClick : () => navigate('/settings')}
                                 className="w-full py-4 bg-brand-quaternary text-white rounded-xl hover:bg-brand-quaternary/90 transition-all duration-300 font-semibold text-lg group-hover:scale-105 shadow-lg cursor-pointer"
                             >
-                                Upgrade to SnapX
+                                {subscription.isSnapUser ? 'Upgrade to SnapX' : 'Current Plan'}
                             </button>
                         </div>
                     </div>
                 </div>
             </section>
 
+            {/* Payment Modal */}
+            {showPaymentModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div className="bg-brand-secondary rounded-2xl p-8 max-w-md w-full border border-brand-quaternary shadow-2xl">
+                        <h2 className="text-2xl font-bold text-white mb-4">Confirm Payment</h2>
+                        <p className="text-gray-300 mb-6">This is a mock payment. Click confirm to upgrade your account to <span className='text-brand-quaternary font-semibold'>SnapX</span>.</p>
+                        <div className="flex gap-4 justify-end">
+                            <button
+                                onClick={() => setShowPaymentModal(false)}
+                                disabled={isProcessingPayment}
+                                className="px-6 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmPayment}
+                                disabled={isProcessingPayment}
+                                className="px-6 py-2 bg-brand-quaternary text-white rounded-lg hover:bg-brand-quaternary/90 font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {isProcessingPayment ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    'Confirm & Upgrade'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
+            {/* Cancel Subscription Modal */}
+            {showCancelModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div className="bg-brand-secondary rounded-2xl p-8 max-w-md w-full border border-red-500 shadow-2xl">
+                        <h2 className="text-2xl font-bold text-white mb-4">Cancel Subscription</h2>
+                        <p className="text-gray-300 mb-6">Are you sure you want to cancel your SnapX subscription? You will continue to have access until the end of your billing period.</p>
+                        <div className="flex gap-4 justify-end">
+                            <button
+                                onClick={() => setShowCancelModal(false)}
+                                disabled={isProcessingCancel}
+                                className="px-6 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Keep Subscription
+                            </button>
+                            <button
+                                onClick={handleCancelSubscription}
+                                disabled={isProcessingCancel}
+                                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {isProcessingCancel ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Cancelling...
+                                    </>
+                                ) : (
+                                    'Cancel Subscription'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
+
+            {/* Success Toast */}
+            {paymentSuccess && (
+                <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50">
+                    <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg font-semibold">
+                        🎉 Operation successful! Your subscription has been updated.
+                    </div>
+                </div>
+            )}
 
             {/* CTA Section */}
             <section className="py-20">

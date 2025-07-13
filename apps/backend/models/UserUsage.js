@@ -13,12 +13,12 @@ const userUsageSchema = new mongoose.Schema({
         daily: {
             count: { type: Number, default: 0 },
             date: { type: String, default: () => new Date().toISOString().split('T')[0] }, // YYYY-MM-DD format
-            limit: { type: Number, default: 100 }
+            limit: { type: Number, default: 20 } // Default for Snap plan
         },
         monthly: {
             count: { type: Number, default: 0 },
             month: { type: String, default: () => new Date().toISOString().substring(0, 7) }, // YYYY-MM format
-            limit: { type: Number, default: 2000 }
+            limit: { type: Number, default: 400 } // Default for Snap plan
         }
     },
     
@@ -27,12 +27,12 @@ const userUsageSchema = new mongoose.Schema({
         daily: {
             count: { type: Number, default: 0 },
             date: { type: String, default: () => new Date().toISOString().split('T')[0] },
-            limit: { type: Number, default: 10 }
+            limit: { type: Number, default: 5 } // Default for Snap plan
         },
         monthly: {
             count: { type: Number, default: 0 },
             month: { type: String, default: () => new Date().toISOString().substring(0, 7) },
-            limit: { type: Number, default: 200 }
+            limit: { type: Number, default: 100 } // Default for Snap plan
         }
     },
     
@@ -67,6 +67,50 @@ userUsageSchema.statics.getOrCreateUsage = async function(userId) {
     }
     
     return usage;
+};
+
+// Method to get limits based on subscription plan
+userUsageSchema.methods.getLimitsForPlan = function(plan = 'snap') {
+    const limits = {
+        snap: {
+            queryExecution: {
+                daily: 20,
+                monthly: 400
+            },
+            aiGeneration: {
+                daily: 5,
+                monthly: 100
+            },
+            queryHistory: 50,
+            connections: 2
+        },
+        snapx: {
+            queryExecution: {
+                daily: -1, // Unlimited
+                monthly: -1 // Unlimited
+            },
+            aiGeneration: {
+                daily: 100,
+                monthly: 2500
+            },
+            queryHistory: -1, // Unlimited
+            connections: -1 // Unlimited
+        }
+    };
+    
+    return limits[plan] || limits.snap;
+};
+
+// Method to update limits based on user's subscription plan
+userUsageSchema.methods.updateLimitsForPlan = function(plan = 'snap') {
+    const limits = this.getLimitsForPlan(plan);
+    
+    this.queryExecution.daily.limit = limits.queryExecution.daily;
+    this.queryExecution.monthly.limit = limits.queryExecution.monthly;
+    this.aiGeneration.daily.limit = limits.aiGeneration.daily;
+    this.aiGeneration.monthly.limit = limits.aiGeneration.monthly;
+    
+    return this;
 };
 
 // Method to check and reset daily/monthly counters if needed
@@ -112,6 +156,18 @@ userUsageSchema.methods.checkAndResetCounters = function() {
 userUsageSchema.methods.canExecuteQuery = function() {
     this.checkAndResetCounters();
     
+    // Check if unlimited (SnapX plan)
+    if (this.queryExecution.daily.limit === -1 && this.queryExecution.monthly.limit === -1) {
+        return {
+            allowed: true,
+            dailyRemaining: -1, // Unlimited
+            monthlyRemaining: -1, // Unlimited
+            dailyLimit: -1,
+            monthlyLimit: -1,
+            reason: null
+        };
+    }
+    
     const dailyOk = this.queryExecution.daily.count < this.queryExecution.daily.limit;
     const monthlyOk = this.queryExecution.monthly.count < this.queryExecution.monthly.limit;
     
@@ -128,6 +184,18 @@ userUsageSchema.methods.canExecuteQuery = function() {
 // Method to check if user can perform AI generation
 userUsageSchema.methods.canGenerateAI = function() {
     this.checkAndResetCounters();
+    
+    // Check if unlimited (SnapX plan)
+    if (this.aiGeneration.daily.limit === -1 && this.aiGeneration.monthly.limit === -1) {
+        return {
+            allowed: true,
+            dailyRemaining: -1, // Unlimited
+            monthlyRemaining: -1, // Unlimited
+            dailyLimit: -1,
+            monthlyLimit: -1,
+            reason: null
+        };
+    }
     
     const dailyOk = this.aiGeneration.daily.count < this.aiGeneration.daily.limit;
     const monthlyOk = this.aiGeneration.monthly.count < this.aiGeneration.monthly.limit;
@@ -190,34 +258,31 @@ userUsageSchema.methods.incrementAIGeneration = async function(operation = 'unkn
 userUsageSchema.methods.getUsageStats = function() {
     this.checkAndResetCounters();
     
+    const formatUsage = (used, limit) => {
+        if (limit === -1) {
+            return {
+                used: used,
+                limit: 'Unlimited',
+                remaining: 'Unlimited',
+                percentage: 0
+            };
+        }
+        return {
+            used: used,
+            limit: limit,
+            remaining: Math.max(0, limit - used),
+            percentage: Math.round((used / limit) * 100)
+        };
+    };
+    
     return {
         queryExecution: {
-            daily: {
-                used: this.queryExecution.daily.count,
-                limit: this.queryExecution.daily.limit,
-                remaining: Math.max(0, this.queryExecution.daily.limit - this.queryExecution.daily.count),
-                percentage: Math.round((this.queryExecution.daily.count / this.queryExecution.daily.limit) * 100)
-            },
-            monthly: {
-                used: this.queryExecution.monthly.count,
-                limit: this.queryExecution.monthly.limit,
-                remaining: Math.max(0, this.queryExecution.monthly.limit - this.queryExecution.monthly.count),
-                percentage: Math.round((this.queryExecution.monthly.count / this.queryExecution.monthly.limit) * 100)
-            }
+            daily: formatUsage(this.queryExecution.daily.count, this.queryExecution.daily.limit),
+            monthly: formatUsage(this.queryExecution.monthly.count, this.queryExecution.monthly.limit)
         },
         aiGeneration: {
-            daily: {
-                used: this.aiGeneration.daily.count,
-                limit: this.aiGeneration.daily.limit,
-                remaining: Math.max(0, this.aiGeneration.daily.limit - this.aiGeneration.daily.count),
-                percentage: Math.round((this.aiGeneration.daily.count / this.aiGeneration.daily.limit) * 100)
-            },
-            monthly: {
-                used: this.aiGeneration.monthly.count,
-                limit: this.aiGeneration.monthly.limit,
-                remaining: Math.max(0, this.aiGeneration.monthly.limit - this.aiGeneration.monthly.count),
-                percentage: Math.round((this.aiGeneration.monthly.count / this.aiGeneration.monthly.limit) * 100)
-            }
+            daily: formatUsage(this.aiGeneration.daily.count, this.aiGeneration.daily.limit),
+            monthly: formatUsage(this.aiGeneration.monthly.count, this.aiGeneration.monthly.limit)
         }
     };
 };

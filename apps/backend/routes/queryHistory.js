@@ -3,6 +3,7 @@ const router = express.Router();
 const QueryHistory = require('../models/QueryHistory');
 const SavedQuery = require('../models/SavedQuery');
 const { verifyToken } = require('./middleware');
+const { checkUserSubscription } = require('./middleware'); // Added this import
 
 // Test endpoint to verify routes are working
 router.get('/test', (req, res) => {
@@ -15,9 +16,10 @@ router.get('/test', (req, res) => {
 });
 
 // Get query history for a user
-router.get('/history', verifyToken, async (req, res) => {
+router.get('/history', verifyToken, checkUserSubscription, async (req, res) => {
     console.log('GET /api/query/history - Request received:', {
         userId: req.userId,
+        userPlan: req.userPlan,
         query: req.query,
         headers: req.headers.authorization ? 'Bearer token present' : 'No auth header'
     });
@@ -35,13 +37,43 @@ router.get('/history', verifyToken, async (req, res) => {
 
         console.log('Query history filter:', filter);
 
+        // Get total count first
+        const total = await QueryHistory.countDocuments(filter);
+        
+        // Check if user is on Snap plan and enforce 50 query limit
+        const isSnapUser = req.userPlan === 'snap';
+        const maxQueries = isSnapUser ? 50 : -1; // -1 means unlimited for SnapX
+        
+        if (isSnapUser && total > maxQueries) {
+            console.log(`Snap user ${req.userId} has ${total} queries, limiting to ${maxQueries}`);
+            // For Snap users, only return the most recent 50 queries
+            const queryHistory = await QueryHistory.find(filter)
+                .sort({ createdAt: -1 })
+                .limit(maxQueries)
+                .populate('connectionId', 'nickname databaseName host');
+            
+            return res.json({
+                success: true,
+                data: {
+                    history: queryHistory,
+                    pagination: {
+                        page: 1,
+                        limit: maxQueries,
+                        total: maxQueries,
+                        pages: 1,
+                        limited: true,
+                        message: `Showing most recent ${maxQueries} queries. Upgrade to SnapX for unlimited query history.`
+                    }
+                }
+            });
+        }
+
+        // For SnapX users or Snap users with <= 50 queries, use normal pagination
         const queryHistory = await QueryHistory.find(filter)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit))
             .populate('connectionId', 'nickname databaseName host');
-
-        const total = await QueryHistory.countDocuments(filter);
 
         console.log(`Query history results: ${queryHistory.length} items, total: ${total}`);
 
@@ -53,7 +85,8 @@ router.get('/history', verifyToken, async (req, res) => {
                     page: parseInt(page),
                     limit: parseInt(limit),
                     total,
-                    pages: Math.ceil(total / limit)
+                    pages: Math.ceil(total / limit),
+                    limited: false
                 }
             }
         });
@@ -210,13 +243,22 @@ router.delete('/history', verifyToken, async (req, res) => {
     }
 });
 
-// Get saved queries for a user
-router.get('/saved', verifyToken, async (req, res) => {
+// Get saved queries for a user (SnapX only)
+router.get('/saved', verifyToken, checkUserSubscription, async (req, res) => {
     console.log('GET /api/query/saved - Request received:', {
         userId: req.userId,
+        userPlan: req.userPlan,
         query: req.query,
         headers: req.headers.authorization ? 'Bearer token present' : 'No auth header'
     });
+    
+    // Check if user is on SnapX plan
+    if (req.userPlan !== 'snapx') {
+        return res.status(403).json({
+            success: false,
+            message: 'Saved queries feature is only available for SnapX users. Upgrade to save and organize your queries.'
+        });
+    }
     
     try {
         const { connectionId, collection, tags } = req.query;
@@ -243,13 +285,22 @@ router.get('/saved', verifyToken, async (req, res) => {
     }
 });
 
-// Save a query
-router.post('/saved', verifyToken, async (req, res) => {
+// Save a query (SnapX only)
+router.post('/saved', verifyToken, checkUserSubscription, async (req, res) => {
     console.log('POST /api/query/saved - Request received:', {
         userId: req.userId,
+        userPlan: req.userPlan,
         body: req.body,
         headers: req.headers.authorization ? 'Bearer token present' : 'No auth header'
     });
+    
+    // Check if user is on SnapX plan
+    if (req.userPlan !== 'snapx') {
+        return res.status(403).json({
+            success: false,
+            message: 'Saved queries feature is only available for SnapX users. Upgrade to save and organize your queries.'
+        });
+    }
     
     try {
         const {
@@ -316,8 +367,8 @@ router.post('/saved', verifyToken, async (req, res) => {
     }
 });
 
-// Update a saved query
-router.put('/saved/:id', verifyToken, async (req, res) => {
+// Update a saved query (SnapX only)
+router.put('/saved/:id', verifyToken, checkUserSubscription, async (req, res) => {
     try {
         const {
             name,
@@ -330,6 +381,14 @@ router.put('/saved/:id', verifyToken, async (req, res) => {
             collection,
             operation
         } = req.body;
+
+        // Check if user is on SnapX plan
+        if (req.userPlan !== 'snapx') {
+            return res.status(403).json({
+                success: false,
+                message: 'Saved queries feature is only available for SnapX users. Upgrade to save and organize your queries.'
+            });
+        }
 
         // Check if name is being changed and if it conflicts with another saved query
         if (name) {
@@ -378,9 +437,17 @@ router.put('/saved/:id', verifyToken, async (req, res) => {
     }
 });
 
-// Delete a saved query
-router.delete('/saved/:id', verifyToken, async (req, res) => {
+// Delete a saved query (SnapX only)
+router.delete('/saved/:id', verifyToken, checkUserSubscription, async (req, res) => {
     try {
+        // Check if user is on SnapX plan
+        if (req.userPlan !== 'snapx') {
+            return res.status(403).json({
+                success: false,
+                message: 'Saved queries feature is only available for SnapX users. Upgrade to save and organize your queries.'
+            });
+        }
+
         const savedQuery = await SavedQuery.findOneAndDelete({
             _id: req.params.id,
             userId: req.userId

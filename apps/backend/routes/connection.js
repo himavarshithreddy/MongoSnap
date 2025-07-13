@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('./middleware');
+const { verifyToken, checkUserSubscription } = require('./middleware');
 const Connection = require('../models/Connection');
 const QueryHistory = require('../models/QueryHistory');
 const User = require('../models/User');
@@ -43,6 +43,14 @@ const checkQueryUsage = async (req, res, next) => {
     try {
         const userId = req.userId;
         const userUsage = await UserUsage.getOrCreateUsage(userId);
+        
+        // Update limits based on user's subscription plan
+        const User = require('../models/User');
+        const user = await User.findById(userId);
+        const currentPlan = user && user.isSnapXUser() ? 'snapx' : 'snap';
+        userUsage.updateLimitsForPlan(currentPlan);
+        await userUsage.save();
+        
         const canExecute = userUsage.canExecuteQuery();
         
         if (!canExecute.allowed) {
@@ -72,6 +80,14 @@ const checkAIUsage = async (req, res, next) => {
     try {
         const userId = req.userId;
         const userUsage = await UserUsage.getOrCreateUsage(userId);
+        
+        // Update limits based on user's subscription plan
+        const User = require('../models/User');
+        const user = await User.findById(userId);
+        const currentPlan = user && user.isSnapXUser() ? 'snapx' : 'snap';
+        userUsage.updateLimitsForPlan(currentPlan);
+        await userUsage.save();
+        
         const canGenerate = userUsage.canGenerateAI();
         
         if (!canGenerate.allowed) {
@@ -180,7 +196,7 @@ if (!ENCRYPTION_KEY) {
 }
 
 // Helper function to check connection limits
-const checkConnectionLimit = async (userId) => {
+const checkConnectionLimit = async (userId, userPlan = 'snap') => {
     try {
         const nonSampleConnections = await Connection.countDocuments({ 
             userId, 
@@ -188,10 +204,22 @@ const checkConnectionLimit = async (userId) => {
             isTemporary: { $ne: true } // Exclude temporary connections
         });
         
+        // SnapX users have unlimited connections
+        if (userPlan === 'snapx') {
+            return {
+                allowed: true,
+                currentCount: nonSampleConnections,
+                limit: -1 // Unlimited
+            };
+        }
+        
+        // Snap users have 2 connection limit
+        const MAX_CONNECTIONS_PER_USER = 2;
+        
         if (nonSampleConnections >= MAX_CONNECTIONS_PER_USER) {
             return {
                 allowed: false,
-                message: `Connection limit reached. You can have up to ${MAX_CONNECTIONS_PER_USER} database connections (excluding sample and temporary databases).`,
+                message: `Connection limit reached. You can have up to ${MAX_CONNECTIONS_PER_USER} database connections (excluding sample and temporary databases). Upgrade to SnapX for unlimited connections.`,
                 currentCount: nonSampleConnections,
                 limit: MAX_CONNECTIONS_PER_USER
             };
@@ -370,10 +398,10 @@ router.post('/test-uri', connectionLimiter, async (req, res) => {
 });
 
 // Get connection limits for the current user
-router.get('/limits', verifyToken, async (req, res) => {
+router.get('/limits', verifyToken, checkUserSubscription, async (req, res) => {
     try {
         const userId = req.userId;
-        const limitCheck = await checkConnectionLimit(userId);
+        const limitCheck = await checkConnectionLimit(userId, req.userPlan);
         
         // Get more detailed connection info
         const totalConnections = await Connection.countDocuments({ userId });
@@ -383,9 +411,9 @@ router.get('/limits', verifyToken, async (req, res) => {
         
         res.status(200).json({
             limits: {
-                maximum: limitCheck.limit,
+                maximum: limitCheck.limit === -1 ? 'Unlimited' : limitCheck.limit,
                 current: limitCheck.currentCount,
-                remaining: limitCheck.limit - limitCheck.currentCount,
+                remaining: limitCheck.limit === -1 ? 'Unlimited' : limitCheck.limit - limitCheck.currentCount,
                 canCreateMore: limitCheck.allowed
             },
             breakdown: {
@@ -724,7 +752,7 @@ router.post('/sample', connectionLimiter, verifyToken, async (req, res) => {
 });
 
 // New endpoint for actual database connection
-router.post('/connect', connectionLimiter, verifyToken, async (req, res) => {
+router.post('/connect', connectionLimiter, verifyToken, checkUserSubscription, async (req, res) => {
     try {
         const userId = req.userId;
         const { nickname, uri, connectionId } = req.body;
@@ -768,7 +796,7 @@ router.post('/connect', connectionLimiter, verifyToken, async (req, res) => {
                 console.log('Using existing connection with same nickname:', connection.nickname);
             } else {
                 // Check connection limit before creating new connection
-                const limitCheck = await checkConnectionLimit(userId);
+                const limitCheck = await checkConnectionLimit(userId, req.userPlan);
                 if (!limitCheck.allowed) {
                     return res.status(429).json({ 
                         message: limitCheck.message,
@@ -1962,11 +1990,19 @@ router.post('/:id/generate-query', verifyToken, checkAIUsage, async (req, res) =
     }
 });
 
-// Export database as ZIP file
-router.post('/:id/export', verifyToken, exportLimiter, async (req, res) => {
+// Export database as ZIP file (SnapX only)
+router.post('/:id/export', verifyToken, checkUserSubscription, exportLimiter, async (req, res) => {
     try {
         const userId = req.userId;
         const connectionId = req.params.id;
+
+        // Check if user is on SnapX plan
+        if (req.userPlan !== 'snapx') {
+            return res.status(403).json({
+                success: false,
+                message: 'Database export feature is only available for SnapX users. Upgrade to export your database schemas.'
+            });
+        }
 
         // Get the connection info from DB
         const dbConn = await Connection.findOne({ _id: connectionId, userId });
@@ -2510,11 +2546,19 @@ const processMongoDBTypes = (obj) => {
 };
 
 // Upload MongoDB dump file and create temporary database
-router.post('/upload', verifyToken, upload.single('dumpFile'), async (req, res) => {
+router.post('/upload', verifyToken, checkUserSubscription, upload.single('dumpFile'), async (req, res) => {
     try {
         const userId = req.userId;
         const { nickname } = req.body;
-        
+
+        // Check if user is on SnapX plan
+        if (req.userPlan !== 'snapx') {
+            return res.status(403).json({
+                success: false,
+                message: 'Database upload feature is only available for SnapX users. Upgrade to upload your own databases.'
+            });
+        }
+
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
         }

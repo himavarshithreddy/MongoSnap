@@ -373,6 +373,184 @@ router.put('/update-login-notifications', generalAuthLimiter, verifyTokenAndVali
   }
 });
 
+// PUT /update-subscription - Update user subscription plan (for mock payments)
+router.put('/update-subscription', generalAuthLimiter, verifyTokenAndValidateCSRF, async (req, res) => {
+  const userId = req.userId;
+  const { subscriptionPlan, subscriptionStatus = 'active' } = req.body;
+
+  // Validate input
+  if (!subscriptionPlan || !['snap', 'snapx'].includes(subscriptionPlan)) {
+    return res.status(400).json({ 
+      success: false,
+      message: 'subscriptionPlan must be either "snap" or "snapx"' 
+    });
+  }
+
+  if (!['active', 'inactive', 'cancelled', 'trial'].includes(subscriptionStatus)) {
+    return res.status(400).json({ 
+      success: false,
+      message: 'subscriptionStatus must be one of: active, inactive, cancelled, trial' 
+    });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    // Update subscription details
+    user.subscriptionPlan = subscriptionPlan;
+    user.subscriptionStatus = subscriptionStatus;
+    
+    // Set expiration date for SnapX (30 days from now for mock payments)
+    if (subscriptionPlan === 'snapx' && subscriptionStatus === 'active') {
+      user.subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    } else if (subscriptionPlan === 'snap') {
+      user.subscriptionExpiresAt = null; // Snap plan doesn't expire
+    }
+
+    await user.save();
+
+    console.log(`Subscription updated for user ${user.email}: ${subscriptionPlan} (${subscriptionStatus})`);
+    
+    res.status(200).json({ 
+      success: true,
+      message: `Subscription updated to ${subscriptionPlan}`,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionExpiresAt: user.subscriptionExpiresAt,
+        isSnapXUser: user.isSnapXUser(),
+        isSnapUser: user.isSnapUser()
+      }
+    });
+
+  } catch (err) {
+    console.error('Update subscription error:', err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error while updating subscription' 
+    });
+  }
+});
+
+// PUT /cancel-subscription - Cancel user subscription
+router.put('/cancel-subscription', generalAuthLimiter, verifyTokenAndValidateCSRF, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    // Check if user has an active subscription to cancel
+    if (user.subscriptionPlan === 'snap' || user.subscriptionStatus !== 'active') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'No active subscription to cancel' 
+      });
+    }
+
+    // Cancel the subscription (keep current plan but mark as cancelled)
+    user.subscriptionStatus = 'cancelled';
+    await user.save();
+
+    console.log(`Subscription cancelled for user ${user.email}`);
+    
+    res.status(200).json({ 
+      success: true,
+      message: 'Subscription cancelled successfully. You will continue to have access until the end of your billing period.',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionExpiresAt: user.subscriptionExpiresAt,
+        isSnapXUser: user.isSnapXUser(),
+        isSnapUser: user.isSnapUser()
+      }
+    });
+
+  } catch (err) {
+    console.error('Cancel subscription error:', err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error while cancelling subscription' 
+    });
+  }
+});
+
+// PUT /reactivate-subscription - Reactivate cancelled subscription
+router.put('/reactivate-subscription', generalAuthLimiter, verifyTokenAndValidateCSRF, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    // Check if user has a cancelled subscription to reactivate
+    if (user.subscriptionStatus !== 'cancelled') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'No cancelled subscription to reactivate' 
+      });
+    }
+
+    // Reactivate the subscription
+    user.subscriptionStatus = 'active';
+    
+    // Extend expiration date if it's close to expiring
+    const now = new Date();
+    const expiresAt = user.subscriptionExpiresAt;
+    if (!expiresAt || expiresAt < new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)) { // Less than 7 days left
+      user.subscriptionExpiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+    }
+    
+    await user.save();
+
+    console.log(`Subscription reactivated for user ${user.email}`);
+    
+    res.status(200).json({ 
+      success: true,
+      message: 'Subscription reactivated successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionExpiresAt: user.subscriptionExpiresAt,
+        isSnapXUser: user.isSnapXUser(),
+        isSnapUser: user.isSnapUser()
+      }
+    });
+
+  } catch (err) {
+    console.error('Reactivate subscription error:', err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error while reactivating subscription' 
+    });
+  }
+});
+
 // GET /usage-stats - Get user's query and AI generation usage statistics
 router.get('/usage-stats', generalAuthLimiter, verifyToken, async (req, res) => {
   const userId = req.userId;
@@ -419,7 +597,13 @@ router.get('/me', generalAuthLimiter, verifyTokenAndGenerateCSRF, async (req, re
         createdAt: user.createdAt,
         loginNotificationsEnabled: user.loginNotificationsEnabled !== false, // Default to true if undefined
         twoFactorEnabled: user.twoFactorEnabled || false,
-        twoFactormethod: user.twoFactormethod || null
+        twoFactormethod: user.twoFactormethod || null,
+        // Subscription information
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionExpiresAt: user.subscriptionExpiresAt,
+        isSnapXUser: user.isSnapXUser(),
+        isSnapUser: user.isSnapUser()
       }
     });
 

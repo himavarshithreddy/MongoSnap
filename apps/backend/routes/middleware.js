@@ -116,10 +116,46 @@ function verifyTokenAndValidateCSRF(req, res, next) {
     });
 }
 
+// Middleware to check user subscription and update usage limits
+const checkUserSubscription = async (req, res, next) => {
+    try {
+        const userId = req.userId;
+        const User = require('../models/User');
+        const UserUsage = require('../models/UserUsage');
+        
+        // Get user with subscription info
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        // Get or create usage record
+        const userUsage = await UserUsage.getOrCreateUsage(userId);
+        
+        // Update limits based on user's subscription plan
+        const currentPlan = user.isSnapXUser() ? 'snapx' : 'snap';
+        userUsage.updateLimitsForPlan(currentPlan);
+        
+        // Save if limits were updated
+        await userUsage.save();
+        
+        // Add user and usage info to request
+        req.user = user;
+        req.userUsage = userUsage;
+        req.userPlan = currentPlan;
+        
+        next();
+    } catch (error) {
+        console.error('Error checking user subscription:', error);
+        res.status(500).json({ message: 'Error checking subscription status' });
+    }
+};
+
 module.exports = { 
     verifyToken, 
     generateCSRFToken, 
     validateCSRFToken,
     verifyTokenAndGenerateCSRF,
-    verifyTokenAndValidateCSRF
+    verifyTokenAndValidateCSRF,
+    checkUserSubscription
 };

@@ -5,6 +5,9 @@ import { useUser } from '../hooks/useUser';
 import Logo from '../components/Logo';
 import SettingsModal from '../components/Settings';
 import FloatingBugReport from '../components/FloatingBugReport';
+import { useSubscription } from '../hooks/useUser';
+import UpgradePrompt from '../components/UpgradePrompt';
+import SnapXBadge from '../components/SnapXBadge';
 
 function Connect() {
     useEffect(() => {
@@ -23,7 +26,6 @@ function Connect() {
     const [sampleLoading, setSampleLoading] = useState(false);
     const [connectionsLoading, setConnectionsLoading] = useState(false);
     const [error, setError] = useState('');
-    const [limitError, setLimitError] = useState('');
     const [success, setSuccess] = useState('');
     const [loadedConnection, setLoadedConnection] = useState(null);
     const [testingConnection, setTestingConnection] = useState(false);
@@ -38,6 +40,11 @@ function Connect() {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [showUploadSection, setShowUploadSection] = useState(false);
     const [showUploadInfoModal, setShowUploadInfoModal] = useState(false);
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [upgradeFeature, setUpgradeFeature] = useState('');
+
+    // Subscription status
+    const { features } = useSubscription();
     
     // Auto-dismiss instructions timer
     const [instructionsTimer, setInstructionsTimer] = useState(null);
@@ -157,17 +164,17 @@ function Connect() {
                 setUriError('');
                 setNicknameError('');
                 setError('');
-                setLimitError('');
+                
                 // Store the loaded connection for testing
                 setLoadedConnection(data.connection);
             } else {
                 const errorData = await response.json();
-                setLimitError('');
+                
                 setError(errorData.message || 'Failed to load connection');
             }
         } catch (error) {
             console.error('Error loading connection:', error);
-            setLimitError('');
+            
             setError('Failed to load connection');
         }
     };
@@ -185,7 +192,7 @@ function Connect() {
                 setPreviousConnections(prev => prev.filter(conn => conn._id !== id));
                 setSuccess('Connection removed successfully');
                 setError('');
-                setLimitError('');
+                
                 setTimeout(() => setSuccess(''), 3000);
                 // Clear loaded connection if it was the one removed
                 if (loadedConnection && loadedConnection._id === id) {
@@ -196,12 +203,12 @@ function Connect() {
             } else {
                 const errorData = await response.json();
                 console.error('Remove error response:', errorData);
-                setLimitError('');
+                
                 setError(errorData.message || 'Failed to remove connection');
             }
         } catch (error) {
             console.error('Error removing connection:', error);
-            setLimitError('');
+            
             setError('Failed to remove connection');
         }
     };
@@ -228,7 +235,6 @@ function Connect() {
         setUriError('');
         setNicknameError('');
         setError('');
-        setLimitError('');
         setSuccess('');
         
         if (!nickname.trim()) {
@@ -265,7 +271,8 @@ function Connect() {
         if (!loadedConnection) {
             const canCreateMore = await checkConnectionLimits();
             if (!canCreateMore) {
-                setLimitError('limit_reached');
+                setUpgradeFeature('connections');
+                setShowUpgradePrompt(true);
                 return;
             }
         }
@@ -303,9 +310,10 @@ function Connect() {
                 const errorData = await connectResponse.json();
                 console.error('Connect error response:', errorData);
                 
-                // Handle connection limit errors with less prominent styling
+                // Handle connection limit errors with upgrade prompt
                 if (connectResponse.status === 429 && errorData.message.includes('Connection limit')) {
-                    setLimitError('limit_reached');
+                    setUpgradeFeature('connections');
+                    setShowUpgradePrompt(true);
                 } else {
                     setError(errorData.message || 'Failed to connect to database');
                     // Auto-expand instructions on connection failure (but not for limit errors)
@@ -315,7 +323,7 @@ function Connect() {
             }
         } catch (error) {
             console.error('Error connecting to database:', error);
-            setLimitError('');
+            
             setError('Failed to connect to database');
             // Auto-expand instructions on connection failure
             setShowInstructions(true);
@@ -331,7 +339,7 @@ function Connect() {
         let valid = true;
         setUriError('');
         setError('');
-        setLimitError('');
+        
         setSuccess('');
         
         // Skip URI validation for temporary databases
@@ -389,7 +397,7 @@ function Connect() {
             }
         } catch (error) {
             console.error('Error testing connection:', error);
-            setLimitError('');
+            
             setError('Failed to test connection');
             // Auto-expand instructions on test failure
             setShowInstructions(true);
@@ -488,7 +496,7 @@ function Connect() {
     const handleSampleDatabase = async () => {
         setSampleLoading(true);
         setError('');
-        setLimitError('');
+        
         setSuccess('');
         
         try {
@@ -523,6 +531,13 @@ function Connect() {
     // Handle file upload
     const handleFileUpload = async (e) => {
         e.preventDefault();
+
+        // Check if user has access to upload feature
+        if (!features.uploadDatabase) {
+            setUpgradeFeature('uploadDatabase');
+            setShowUpgradePrompt(true);
+            return;
+        }
         
         if (!uploadFile) {
             setUploadError('Please select a file to upload');
@@ -587,7 +602,8 @@ function Connect() {
                     console.error('Upload failed:', errorData);
                     
                     if (xhr.status === 429 && errorData.message.includes('Connection limit')) {
-                        setLimitError('limit_reached');
+                        setUpgradeFeature('connections');
+                        setShowUpgradePrompt(true);
                     } else {
                         setUploadError(errorData.message || 'Failed to upload file');
                     }
@@ -735,6 +751,9 @@ function Connect() {
                                 <Upload size={16} className='text-brand-quaternary' />
                             </div>
                             <h3 className='text-white font-semibold text-base'>Upload Database</h3>
+                            {!features.uploadDatabase && (
+                                <SnapXBadge variant="small" />
+                            )}
                             <button
                                 onClick={() => setShowUploadInfoModal(!showUploadInfoModal)}
                                 className='text-gray-400 hover:text-brand-quaternary transition-colors duration-200 cursor-pointer'
@@ -759,7 +778,24 @@ function Connect() {
                         </div>
                     </button>
                     
-                    {showUploadSection && (
+                    {showUploadSection && !features.uploadDatabase && (
+                        <div className='mt-5'>
+                            <UpgradePrompt
+                                feature="uploadDatabase"
+                                title="Unlock Database Upload"
+                                description="Upload and restore your own MongoDB databases with SnapX."
+                                benefits={[
+                                    'Upload .gz and .zip database files',
+                                    'Automatic database restoration',
+                                    'Temporary database environments',
+                                    'Support for multiple formats'
+                                ]}
+                                inline={true}
+                            />
+                        </div>
+                    )}
+
+                    {showUploadSection && features.uploadDatabase && (
                         <div className='mt-5 space-y-4 animate-in slide-in-from-top-2 duration-300'>
                             {/* Upload Error/Success Messages */}
                             {uploadError && (
@@ -1129,52 +1165,7 @@ function Connect() {
                 </div>
             )}
             
-            {limitError && (
-                <div className="w-[50%] bg-brand-secondary border border-brand-quaternary/50 rounded-lg p-4">
-                    <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 bg-brand-quaternary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-brand-quaternary text-sm">ℹ️</span>
-                        </div>
-                        <div className="flex-1">
-                            <h4 className="text-white font-medium text-sm mb-2">Connection Limit Reached</h4>
-                            <p className="text-gray-300 text-sm leading-relaxed mb-3">
-                                You can only have up to 2 database connections. To create a new connection, please remove an existing one first, or use one of your previous connections below.
-                            </p>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => {
-                                        setLimitError('');
-                                        // Smooth scroll to previous connections section
-                                        setTimeout(() => {
-                                            const connectionsSection = document.querySelector('.previous-connections');
-                                            if (connectionsSection) {
-                                                connectionsSection.parentElement.scrollIntoView({ 
-                                                    behavior: 'smooth',
-                                                    block: 'center'
-                                                });
-                                                // Brief highlight effect
-                                                connectionsSection.parentElement.style.backgroundColor = 'rgba(60, 188, 107, 0.1)';
-                                                setTimeout(() => {
-                                                    connectionsSection.parentElement.style.backgroundColor = '';
-                                                }, 2000);
-                                            }
-                                        }, 100);
-                                    }}
-                                    className="text-xs bg-brand-quaternary/20 text-white px-3 py-1.5 rounded-md hover:bg-brand-quaternary/30 transition-colors cursor-pointer"
-                                >
-                                    View Connections
-                                </button>
-                                <button
-                                    onClick={() => setLimitError('')}
-                                    className="text-xs bg-brand-tertiary text-gray-300 px-3 py-1.5 rounded-md hover:text-white hover:bg-opacity-80 transition-colors cursor-pointer"
-                                >
-                                    Dismiss
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+
             
             {error && (
                 <div className="w-[50%] bg-brand-secondary border border-red-500/50 rounded-lg p-4">
@@ -1690,6 +1681,30 @@ function Connect() {
             connectionId={loadedConnection?._id}
             problematicQuery=""
         />
+
+        {/* Upgrade Prompt Modal */}
+        {showUpgradePrompt && (
+            <UpgradePrompt
+                feature={upgradeFeature}
+                title={upgradeFeature === 'connections' ? "Unlock Unlimited Connections" : "Unlock Database Upload"}
+                description={upgradeFeature === 'connections' 
+                    ? "Create unlimited database connections with SnapX." 
+                    : "Upload and restore your own MongoDB databases with SnapX."
+                }
+                benefits={upgradeFeature === 'connections' ? [
+                    'Unlimited database connections',
+                    'Connect to multiple databases simultaneously',
+                    'No connection limits or restrictions',
+                    'Professional database management'
+                ] : [
+                    'Upload .gz and .zip database files',
+                    'Automatic database restoration',
+                    'Temporary database environments',
+                    'Support for multiple formats'
+                ]}
+                onClose={() => setShowUpgradePrompt(false)}
+            />
+        )}
         </div>
     )
 }

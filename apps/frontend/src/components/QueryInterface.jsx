@@ -2,6 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Save, Check, AlertCircle, MessageSquare, Code, Play, Sparkles, RefreshCw, Copy } from 'lucide-react';
 import InlineConfirmation from './InlineConfirmation';
 import { analyzeDangerousOperation } from '../utils/dangerousOperations';
+import { useSubscription } from '../hooks/useUser';
+import UpgradePrompt from './UpgradePrompt';
+import SnapXBadge from './SnapXBadge';
+import UsageLimitPrompt from './UsageLimitPrompt';
 
 function QueryInterface({ 
     queryInput, 
@@ -26,9 +30,15 @@ function QueryInterface({
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [pendingQuery, setPendingQuery] = useState(null);
     const [dangerousOperation, setDangerousOperation] = useState(null);
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [showUsageLimitPrompt, setShowUsageLimitPrompt] = useState(false);
+    const [usageLimitData, setUsageLimitData] = useState(null);
     
     // Ref for textarea auto-resize
     const textareaRef = useRef(null);
+    
+    // Subscription status
+    const { features } = useSubscription();
 
     // Auto-resize textarea function
     const autoResizeTextarea = () => {
@@ -52,6 +62,12 @@ function QueryInterface({
 
     const handleSaveClick = () => {
         if (!queryInput.trim()) {
+            return;
+        }
+        
+        // Check if user has access to save queries
+        if (!features.saveQueries) {
+            setShowUpgradePrompt(true);
             return;
         }
         
@@ -244,23 +260,18 @@ function QueryInterface({
                 
                 // Handle usage limit errors (429 status)
                 if (response.status === 429) {
-                    let limitError = '🚫 AI Generation Limit Reached\n\n';
-                    
-                    if (errorData.limitType === 'daily_limit_exceeded') {
-                        limitError += `You've reached your daily AI generation limit. Your limit will reset tomorrow.\n\n`;
-                    } else if (errorData.limitType === 'monthly_limit_exceeded') {
-                        limitError += `You've reached your monthly AI generation limit. Your limit will reset next month.\n\n`;
-                    } else {
-                        limitError += `${errorData.message}\n\n`;
-                    }
-                    
-                    if (errorData.usage) {
-                        limitError += `Current Usage:\n`;
-                        limitError += `Daily: ${errorData.usage.daily.used}/${errorData.usage.daily.limit}\n`;
-                        limitError += `Monthly: ${errorData.usage.monthly.used}/${errorData.usage.monthly.limit}`;
-                    }
-                    
-                    throw new Error(limitError);
+                    setUsageLimitData({
+                        limitType: errorData.limitType,
+                        usage: errorData.usage,
+                        title: errorData.limitType === 'daily_limit_exceeded' 
+                            ? 'Daily AI Limit Reached' 
+                            : 'Monthly AI Limit Reached',
+                        description: errorData.limitType === 'daily_limit_exceeded'
+                            ? 'You\'ve used up your daily AI generations. Resets tomorrow or upgrade for unlimited access.'
+                            : 'You\'ve reached your monthly AI generation limit. Resets next month or upgrade for unlimited access.'
+                    });
+                    setShowUsageLimitPrompt(true);
+                    return;
                 }
                 
                 throw new Error(errorData.message || 'Failed to generate query');
@@ -361,15 +372,20 @@ function QueryInterface({
                     />
                     {/* Only show save button in manual mode or when no generated query is shown */}
                     {queryMode === 'query' && (
+                    <div className="absolute bottom-4 right-2 flex items-center gap-2">
+                        {!features.saveQueries && (
+                            <SnapXBadge variant="small" />
+                        )}
                     <button 
                         onClick={handleSaveClick}
                         disabled={queryLoading || !queryInput.trim()}
-                        className={`absolute bottom-4 right-2 px-3 py-1.5 rounded-md text-white text-sm transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${buttonState.className} ${(!queryInput.trim() || queryLoading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-80'}`}
-                        title="Save Query"
+                            className={`px-3 py-1.5 rounded-md text-white text-sm transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${buttonState.className} ${(!queryInput.trim() || queryLoading) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-80'}`}
+                            title={features.saveQueries ? "Save Query" : "Save Query (SnapX Feature)"}
                     >
                         {buttonState.icon}
                         {buttonState.text}
                     </button>
+                    </div>
                     )}
                 </div>
                 
@@ -516,6 +532,36 @@ function QueryInterface({
                         operation={dangerousOperation?.operation}
                         query={pendingQuery?.query}
                         dangerLevel={dangerousOperation?.level || 'medium'}
+                    />
+                )}
+
+                {/* Upgrade Prompt for Save Queries */}
+                {showUpgradePrompt && (
+                    <UpgradePrompt
+                        feature="saveQueries"
+                        title="Unlock Query Management"
+                        description="Save, organize, and reuse your MongoDB queries with SnapX."
+                        benefits={[
+                            'Save unlimited queries',
+                            'Organize with tags and descriptions',
+                            'Quick access to frequently used queries',
+                            'Share queries with your team'
+                        ]}
+                        onClose={() => setShowUpgradePrompt(false)}
+                    />
+                )}
+
+                {/* Usage Limit Prompt */}
+                {showUsageLimitPrompt && usageLimitData && (
+                    <UsageLimitPrompt
+                        limitType={usageLimitData.limitType}
+                        usage={usageLimitData.usage}
+                        title={usageLimitData.title}
+                        description={usageLimitData.description}
+                        onClose={() => {
+                            setShowUsageLimitPrompt(false);
+                            setUsageLimitData(null);
+                        }}
                     />
                 )}
             </div>

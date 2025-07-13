@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Clock, Play, Copy, Trash2, CheckCircle, XCircle, BookOpen, Save, Eye, EyeOff, Check } from 'lucide-react';
 import InlineConfirmation from './InlineConfirmation';
 import { analyzeDangerousOperation } from '../utils/dangerousOperations';
+import { useSubscription } from '../hooks/useUser';
+import UpgradePrompt from './UpgradePrompt';
+import SnapXBadge from './SnapXBadge';
 
 function QueryHistory({ 
     queryHistory, 
@@ -12,7 +15,8 @@ function QueryHistory({
     deleteSavedQuery,
     formatTimestamp,
     historyLoading = false,
-    savedQueriesLoading = false
+    savedQueriesLoading = false,
+    pagination = null
 }) {
     const [activeHistoryTab, setActiveHistoryTab] = useState('history'); // 'history' or 'saved'
     const [expandedResults, setExpandedResults] = useState(new Set()); // Track which results are expanded
@@ -22,6 +26,10 @@ function QueryHistory({
     const [confirmingItemId, setConfirmingItemId] = useState(null);
     const [pendingQuery, setPendingQuery] = useState(null);
     const [dangerousOperation, setDangerousOperation] = useState(null);
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    
+    // Subscription status
+    const { features } = useSubscription();
 
     // Format result for display
     const formatResult = (result, status, documentsAffected, operation) => {
@@ -168,7 +176,13 @@ function QueryHistory({
                     </button>
                     
                     <button
-                        onClick={() => setActiveHistoryTab('saved')}
+                        onClick={() => {
+                            if (!features.saveQueries) {
+                                setShowUpgradePrompt(true);
+                                return;
+                            }
+                            setActiveHistoryTab('saved');
+                        }}
                         className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 text-sm cursor-pointer ${
                             activeHistoryTab === 'saved' 
                                 ? 'bg-brand-quaternary text-white shadow-md' 
@@ -176,7 +190,8 @@ function QueryHistory({
                         }`}
                     >
                         <BookOpen size={16} />
-                        Saved Queries ({savedQueries.length})
+                        Saved Queries ({features.saveQueries ? savedQueries.length : 0})
+                        {!features.saveQueries && <SnapXBadge variant="small" className="ml-1" />}
                     </button>
                 </div>
             </div>
@@ -184,6 +199,16 @@ function QueryHistory({
             {/* Execution History Tab */}
             {activeHistoryTab === 'history' && (
                 <>
+                    {/* Show limit message for Snap users */}
+                    {pagination && pagination.limited && (
+                        <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+                            <div className="flex items-center gap-2 text-yellow-400">
+                                <Clock size={16} />
+                                <span className="text-sm font-medium">{pagination.message}</span>
+                            </div>
+                        </div>
+                    )}
+                    
                     {historyLoading ? (
                         <div className="text-center py-12 text-gray-400">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-quaternary mx-auto mb-4"></div>
@@ -385,7 +410,20 @@ function QueryHistory({
             {/* Saved Queries Tab */}
             {activeHistoryTab === 'saved' && (
                 <>
-                    {savedQueriesLoading ? (
+                    {!features.saveQueries ? (
+                        <UpgradePrompt
+                            feature="saveQueries"
+                            title="Unlock Query Management"
+                            description="Save, organize, and reuse your MongoDB queries with SnapX."
+                            benefits={[
+                                'Save unlimited queries',
+                                'Organize with tags and descriptions',
+                                'Quick access to frequently used queries',
+                                'Export and share query collections'
+                            ]}
+                            inline={true}
+                        />
+                    ) : savedQueriesLoading ? (
                         <div className="text-center py-12 text-gray-400">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-quaternary mx-auto mb-4"></div>
                             <p className="text-sm">Loading saved queries...</p>
@@ -566,6 +604,22 @@ function QueryHistory({
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Upgrade Prompt Modal */}
+            {showUpgradePrompt && (
+                <UpgradePrompt
+                    feature="saveQueries"
+                    title="Unlock Query Management"
+                    description="Save, organize, and reuse your MongoDB queries with SnapX."
+                    benefits={[
+                        'Save unlimited queries',
+                        'Organize with tags and descriptions',
+                        'Quick access to frequently used queries',
+                        'Export and share query collections'
+                    ]}
+                    onClose={() => setShowUpgradePrompt(false)}
+                />
             )}
         </div>
     );

@@ -8,6 +8,10 @@ import SchemaExplorer from '../components/SchemaExplorer';
 import QueryHistory from '../components/QueryHistory';
 import SettingsModal from '../components/Settings';
 import FloatingBugReport from '../components/FloatingBugReport';
+import { useSubscription } from '../hooks/useUser';
+import UpgradePrompt from '../components/UpgradePrompt';
+import SnapXBadge from '../components/SnapXBadge';
+import UsageLimitPrompt from '../components/UsageLimitPrompt';
 
 function Playground() {
     useEffect(() => {
@@ -35,6 +39,7 @@ function Playground() {
     const [activeTab, setActiveTab] = useState('query'); // 'query', 'schema', 'history'
     const [showConnectionConfirm, setShowConnectionConfirm] = useState(false);
     const [queryHistory, setQueryHistory] = useState([]);
+    const [queryHistoryPagination, setQueryHistoryPagination] = useState(null);
     const [savedQueries, setSavedQueries] = useState([]);
     const [saveMessage, setSaveMessage] = useState('');
     const [queryMode, setQueryMode] = useState('natural'); // 'natural' or 'query'
@@ -46,6 +51,13 @@ function Playground() {
     const [exportLoading, setExportLoading] = useState(false);
     const [exportError, setExportError] = useState('');
     const [exportSuccess, setExportSuccess] = useState('');
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+    const [upgradeFeature, setUpgradeFeature] = useState('');
+    const [showUsageLimitPrompt, setShowUsageLimitPrompt] = useState(false);
+    const [usageLimitData, setUsageLimitData] = useState(null);
+
+    // Subscription status
+    const { features } = useSubscription();
 
     // Fetch query history from backend
     const fetchQueryHistory = async () => {
@@ -57,6 +69,10 @@ function Playground() {
             if (response.ok) {
                 const data = await response.json();
                 setQueryHistory(data.data.history || []);
+                // Store pagination info for limit messages
+                if (data.data.pagination) {
+                    setQueryHistoryPagination(data.data.pagination);
+                }
             } else {
                 console.error('Failed to fetch query history');
             }
@@ -400,6 +416,13 @@ function Playground() {
     // Handle database export
     const handleExportDatabase = async () => {
         if (!connectionIdRef.current) return;
+
+        // Check if user has access to export feature
+        if (!features.exportDatabase) {
+            setUpgradeFeature('export');
+            setShowUpgradePrompt(true);
+            return;
+        }
         
         setExportLoading(true);
         setExportError('');
@@ -459,6 +482,11 @@ function Playground() {
                     setExportError(`🕒 Export limit reached. You can export up to 2 databases per hour. Please try again in ${retryAfter} minutes.`);
                 } else if (response.status === 404) {
                     setExportError('❌ Database connection not found. Please reconnect and try again.');
+                } else if (response.status === 403) {
+                    // SnapX feature restriction
+                    setUpgradeFeature('export');
+                    setShowUpgradePrompt(true);
+                    return;
                 } else if (response.status === 400) {
                     setExportError('⚠️ Database connection issue. Please check your connection and try again.');
                 } else {
@@ -543,23 +571,17 @@ function Playground() {
                 
                 // Handle usage limit errors (429 status)
                 if (response.status === 429) {
-                    let limitError = '🚫 Usage Limit Reached\n\n';
-                    
-                    if (errorData.limitType === 'daily_limit_exceeded') {
-                        limitError += `You've reached your daily query limit. Your limit will reset tomorrow.\n\n`;
-                    } else if (errorData.limitType === 'monthly_limit_exceeded') {
-                        limitError += `You've reached your monthly query limit. Your limit will reset next month.\n\n`;
-                    } else {
-                        limitError += `${errorData.message}\n\n`;
-                    }
-                    
-                    if (errorData.usage) {
-                        limitError += `Current Usage:\n`;
-                        limitError += `Daily: ${errorData.usage.daily.used}/${errorData.usage.daily.limit}\n`;
-                        limitError += `Monthly: ${errorData.usage.monthly.used}/${errorData.usage.monthly.limit}`;
-                    }
-                    
-                    setQueryError(limitError);
+                    setUsageLimitData({
+                        limitType: errorData.limitType,
+                        usage: errorData.usage,
+                        title: errorData.limitType === 'daily_limit_exceeded' 
+                            ? 'Daily Query Limit Reached' 
+                            : 'Monthly Query Limit Reached',
+                        description: errorData.limitType === 'daily_limit_exceeded'
+                            ? 'You\'ve used up your daily queries. Resets tomorrow or upgrade for unlimited access.'
+                            : 'You\'ve reached your monthly query limit. Resets next month or upgrade for unlimited access.'
+                    });
+                    setShowUsageLimitPrompt(true);
                     // Refresh usage stats to reflect current state
                     fetchUsageStats();
                     return;
@@ -1152,18 +1174,24 @@ function Playground() {
                             onClick={handleExportDatabase}
                             disabled={exportLoading || !connectionStatus?.isConnected}
                             className='w-full flex items-center gap-2 p-3 bg-brand-quaternary text-white rounded-lg hover:bg-opacity-80 transition-all duration-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
-                            title={!connectionStatus?.isConnected ? 'Connect to database first' : 'Export all collections as ZIP file (hover for limits)'}
+                            title={!connectionStatus?.isConnected ? 'Connect to database first' : 
+                                   !features.exportDatabase ? 'Export Database (SnapX Feature)' :
+                                   'Export all collections as ZIP file (hover for limits)'}
                         >
-                            {exportLoading ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                    <span>Exporting...</span>
+                            
+                                {exportLoading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        <span>Exporting...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Download size={16} />
+                                        <span>Export Database</span>
                                 </>
-                            ) : (
-                                <>
-                                    <Download size={16} />
-                                    <span>Export Database</span>
-                                </>
+                            )}
+                            {!features.exportDatabase && (
+                                <SnapXBadge variant="small" className="mr-1" />
                             )}
                         </button>
                         
@@ -1360,23 +1388,41 @@ function Playground() {
                                                 <div className='flex items-center justify-between mb-1'>
                                                     <span className='text-gray-400 text-xs font-medium'>Query Execution</span>
                                                     <span className='text-white text-xs'>
-                                                        {usageStats.queryExecution.daily.used}/{usageStats.queryExecution.daily.limit}
+                                                        {usageStats.queryExecution.daily.limit === 'Unlimited' 
+                                                            ? `${usageStats.queryExecution.daily.used} (Unlimited)`
+                                                            : `${usageStats.queryExecution.daily.used}/${usageStats.queryExecution.daily.limit}`
+                                                        }
                                                     </span>
                                                 </div>
-                                                <div className='w-full bg-brand-tertiary rounded-full h-2 mb-1'>
-                                                    <div 
-                                                        className={`h-2 rounded-full transition-all duration-300 ${
-                                                            usageStats.queryExecution.daily.percentage >= 90 ? 'bg-red-500' :
-                                                            usageStats.queryExecution.daily.percentage >= 70 ? 'bg-yellow-500' :
-                                                            'bg-green-500'
-                                                        }`}
-                                                        style={{ width: `${Math.min(usageStats.queryExecution.daily.percentage, 100)}%` }}
-                                                    ></div>
-                                                </div>
-                                                <div className='flex justify-between text-xs text-gray-400'>
-                                                    <span>Daily: {usageStats.queryExecution.daily.remaining} left</span>
-                                                    <span>Monthly: {usageStats.queryExecution.monthly.used}/{usageStats.queryExecution.monthly.limit}</span>
-                                                </div>
+                                                {usageStats.queryExecution.daily.limit !== 'Unlimited' && (
+                                                    <>
+                                                        <div className='w-full bg-brand-tertiary rounded-full h-2 mb-1'>
+                                                            <div 
+                                                                className={`h-2 rounded-full transition-all duration-300 ${
+                                                                    usageStats.queryExecution.daily.percentage >= 90 ? 'bg-red-500' :
+                                                                    usageStats.queryExecution.daily.percentage >= 70 ? 'bg-yellow-500' :
+                                                                    'bg-green-500'
+                                                                }`}
+                                                                style={{ width: `${Math.min(usageStats.queryExecution.daily.percentage, 100)}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        <div className='flex justify-between text-xs text-gray-400'>
+                                                            <span>Daily: {usageStats.queryExecution.daily.remaining} left</span>
+                                                            <span>Monthly: {usageStats.queryExecution.monthly.used}/{usageStats.queryExecution.monthly.limit}</span>
+                                                        </div>
+                                                        {usageStats.queryExecution.daily.percentage >= 80 && (
+                                                            <div className='mt-2 text-xs text-yellow-400 flex items-center gap-1'>
+                                                                <span>⚠️ Running low - upgrade for unlimited access</span>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                                {usageStats.queryExecution.daily.limit === 'Unlimited' && (
+                                                    <div className='flex justify-between text-xs text-gray-400'>
+                                                        <span>Daily: Unlimited</span>
+                                                        <span>Monthly: Unlimited</span>
+                                                    </div>
+                                                )}
                                             </div>
                                             
                                             {/* AI Generation Usage */}
@@ -1384,23 +1430,41 @@ function Playground() {
                                                 <div className='flex items-center justify-between mb-1'>
                                                     <span className='text-gray-400 text-xs font-medium'>AI Generation</span>
                                                     <span className='text-white text-xs'>
-                                                        {usageStats.aiGeneration.daily.used}/{usageStats.aiGeneration.daily.limit}
+                                                        {usageStats.aiGeneration.daily.limit === 'Unlimited' 
+                                                            ? `${usageStats.aiGeneration.daily.used} (Unlimited)`
+                                                            : `${usageStats.aiGeneration.daily.used}/${usageStats.aiGeneration.daily.limit}`
+                                                        }
                                                     </span>
                                                 </div>
-                                                <div className='w-full bg-brand-tertiary rounded-full h-2 mb-1'>
-                                                    <div 
-                                                        className={`h-2 rounded-full transition-all duration-300 ${
-                                                            usageStats.aiGeneration.daily.percentage >= 90 ? 'bg-red-500' :
-                                                            usageStats.aiGeneration.daily.percentage >= 70 ? 'bg-yellow-500' :
-                                                            'bg-green-500'
-                                                        }`}
-                                                        style={{ width: `${Math.min(usageStats.aiGeneration.daily.percentage, 100)}%` }}
-                                                    ></div>
-                                                </div>
-                                                <div className='flex justify-between text-xs text-gray-400'>
-                                                    <span>Daily: {usageStats.aiGeneration.daily.remaining} left</span>
-                                                    <span>Monthly: {usageStats.aiGeneration.monthly.used}/{usageStats.aiGeneration.monthly.limit}</span>
-                                                </div>
+                                                {usageStats.aiGeneration.daily.limit !== 'Unlimited' && (
+                                                    <>
+                                                        <div className='w-full bg-brand-tertiary rounded-full h-2 mb-1'>
+                                                            <div 
+                                                                className={`h-2 rounded-full transition-all duration-300 ${
+                                                                    usageStats.aiGeneration.daily.percentage >= 90 ? 'bg-red-500' :
+                                                                    usageStats.aiGeneration.daily.percentage >= 70 ? 'bg-yellow-500' :
+                                                                    'bg-green-500'
+                                                                }`}
+                                                                style={{ width: `${Math.min(usageStats.aiGeneration.daily.percentage, 100)}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        <div className='flex justify-between text-xs text-gray-400'>
+                                                            <span>Daily: {usageStats.aiGeneration.daily.remaining} left</span>
+                                                            <span>Monthly: {usageStats.aiGeneration.monthly.used}/{usageStats.aiGeneration.monthly.limit}</span>
+                                                        </div>
+                                                        {usageStats.aiGeneration.daily.percentage >= 80 && (
+                                                            <div className='mt-2 text-xs text-yellow-400 flex items-center gap-1'>
+                                                                <span>⚠️ Running low - upgrade for unlimited access</span>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                                {usageStats.aiGeneration.daily.limit === 'Unlimited' && (
+                                                    <div className='flex justify-between text-xs text-gray-400'>
+                                                        <span>Daily: Unlimited</span>
+                                                        <span>Monthly: Unlimited</span>
+                                                    </div>
+                                                )}
                                             </div>
                                             
                                             {/* Refresh button */}
@@ -1541,6 +1605,7 @@ function Playground() {
                         formatTimestamp={formatTimestamp}
                         historyLoading={historyLoading}
                         savedQueriesLoading={savedQueriesLoading}
+                        pagination={queryHistoryPagination}
                     />
                 ) : (
                     <QueryInterface 
@@ -1574,6 +1639,49 @@ function Playground() {
             connectionId={connectionIdRef.current}
             problematicQuery={queryInput}
         />
+
+        {/* Upgrade Prompts */}
+        {showUpgradePrompt && (
+            <UpgradePrompt
+                feature={upgradeFeature}
+                title={upgradeFeature === 'export' ? 'Unlock Database Export' : 'Unlock Database Upload'}
+                description={
+                    upgradeFeature === 'export' 
+                        ? 'Export your database collections as organized ZIP files with SnapX.'
+                        : 'Upload and restore your own MongoDB databases with SnapX.'
+                }
+                benefits={
+                    upgradeFeature === 'export' 
+                        ? [
+                            'Export all collections as organized ZIP',
+                            'Include metadata and statistics',
+                            'Memory-safe streaming for large datasets',
+                            'Professional export format'
+                        ]
+                        : [
+                            'Upload .gz and .zip database files',
+                            'Automatic database restoration',
+                            'Temporary database environments',
+                            'Support for multiple formats'
+                        ]
+                }
+                                 onClose={() => setShowUpgradePrompt(false)}
+             />
+         )}
+
+         {/* Usage Limit Prompt */}
+         {showUsageLimitPrompt && usageLimitData && (
+             <UsageLimitPrompt
+                 limitType={usageLimitData.limitType}
+                 usage={usageLimitData.usage}
+                 title={usageLimitData.title}
+                 description={usageLimitData.description}
+                 onClose={() => {
+                     setShowUsageLimitPrompt(false);
+                     setUsageLimitData(null);
+                 }}
+             />
+         )}
         </div>
     );
 }

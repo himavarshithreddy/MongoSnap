@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { X, Shield, Mail, Key, Smartphone, Check, AlertCircle, Settings as SettingsIcon, User, QrCode, Clock, Smartphone as PhoneIcon, Monitor, Activity } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import { X, Shield, Mail, Key, Smartphone, Check, AlertCircle, Settings as SettingsIcon, User, QrCode, Clock, Smartphone as PhoneIcon, Monitor, Activity, CreditCard, Zap } from 'lucide-react';
 import { useUser } from '../hooks/useUser';
+import { useSubscription } from '../hooks/useUser';
+import { UserContext } from '../contexts/UserContext';
 import SessionManager from './SessionManager';
 
 function Settings({ isOpen, onClose, isStandalone = false }) {
@@ -32,6 +34,14 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
     const [loginNotificationsLoading, setLoginNotificationsLoading] = useState(false);
     const [loginNotificationsError, setLoginNotificationsError] = useState('');
     const [loginNotificationsSuccess, setLoginNotificationsSuccess] = useState('');
+
+    // Subscription States
+    const { fetchWithAuth, refreshUser } = useContext(UserContext);
+    const subscription = useSubscription();
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [isProcessingCancel, setIsProcessingCancel] = useState(false);
+    const [subscriptionSuccess, setSubscriptionSuccess] = useState('');
+    const [subscriptionError, setSubscriptionError] = useState('');
 
     const isOAuthUser = user?.oauthProvider;
 
@@ -387,6 +397,43 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         }
     };
 
+    // Subscription Management Functions
+    const handleCancelSubscription = async () => {
+        try {
+            setIsProcessingCancel(true);
+            setSubscriptionError('');
+            setSubscriptionSuccess('');
+            
+            const response = await fetchWithAuth('/api/auth/cancel-subscription', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setShowCancelModal(false);
+                setSubscriptionSuccess(data.message);
+                
+                // Refresh user data from backend to get updated subscription info
+                await refreshUser();
+                
+                setTimeout(() => setSubscriptionSuccess(''), 5000);
+            } else {
+                const errorData = await response.json();
+                setSubscriptionError(errorData.message || 'Failed to cancel subscription');
+            }
+        } catch (error) {
+            console.error('Error cancelling subscription:', error);
+            setSubscriptionError('Failed to cancel subscription. Please try again.');
+        } finally {
+            setIsProcessingCancel(false);
+        }
+    };
+
+
+
     return (
         <div className={isStandalone 
             ? "min-h-screen bg-[#101813] flex items-center justify-center p-4" 
@@ -428,6 +475,18 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                             <Monitor size={18} className={activeTab === 'sessions' ? 'text-[#11a15e]' : ''} />
                             <span className="font-medium">Sessions</span>
                         </button>
+
+                        <button
+                            onClick={() => setActiveTab('subscription')}
+                            className={`w-full rounded-lg p-4 flex items-center gap-3 transition-colors cursor-pointer ${
+                                activeTab === 'subscription' 
+                                    ? 'bg-[#35c56a69] text-white' 
+                                    : 'text-gray-400 hover:text-white hover:bg-[#1a2520]'
+                            }`}
+                        >
+                            <CreditCard size={18} className={activeTab === 'subscription' ? 'text-[#11a15e]' : ''} />
+                            <span className="font-medium">Subscription</span>
+                        </button>
                     </div>
                 </div>
 
@@ -436,7 +495,9 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                     {/* Header */}
                     <div className="flex items-center justify-between p-6">
                         <h3 className="text-xl font-semibold text-white">
-                            {activeTab === 'security' ? 'Security' : 'Session Management'}
+                            {activeTab === 'security' ? 'Security' : 
+                             activeTab === 'sessions' ? 'Session Management' : 
+                             'Subscription Management'}
                         </h3>
                         <button
                             onClick={onClose}
@@ -451,6 +512,194 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                         {activeTab === 'sessions' ? (
                             <div className="h-full">
                                 <SessionManager />
+                            </div>
+                        ) : activeTab === 'subscription' ? (
+                            <div className="space-y-6">
+                                {/* Subscription Status */}
+                                <div className="bg-[#1a2520] rounded-lg p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="p-2 bg-[#35c56a69] rounded-lg">
+                                            <Zap size={20} className="text-[#11a15e]" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-white">Current Plan</h4>
+                                            <p className="text-gray-400 text-sm">Manage your subscription and billing</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Success/Error Messages */}
+                                    {subscriptionSuccess && (
+                                        <div className="flex items-center gap-2 bg-green-900/50 border border-green-500 text-green-200 px-4 py-3 rounded-lg mb-4">
+                                            <Check size={16} />
+                                            <span className="text-sm">{subscriptionSuccess}</span>
+                                        </div>
+                                    )}
+
+                                    {subscriptionError && (
+                                        <div className="flex items-center gap-2 bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-4">
+                                            <AlertCircle size={16} />
+                                            <span className="text-sm">{subscriptionError}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Current Plan Details */}
+                                    <div className="bg-[#0f1611] rounded-lg p-4 border border-gray-700 mb-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-3 h-3 rounded-full ${subscription.isSnapXUser ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+                                                <span className="text-white font-medium text-lg">{subscription.planName}</span>
+                                                <span className={`px-3 py-1 rounded text-xs font-medium ${
+                                                    subscription.subscriptionStatus === 'active' 
+                                                        ? 'bg-green-900/50 text-green-300 border border-green-600' 
+                                                        : subscription.subscriptionStatus === 'cancelled'
+                                                        ? 'bg-orange-900/50 text-orange-300 border border-orange-600'
+                                                        : 'bg-gray-900/50 text-gray-300 border border-gray-600'
+                                                }`}>
+                                                    {subscription.subscriptionStatus.toUpperCase()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">Plan:</span>
+                                                <span className="text-white">{subscription.planName}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">Status:</span>
+                                                <span className={`${
+                                                    subscription.subscriptionStatus === 'active' ? 'text-green-400' : 
+                                                    subscription.subscriptionStatus === 'cancelled' ? 'text-orange-400' : 
+                                                    'text-gray-400'
+                                                }`}>
+                                                    {subscription.subscriptionStatus.charAt(0).toUpperCase() + subscription.subscriptionStatus.slice(1)}
+                                                </span>
+                                            </div>
+                                            {user?.subscriptionExpiresAt && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">Expires:</span>
+                                                    <span className="text-white">{new Date(user.subscriptionExpiresAt).toLocaleDateString()}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="space-y-3">
+                                        {subscription.isSnapXUser && subscription.subscriptionStatus === 'active' && (
+                                            <button
+                                                onClick={() => setShowCancelModal(true)}
+                                                className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+                                            >
+                                                <X size={16} />
+                                                Cancel Subscription
+                                            </button>
+                                        )}
+                                        
+
+                                        
+                                        {subscription.isSnapUser && (
+                                            <button
+                                                onClick={() => window.open('/pricing', '_blank')}
+                                                className="w-full px-6 py-3 bg-[#35c56a69] hover:bg-[#35c56a] text-white rounded-lg font-medium transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+                                            >
+                                                <Zap size={16} />
+                                                Upgrade to SnapX
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Plan Features */}
+                                <div className="bg-[#1a2520] rounded-lg p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="p-2 bg-[#35c56a69] rounded-lg">
+                                            <Activity size={20} className="text-[#11a15e]" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-white">Plan Features</h4>
+                                            <p className="text-gray-400 text-sm">What's included in your current plan</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {subscription.isSnapXUser ? (
+                                            <>
+                                                <div className="flex items-center gap-3 text-green-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Unlimited Query History</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-green-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Save & Organize Queries</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-green-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Unlimited Database Connections</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-green-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Unlimited Executions</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-green-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">100 AI Generations/day (2,500/month)</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-green-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Enhanced AI Generation</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-green-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Export Database Schemas</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-green-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Upload Your Database</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-green-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Priority Support</span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="flex items-center gap-3 text-gray-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">MongoDB Query Generation</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-gray-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Schema Explorer</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-gray-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Query History (50 queries)</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-gray-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">2 Database Connections</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-gray-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">20 Executions/day (400/month)</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-gray-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">5 AI Generations/day (100/month)</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-gray-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">PC Version</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-gray-400">
+                                                    <Check size={16} />
+                                                    <span className="text-white">Sample Database Access</span>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <>
@@ -975,6 +1224,69 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                     </div>
                 </div>
             )}
+
+            {/* Cancel Subscription Modal */}
+            {showCancelModal && (
+                <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/80 p-4">
+                    <div className="bg-[#17211b] rounded-xl w-full max-w-md shadow-2xl">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-red-600 rounded-lg">
+                                    <X size={20} className="text-white" />
+                                </div>
+                                <h3 className="text-xl font-semibold text-white">Cancel Subscription</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowCancelModal(false)}
+                                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div className="bg-red-900/50 border border-red-600 text-red-200 px-4 py-3 rounded-lg">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <AlertCircle size={16} />
+                                    <span className="font-medium">Warning!</span>
+                                </div>
+                                <p className="text-sm">
+                                    Are you sure you want to cancel your SnapX subscription? You will continue to have access until the end of your billing period.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowCancelModal(false)}
+                                    disabled={isProcessingCancel}
+                                    className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Keep Subscription
+                                </button>
+                                <button
+                                    onClick={handleCancelSubscription}
+                                    disabled={isProcessingCancel}
+                                    className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isProcessingCancel ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            Cancelling...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <X size={16} />
+                                            Cancel Subscription
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
         </div>
     );
 }
