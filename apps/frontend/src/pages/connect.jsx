@@ -1687,8 +1687,8 @@ function Connect() {
             <UpgradePrompt
                 feature={upgradeFeature}
                 title={upgradeFeature === 'connections' ? "Unlock Unlimited Connections" : "Unlock Database Upload"}
-                description={upgradeFeature === 'connections' 
-                    ? "Create unlimited database connections with SnapX." 
+                description={upgradeFeature === 'connections'
+                    ? "Create unlimited database connections with SnapX."
                     : "Upload and restore your own MongoDB databases with SnapX."
                 }
                 benefits={upgradeFeature === 'connections' ? [
@@ -1702,7 +1702,10 @@ function Connect() {
                     'Temporary database environments',
                     'Support for multiple formats'
                 ]}
-                onClose={() => setShowUpgradePrompt(false)}
+                onClose={() => {
+                    setShowUpgradePrompt(false);
+                    setUpgradeFeature('');
+                }}
             />
         )}
         </div>

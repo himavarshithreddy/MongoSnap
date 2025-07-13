@@ -14,13 +14,7 @@ export const useSubscription = () => {
     const subscriptionStatus = user?.subscriptionStatus || 'active';
     const subscriptionExpiresAt = user?.subscriptionExpiresAt;
     
-    // Debug logging
-    console.log('useSubscription - User data:', {
-        subscriptionPlan,
-        subscriptionStatus,
-        subscriptionExpiresAt,
-        backendIsSnapXUser: user?.isSnapXUser
-    });
+  
     
     // Determine if user has SnapX access
     const hasSnapXAccess = () => {
@@ -30,9 +24,9 @@ export const useSubscription = () => {
             return false;
         }
         
-        // If subscription is inactive, no access
-        if (subscriptionStatus === 'inactive') {
-            console.log('useSubscription - Inactive subscription');
+        // If subscription is inactive or cancelled, no access
+        if (subscriptionStatus === 'inactive' || subscriptionStatus === 'cancelled') {
+            console.log('useSubscription - Inactive or cancelled subscription:', subscriptionStatus);
             return false;
         }
         
@@ -42,10 +36,25 @@ export const useSubscription = () => {
             return false;
         }
         
-        // Active or cancelled subscriptions have access until expiration
-        const hasAccess = subscriptionStatus === 'active' || subscriptionStatus === 'cancelled' || subscriptionStatus === 'trial';
-        console.log('useSubscription - Has access:', hasAccess, 'Status:', subscriptionStatus);
-        return hasAccess;
+        // Check if subscription has expired
+        if (subscriptionExpiresAt) {
+            try {
+                const expiryDate = new Date(subscriptionExpiresAt);
+                if (isNaN(expiryDate.getTime())) {
+                    console.error('Invalid subscription expiry date:', subscriptionExpiresAt);
+                    return false;
+                }
+                if (new Date() > expiryDate) {
+                    console.log('useSubscription - Subscription expired:', subscriptionExpiresAt);
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error parsing subscription expiry date:', error);
+                return false;
+            }
+        }
+        
+        return true;
     };
     
     const isSnapXUser = hasSnapXAccess();
@@ -76,6 +85,6 @@ export const useSubscription = () => {
         subscriptionStatus,
         subscriptionExpiresAt,
         features: getFeatureAccess(),
-        planName: isSnapXUser ? 'SnapX' : 'Snap'
+        planName: subscriptionPlan === 'snapx' ? 'SnapX' : 'Snap'
     };
 }; 

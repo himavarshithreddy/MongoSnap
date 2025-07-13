@@ -372,7 +372,7 @@ const BugReport = ({
                                 value={formData.description}
                                 onChange={(e) => handleInputChange('description', e.target.value)}
                                 placeholder="Please describe the issue in detail. Include:&#10;• What you were trying to do&#10;• What happened instead&#10;• Steps to reproduce the issue&#10;• Any error messages you saw"
-                                className={`w-full min-h-32 px-4 py-3 bg-brand-tertiary border rounded-md text-white placeholder-gray-500 focus:outline-none focus:border-brand-quaternary transition-all duration-200 resize-none overflow-hidden ${
+                                className={`w-full min-h-32 px-4 py-3 bg-brand-tertiary border rounded-md text-white placeholder-gray-500 focus:outline-none focus:border-brand-quaternary transition-all duration-200 resize-none overflow-hidden text-sm ${
                                     errors.description ? 'border-orange-500' : 'border-gray-500/30'
                                 }`}
                                 disabled={isSubmitting}

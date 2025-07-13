@@ -8,6 +8,7 @@ import { useSubscription } from '../hooks/useUser';
 import { useContext } from 'react';
 import { UserContext } from '../contexts/UserContext';
 import { useState } from 'react';
+import ErrorNotification from '../components/ErrorNotification';
 
 const Pricing = () => {
     const navigate = useNavigate();
@@ -20,6 +21,8 @@ const Pricing = () => {
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [isProcessingPayment, setIsProcessingPayment] = useState(false);
     const [isProcessingCancel, setIsProcessingCancel] = useState(false);
+    const [paymentError, setPaymentError] = useState('');
+    const [cancelError, setCancelError] = useState('');
 
     useEffect(() => {
         document.title = "Pricing - MongoSnap";
@@ -82,11 +85,11 @@ const Pricing = () => {
             } else {
                 const errorData = await response.json();
                 console.error('Failed to update subscription:', errorData);
-                alert('Failed to upgrade subscription. Please try again.');
+                setPaymentError('Failed to upgrade subscription. Please try again.');
             }
         } catch (error) {
             console.error('Error updating subscription:', error);
-            alert('Failed to upgrade subscription. Please try again.');
+            setPaymentError('Failed to upgrade subscription. Please try again.');
         } finally {
             setIsProcessingPayment(false);
         }
@@ -115,11 +118,11 @@ const Pricing = () => {
             } else {
                 const errorData = await response.json();
                 console.error('Failed to cancel subscription:', errorData);
-                alert('Failed to cancel subscription. Please try again.');
+                setCancelError('Failed to cancel subscription. Please try again.');
             }
         } catch (error) {
             console.error('Error cancelling subscription:', error);
-            alert('Failed to cancel subscription. Please try again.');
+            setCancelError('Failed to cancel subscription. Please try again.');
         } finally {
             setIsProcessingCancel(false);
         }
@@ -303,7 +306,7 @@ const Pricing = () => {
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
                     <div className="bg-brand-secondary rounded-2xl p-8 max-w-md w-full border border-red-500 shadow-2xl">
                         <h2 className="text-2xl font-bold text-white mb-4">Cancel Subscription</h2>
-                        <p className="text-gray-300 mb-6">Are you sure you want to cancel your SnapX subscription? You will continue to have access until the end of your billing period.</p>
+                        <p className="text-gray-300 mb-6">Are you sure you want to cancel your SnapX subscription? Your access will be revoked immediately upon cancellation.</p>
                         <div className="flex gap-4 justify-end">
                             <button
                                 onClick={() => setShowCancelModal(false)}
@@ -339,6 +342,29 @@ const Pricing = () => {
                     <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg font-semibold">
                         🎉 Operation successful! Your subscription has been updated.
                     </div>
+                </div>
+            )}
+
+            {/* Error Notifications */}
+            {paymentError && (
+                <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50">
+                    <ErrorNotification
+                        message={paymentError}
+                        onDismiss={() => setPaymentError('')}
+                        autoDismiss={true}
+                        autoDismissTime={5000}
+                    />
+                </div>
+            )}
+
+            {cancelError && (
+                <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50">
+                    <ErrorNotification
+                        message={cancelError}
+                        onDismiss={() => setCancelError('')}
+                        autoDismiss={true}
+                        autoDismissTime={5000}
+                    />
                 </div>
             )}
 

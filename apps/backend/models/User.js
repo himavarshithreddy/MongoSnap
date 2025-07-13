@@ -90,7 +90,7 @@ userSchema.methods.clearExpiredCSRFToken = function() {
 
 // Method to check if user has active subscription
 userSchema.methods.hasActiveSubscription = function() {
-    if (this.subscriptionStatus === 'inactive') {
+    if (this.subscriptionStatus === 'inactive' || this.subscriptionStatus === 'cancelled') {
         return false;
     }
     
@@ -99,8 +99,8 @@ userSchema.methods.hasActiveSubscription = function() {
         return false;
     }
     
-    // Active, cancelled, or trial subscriptions are considered active until expiration
-    return this.subscriptionStatus === 'active' || this.subscriptionStatus === 'cancelled' || this.subscriptionStatus === 'trial';
+    // Only active or trial subscriptions are considered active
+    return this.subscriptionStatus === 'active' || this.subscriptionStatus === 'trial';
 };
 
 // Method to check if user is on SnapX plan

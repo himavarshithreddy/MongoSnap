@@ -1251,7 +1251,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                                     <span className="font-medium">Warning!</span>
                                 </div>
                                 <p className="text-sm">
-                                    Are you sure you want to cancel your SnapX subscription? You will continue to have access until the end of your billing period.
+                                    Are you sure you want to cancel your SnapX subscription? Your access will be revoked immediately upon cancellation.
                                 </p>
                             </div>
 

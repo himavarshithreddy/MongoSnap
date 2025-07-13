@@ -462,15 +462,16 @@ router.put('/cancel-subscription', generalAuthLimiter, verifyTokenAndValidateCSR
       });
     }
 
-    // Cancel the subscription (keep current plan but mark as cancelled)
+    // Cancel the subscription and immediately revoke access
     user.subscriptionStatus = 'cancelled';
+    user.subscriptionExpiresAt = new Date(); // Set expiration to now to immediately revoke access
     await user.save();
 
-    console.log(`Subscription cancelled for user ${user.email}`);
+    console.log(`Subscription cancelled for user ${user.email} - access revoked immediately`);
     
     res.status(200).json({ 
       success: true,
-      message: 'Subscription cancelled successfully. You will continue to have access until the end of your billing period.',
+      message: 'Subscription cancelled successfully. Your access has been revoked immediately.',
       user: {
         _id: user._id,
         name: user.name,
@@ -516,12 +517,8 @@ router.put('/reactivate-subscription', generalAuthLimiter, verifyTokenAndValidat
     // Reactivate the subscription
     user.subscriptionStatus = 'active';
     
-    // Extend expiration date if it's close to expiring
-    const now = new Date();
-    const expiresAt = user.subscriptionExpiresAt;
-    if (!expiresAt || expiresAt < new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)) { // Less than 7 days left
-      user.subscriptionExpiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
-    }
+    // Set new expiration date (30 days from now for reactivated subscriptions)
+    user.subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
     
     await user.save();
 
