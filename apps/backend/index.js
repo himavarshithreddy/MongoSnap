@@ -22,7 +22,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: ['https://mongosnap.mp:5173'],
+  origin: ['https://mongosnap.mp:5173','https://mongosnap.live'],
   credentials: true,
   sameSite: 'lax'
 }));
@@ -99,16 +99,11 @@ mongoose.connect(process.env.MONGO_URI, {
 .then(() => console.log('✅ MongoDB connected'))
 .catch((err) => console.error('❌ MongoDB connection failed:', err));
 
-const sslOptions = {
-  key: fs.readFileSync(path.resolve(__dirname, '../../mongosnap.mp-key.pem')),
-  cert: fs.readFileSync(path.resolve(__dirname, '../../mongosnap.mp.pem')),
-};
 
-const server = https.createServer(sslOptions, app);
 
-server.listen(4000, '0.0.0.0', () => {
-  console.log(`🔒 HTTPS server running at https://mongosnap.mp:4000`);
-  console.log(`🚀 Frontend expected at https://mongosnap.mp:5173`);
+app.listen(4000, '0.0.0.0', () => {
+  console.log(`🔒 HTTP server running at http://localhost:4000`);
+  console.log(`🚀 Frontend expected at http://localhost:5173`);
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error('❌ Port 4000 is already in use. Please stop any other services using this port.');
