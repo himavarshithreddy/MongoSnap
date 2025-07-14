@@ -467,7 +467,12 @@ router.put('/cancel-subscription', generalAuthLimiter, verifyTokenAndValidateCSR
     user.subscriptionExpiresAt = new Date(); // Set expiration to now to immediately revoke access
     await user.save();
 
-    console.log(`Subscription cancelled for user ${user.email} - access revoked immediately`);
+    // Reset usage limits to free (Snap) plan
+    const userUsage = await UserUsage.getOrCreateUsage(userId);
+    userUsage.updateLimitsForPlan('snap');
+    await userUsage.save();
+
+    console.log(`Subscription cancelled for user ${user.email} - access revoked immediately and limits reset to Snap plan`);
     
     res.status(200).json({ 
       success: true,
