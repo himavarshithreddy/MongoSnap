@@ -47,22 +47,15 @@ const Contact = () => {
         {
             icon: Phone,
             title: "Phone Number",
-            content: "7815849505",
+            content: "+91 7815849505",
             description: "Call us for immediate assistance during business hours",
-            action: "tel:7815849505"
+            action: "tel:+917815849505"
         },
         {
             icon: MapPin,
             title: "Office Address",
             content: "18-14-128/1A, Maruthi Nagar, Street Number 3, Siddipet, Telangana, 502103, India",
             description: "Visit us at our headquarters",
-            action: null
-        },
-        {
-            icon: Clock,
-            title: "Business Hours",
-            content: "Monday - Friday\n9:00 AM - 6:00 PM IST",
-            description: "We're here to help during business hours",
             action: null
         }
     ];
