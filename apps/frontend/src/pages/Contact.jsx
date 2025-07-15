@@ -45,9 +45,16 @@ const Contact = () => {
             action: "mailto:support@mongosnap.live"
         },
         {
+            icon: Phone,
+            title: "Phone Number",
+            content: "7815849505",
+            description: "Call us for immediate assistance during business hours",
+            action: "tel:7815849505"
+        },
+        {
             icon: MapPin,
             title: "Office Address",
-            content: "Maruthi Nagar\nHyderabad, Telangana",
+            content: "18-14-128/1A, Maruthi Nagar, Street Number 3, Siddipet, Telangana, 502103, India",
             description: "Visit us at our headquarters",
             action: null
         },

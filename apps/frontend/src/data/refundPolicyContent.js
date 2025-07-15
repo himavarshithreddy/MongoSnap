@@ -8,7 +8,7 @@ export const refundPolicyContent = {
         {
             id: "cancellation-policy",
             title: "1. Cancellation Policy",
-            content: "Subscribers may cancel their recurring subscription at any time. Upon cancellation, your account will remain active until the end of your current billing cycle."
+            content: "Subscribers may cancel their recurring subscription at any time. Upon cancellation, your access to MongoSnap services will be revoked immediately. No further access will be provided after cancellation, regardless of the remaining time in your billing cycle."
         },
         {
             id: "refund-eligibility",

@@ -205,8 +205,10 @@ const PublicLayout = ({ children }) => {
                                     </a>
                                 </p>
                                 <p className="text-gray-400">
-                                    Maruthi Nagar<br />
-                                    Hyderabad, Telangana
+                                    18-14-128/1A, Maruthi Nagar, Street Number 3, Siddipet, Telangana, 502103, India
+                                </p>
+                                <p className="text-gray-400">
+                                    <a href="tel:7815849505" className="hover:text-brand-quaternary transition-colors duration-200 cursor-pointer">7815849505</a>
                                 </p>
                             </div>
                         </div>
