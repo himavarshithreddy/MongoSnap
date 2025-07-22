@@ -6,6 +6,9 @@ const User = require('../models/User');
 const { verifyToken } = require('./middleware');
 const sanitizeHtml = require('sanitize-html');
 
+const JWT_ISSUER = process.env.JWT_ISSUER || 'mongosnap';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'mongosnap-client';
+
 // Helper function to anonymize IP addresses
 const anonymizeIP = (ip) => {
     if (!ip) return ip;
@@ -109,7 +112,15 @@ router.post('/submit', async (req, res) => {
         if (authHeader && authHeader.startsWith('Bearer ')) {
             try {
                 const token = authHeader.substring(7);
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const decoded = jwt.verify(
+                    token,
+                    process.env.JWT_SECRET,
+                    {
+                        algorithms: ['HS256'],
+                        issuer: JWT_ISSUER,
+                        audience: JWT_AUDIENCE
+                    }
+                );
                 userId = decoded.userId;
             } catch (error) {
                 // Token invalid, continue as anonymous user

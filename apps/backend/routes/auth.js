@@ -26,6 +26,9 @@ const {
   clearRefreshToken
 } = require('../utils/tokengeneration');
 
+const JWT_ISSUER = process.env.JWT_ISSUER || 'mongosnap';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'mongosnap-client';
+
 // Rate limiters for different types of operations
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -276,7 +279,15 @@ router.post('/logout', async (req, res) => {
         await revokeRefreshToken(token, 'logout');
         
         // Get user ID for database disconnection
-        const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+        const payload = jwt.verify(
+            token,
+            process.env.REFRESH_TOKEN_SECRET,
+            {
+                algorithms: ['HS256'],
+                issuer: JWT_ISSUER,
+                audience: JWT_AUDIENCE
+            }
+        );
         userId = payload.id;
         
         if (userId) {

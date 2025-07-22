@@ -4,6 +4,8 @@ const User = require('../models/User');
 const { updateTokenUsage } = require('../utils/tokengeneration');
 dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_ISSUER = process.env.JWT_ISSUER || 'mongosnap';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'mongosnap-client';
 
 function verifyToken(req, res, next) {
     let token = req.headers.authorization;
@@ -14,22 +16,31 @@ function verifyToken(req, res, next) {
     if (token.startsWith('Bearer ')) {
         token = token.slice(7);
     }
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
-        if (err) {
-            return res.status(401).json({ message: 'Unauthorized' });
+    jwt.verify(
+        token,
+        JWT_SECRET,
+        {
+            algorithms: ['HS256'],
+            issuer: JWT_ISSUER,
+            audience: JWT_AUDIENCE
+        },
+        (err, decoded) => {
+            if (err) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+            req.userId = decoded.id;
+            
+            // Track refresh token usage if available (async, don't wait)
+            const refreshToken = req.cookies.refreshToken;
+            if (refreshToken) {
+                updateTokenUsage(refreshToken, req).catch(err => {
+                    console.error('Failed to update token usage:', err);
+                });
+            }
+            
+            next();
         }
-        req.userId = decoded.id;
-        
-        // Track refresh token usage if available (async, don't wait)
-        const refreshToken = req.cookies.refreshToken;
-        if (refreshToken) {
-            updateTokenUsage(refreshToken, req).catch(err => {
-                console.error('Failed to update token usage:', err);
-            });
-        }
-        
-        next();
-    });
+    );
 }
 
 // CSRF Protection Middleware

@@ -5,15 +5,33 @@ const RefreshToken = require('../models/RefreshToken');
 const User = require('../models/User');
 dotenv.config();
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
+const JWT_ISSUER = process.env.JWT_ISSUER || 'mongosnap';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'mongosnap-client';
 
 function generateAccessToken(user) {
-    return jwt.sign({ id: user._id }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
-  }
+    return jwt.sign(
+        { id: user._id },
+        ACCESS_TOKEN_SECRET,
+        {
+            expiresIn: '15m',
+            algorithm: 'HS256',
+            issuer: JWT_ISSUER,
+            audience: JWT_AUDIENCE
+        }
+    );
+}
 
-  function generateRefreshToken(user) {
-    return jwt.sign({ id: user._id }, process.env.REFRESH_TOKEN_SECRET, {
-        expiresIn: '7d', // Extended to 7 days for better UX
-    });
+function generateRefreshToken(user) {
+    return jwt.sign(
+        { id: user._id },
+        process.env.REFRESH_TOKEN_SECRET,
+        {
+            expiresIn: '7d',
+            algorithm: 'HS256',
+            issuer: JWT_ISSUER,
+            audience: JWT_AUDIENCE
+        }
+    );
 }
 
 // Enhanced function to create and store refresh token in database
@@ -64,7 +82,15 @@ async function createAndStoreRefreshToken(user, req, family = null) {
 async function validateAndRotateRefreshToken(token, req) {
     try {
         // Verify JWT token first
-        const payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+        const payload = jwt.verify(
+            token,
+            process.env.REFRESH_TOKEN_SECRET,
+            {
+                algorithms: ['HS256'],
+                issuer: JWT_ISSUER,
+                audience: JWT_AUDIENCE
+            }
+        );
         
         // Find token in database
         const refreshTokenDoc = await RefreshToken.findOne({ 
