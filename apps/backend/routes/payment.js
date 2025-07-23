@@ -41,6 +41,7 @@ router.post('/payu/initiate', verifyToken, async (req, res) => {
 // PayU callback (success/failure)
 router.post('/payu/callback', async (req, res) => {
   try {
+    console.log('[PayU Callback Debug] Headers:', req.headers);
     console.log('[PayU Callback] Received body:', req.body);
     const body = req.body;
     // PayU sends POST data (x-www-form-urlencoded)
