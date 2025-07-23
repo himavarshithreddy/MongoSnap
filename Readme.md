@@ -1,7 +1,7 @@
 # MongoSnap
 
 <p align="center">
-  <img src="https://mongosnap.live/MongoSnap.png" alt="MongoSnap Logo" width="120" />
+  <img src="https://mongosnap.live/MongoSnap.svg" alt="MongoSnap Logo" width="120" />
 </p>
 
 <p align="center">
@@ -35,7 +35,6 @@ MongoSnap is a web application for generating, running, and managing MongoDB que
 | Saved Queries           | Bookmark and organize frequently used queries.                               |
 | Data Export             | Export query results.                                                        |
 | Two-Factor Auth (2FA)   | Add an extra layer of security to your account.                              |
-| Admin Dashboard         | View bug reports and user contact submissions.                               |
 | In-app Support          | Report bugs or contact support from within the app.                          |
 | SnapX Premium           | Remove query limits and access additional features.                          |
 
