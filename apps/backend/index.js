@@ -28,6 +28,7 @@ app.use(cors({
   sameSite: 'lax'
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // <-- Add this line
 app.use(cookieParser());
 
 // Global rate limiter - applies to all requests

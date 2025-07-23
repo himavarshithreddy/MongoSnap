@@ -520,10 +520,11 @@ router.get('/test-config', (req, res) => {
 // Add PayU callback endpoints
 router.post('/success', async (req, res) => {
     try {
-        // Extract PayU POST data
-        const params = req.body;
+        console.log('PayU /success callback received. Raw body:', req.body);
         // Optionally, verify payment here or just redirect
+        const params = req.body;
         const query = new URLSearchParams(params).toString();
+        console.log('Redirecting to frontend with query:', query);
         // Redirect to frontend success page with query params
         res.redirect(302, `${process.env.FRONTEND_URL}/payment/success?${query}`);
     } catch (error) {
@@ -534,11 +535,10 @@ router.post('/success', async (req, res) => {
 
 router.post('/failure', async (req, res) => {
     try {
-        // Extract PayU POST data
+        console.log('PayU /failure callback received. Raw body:', req.body);
         const params = req.body;
-        // Optionally, log or process failure
         const query = new URLSearchParams(params).toString();
-        // Redirect to frontend failure page with query params
+        console.log('Redirecting to frontend with query:', query);
         res.redirect(302, `${process.env.FRONTEND_URL}/payment/failure?${query}`);
     } catch (error) {
         console.error('Error in /api/payment/failure callback:', error);
