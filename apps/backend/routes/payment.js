@@ -116,8 +116,8 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
             firstname: user.name,
             email: user.email,
             phone: phone,
-            surl: `${process.env.FRONTEND_URL}/payment/success`,
-            furl: `${process.env.FRONTEND_URL}/payment/failure`,
+            surl: `${process.env.BACKEND_URL}/api/payment/success`,
+            furl: `${process.env.BACKEND_URL}/api/payment/failure`,
             udf1: subscriptionPlan,
             udf2: userId.toString(),
             udf3: '30', // Subscription duration in days
@@ -515,6 +515,35 @@ router.get('/test-config', (req, res) => {
             environment: 'test'
         }
     });
+});
+
+// Add PayU callback endpoints
+router.post('/success', async (req, res) => {
+    try {
+        // Extract PayU POST data
+        const params = req.body;
+        // Optionally, verify payment here or just redirect
+        const query = new URLSearchParams(params).toString();
+        // Redirect to frontend success page with query params
+        res.redirect(302, `${process.env.FRONTEND_URL}/payment/success?${query}`);
+    } catch (error) {
+        console.error('Error in /api/payment/success callback:', error);
+        res.redirect(302, `${process.env.FRONTEND_URL}/payment/success?error=callback_error`);
+    }
+});
+
+router.post('/failure', async (req, res) => {
+    try {
+        // Extract PayU POST data
+        const params = req.body;
+        // Optionally, log or process failure
+        const query = new URLSearchParams(params).toString();
+        // Redirect to frontend failure page with query params
+        res.redirect(302, `${process.env.FRONTEND_URL}/payment/failure?${query}`);
+    } catch (error) {
+        console.error('Error in /api/payment/failure callback:', error);
+        res.redirect(302, `${process.env.FRONTEND_URL}/payment/failure?error=callback_error`);
+    }
 });
 
 module.exports = router; 
