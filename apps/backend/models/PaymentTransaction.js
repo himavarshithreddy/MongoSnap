@@ -222,7 +222,6 @@ paymentTransactionSchema.pre('save', function(next) {
 
 // Index for efficient queries
 paymentTransactionSchema.index({ userId: 1, status: 1 });
-paymentTransactionSchema.index({ txnid: 1 });
 paymentTransactionSchema.index({ mihpayid: 1 });
 paymentTransactionSchema.index({ createdAt: -1 });
 

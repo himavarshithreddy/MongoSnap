@@ -24,70 +24,86 @@ const createBaseTemplate = (content, title) => {
         <style>
             body {
                 font-family: 'Inter', Arial, sans-serif;
-                line-height: 1.6;
-                color: #ffffff;
-                background-color: #101813;
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
+                background: #101813;
+                color: #e5e7eb;
+                margin: 0;
+                padding: 0;
+                min-width: 100vw;
+            }
+            .container {
+                background: #203127;
+                max-width: 480px;
+                margin: 40px auto;
+                border-radius: 18px;
+                box-shadow: 0 4px 32px 0 #00000033;
+                padding: 32px 24px 24px 24px;
+                border: 1px solid #235337;
             }
             .header {
                 text-align: center;
-                margin-bottom: 30px;
+                margin-bottom: 24px;
                 border-bottom: 2px solid #3CBC6B;
-                padding-bottom: 20px;
+                padding-bottom: 16px;
             }
             .title {
                 color: #3CBC6B;
-                font-size: 24px;
+                font-size: 26px;
+                font-weight: 800;
                 margin: 0;
-                font-weight: 700;
+                letter-spacing: 1px;
+            }
+            .main-content {
+                margin-top: 24px;
+                margin-bottom: 24px;
             }
             .button {
                 display: inline-block;
-                background-color: #3CBC6B;
-                color: white;
+                background: linear-gradient(90deg, #3CBC6B 0%, #35c56a 100%);
+                color: #ffffff !important;
                 text-decoration: none;
-                padding: 12px 24px;
-                border-radius: 8px;
-                margin: 20px 0;
-                font-weight: 600;
-                transition: all 0.3s ease;
+                padding: 14px 32px;
+                border-radius: 10px;
+                font-weight: 700;
+                font-size: 16px;
+                margin: 24px 0 12px 0;
+                transition: background 0.2s, transform 0.2s;
+                box-shadow: 0 2px 8px 0 #3cbc6b22;
             }
             .button:hover {
-                background-color: #0da850;
-                transform: scale(1.02);
+                background: linear-gradient(90deg, #35c56a 0%, #3CBC6B 100%);
+                transform: scale(1.03);
             }
             .code {
-                background-color: #17211b;
+                background: #235337;
                 border: 2px solid #3CBC6B;
                 border-radius: 8px;
-                padding: 15px;
+                padding: 18px;
                 text-align: center;
-                font-size: 24px;
+                font-size: 28px;
                 font-weight: bold;
                 color: #3CBC6B;
-                margin: 20px 0;
+                margin: 24px 0;
                 letter-spacing: 2px;
             }
             .footer {
                 text-align: center;
                 color: #9ca3af;
-                font-size: 12px;
-                margin-top: 30px;
-                border-top: 1px solid #374151;
-                padding-top: 20px;
+                font-size: 13px;
+                margin-top: 32px;
+                border-top: 1px solid #235337;
+                padding-top: 18px;
             }
             .warning {
-                background-color: #1f2937;
+                background: #1f2937;
                 border: 1px solid #374151;
                 border-radius: 8px;
                 padding: 12px;
                 margin: 20px 0;
                 color: #fbbf24;
+                font-size: 15px;
             }
             .info-box {
-                background-color: #17211b;
+                background: #17211b;
                 border: 1px solid #374151;
                 border-radius: 8px;
                 padding: 15px;
@@ -101,26 +117,30 @@ const createBaseTemplate = (content, title) => {
                 color: #3CBC6B;
             }
             h2 {
-                color: #ffffff;
-                font-weight: 600;
-                margin-bottom: 15px;
+                color: #fff;
+                font-weight: 700;
+                margin-bottom: 16px;
+                font-size: 22px;
             }
             p {
                 color: #d1d5db;
                 margin-bottom: 15px;
+                font-size: 16px;
             }
         </style>
     </head>
     <body>
-        <div class="header">
-            <h1 class="title">MongoSnap</h1>
-        </div>
-        
-        ${content}
-        
-        <div class="footer">
-            <p>© 2025 MongoSnap. All rights reserved.</p>
-            <p>Need help? Contact support@mongosnap.live</p>
+        <div class="container">
+            <div class="header">
+                <h1 class="title">MongoSnap</h1>
+            </div>
+            <div class="main-content">
+                ${content}
+            </div>
+            <div class="footer">
+                <p>© 2025 MongoSnap. All rights reserved.</p>
+                <p>Need help? Contact <a href="mailto:support@mongosnap.live" style="color:#3CBC6B;text-decoration:none;">support@mongosnap.live</a></p>
+            </div>
         </div>
     </body>
     </html>
