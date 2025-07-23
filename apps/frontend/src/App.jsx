@@ -15,6 +15,8 @@ import Connect from './pages/connect.jsx'
 import Playground from './pages/Playground.jsx'
 import SettingsPage from './pages/Settings.jsx'
 import Pricing from './pages/Pricing.jsx'
+import PaymentSuccess from './pages/PaymentSuccess.jsx'
+import PaymentFailure from './pages/PaymentFailure.jsx'
 import Prolicy from './pages/Prolicy.jsx'
 import Teervice from './pages/Teervice.jsx'
 import Reolicy from './pages/Reolicy.jsx'
@@ -45,6 +47,8 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/payment/failure" element={<PaymentFailure />} />
         <Route path="/privacy-policy" element={<Prolicy />} />
         <Route path="/terms-of-service" element={<Teervice />} />
         <Route path="/refund-policy" element={<Reolicy />} />
