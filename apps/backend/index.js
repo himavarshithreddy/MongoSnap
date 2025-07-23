@@ -79,7 +79,7 @@ app.get('/health', (req, res) => {
 
 // Apply public rate limiter to public/auth routes (more restrictive)
 app.use('/api/auth', publicLimiter, authRoutes);
-app.use('/api/forgot-password', publicLimiter, forgotPasswordRoutes);
+app.use('/api', publicLimiter, forgotPasswordRoutes);
 app.use('/api/verify-email', publicLimiter, verifyRoutes);
 app.use('/api/auth', publicLimiter, oauthRoutes); // OAuth routes are also public
 
