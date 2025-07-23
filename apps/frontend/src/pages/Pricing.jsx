@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { useAuthActionButton } from '../hooks/useAuthActionButton.jsx';
 import PublicLayout from '../components/PublicLayout';
@@ -12,6 +12,7 @@ import ErrorNotification from '../components/ErrorNotification';
 
 const Pricing = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const getActionButton = useAuthActionButton();
     const { user } = useUser();
     const { fetchWithAuth, refreshUser } = useContext(UserContext);
@@ -23,10 +24,24 @@ const Pricing = () => {
     const [isProcessingCancel, setIsProcessingCancel] = useState(false);
     const [paymentError, setPaymentError] = useState('');
     const [cancelError, setCancelError] = useState('');
+    const [paymentResult, setPaymentResult] = useState(null);
+
 
     useEffect(() => {
         document.title = "Pricing - MongoSnap";
-    }, []);
+        // Check for payment result in URL
+        const params = new URLSearchParams(location.search);
+        const payment = params.get('payment');
+        if (payment === 'success') {
+            setPaymentResult('success');
+            // Optionally refresh user data to reflect new subscription
+            refreshUser && refreshUser();
+        } else if (payment === 'failure') {
+            setPaymentResult('failure');
+        } else {
+            setPaymentResult(null);
+        }
+    }, [location.search, refreshUser]);
 
     const features = {
         free: [
@@ -60,37 +75,37 @@ const Pricing = () => {
     const handleConfirmPayment = async () => {
         try {
             setIsProcessingPayment(true);
-            
-            // Call backend to update subscription
-            const response = await fetchWithAuth('/api/auth/update-subscription', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    subscriptionPlan: 'snapx',
-                    subscriptionStatus: 'active'
-                })
+            setPaymentError('');
+            // Call backend to get PayU params
+            const response = await fetchWithAuth('/api/payment/payu/initiate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plan: 'snapx' })
             });
-
-            if (response.ok) {
-                await response.json();
-                setShowPaymentModal(false);
-                setPaymentSuccess(true);
-                
-                // Refresh user data from backend to get updated subscription info
-                await refreshUser();
-                
-                setTimeout(() => setPaymentSuccess(false), 3000);
-            } else {
+            if (!response.ok) {
                 const errorData = await response.json();
-                console.error('Failed to update subscription:', errorData);
-                setPaymentError('Failed to upgrade subscription. Please try again.');
+                setPaymentError(errorData.error || 'Failed to initiate payment.');
+                setIsProcessingPayment(false);
+                return;
             }
-        } catch (error) {
-            console.error('Error updating subscription:', error);
-            setPaymentError('Failed to upgrade subscription. Please try again.');
-        } finally {
+            const data = await response.json();
+            // Build a form and submit to PayU
+            const form = document.createElement('form');
+            form.action = data.payuUrl;
+            form.method = 'POST';
+            form.style.display = 'none';
+            for (const [key, value] of Object.entries(data.params)) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value;
+                form.appendChild(input);
+            }
+            document.body.appendChild(form);
+            setShowPaymentModal(false);
+            form.submit();
+        } catch {
+            setPaymentError('Failed to initiate payment.');
             setIsProcessingPayment(false);
         }
     };
@@ -273,7 +288,7 @@ const Pricing = () => {
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
                     <div className="bg-brand-secondary rounded-2xl p-8 max-w-md w-full border border-brand-quaternary shadow-2xl">
                         <h2 className="text-2xl font-bold text-white mb-4">Confirm Payment</h2>
-                        <p className="text-gray-300 mb-6">This is a mock payment. Click confirm to upgrade your account to <span className='text-brand-quaternary font-semibold'>SnapX</span>.</p>
+                        <p className="text-gray-300 mb-6">You will be redirected to PayU to complete your payment for <span className='text-brand-quaternary font-semibold'>SnapX</span>.</p>
                         <div className="flex gap-4 justify-end">
                             <button
                                 onClick={() => setShowPaymentModal(false)}
@@ -290,10 +305,10 @@ const Pricing = () => {
                                 {isProcessingPayment ? (
                                     <>
                                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                        Processing...
+                                        Redirecting...
                                     </>
                                 ) : (
-                                    'Confirm & Upgrade'
+                                    'Proceed to Payment'
                                 )}
                             </button>
                         </div>
@@ -365,6 +380,24 @@ const Pricing = () => {
                         autoDismiss={true}
                         autoDismissTime={5000}
                     />
+                </div>
+            )}
+
+            {/* Payment Result Banner */}
+            {paymentResult === 'success' && (
+                <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50">
+                    <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg font-semibold flex items-center gap-2">
+                        <span role="img" aria-label="success">✅</span>
+                        Payment successful! Your SnapX subscription is now active.
+                    </div>
+                </div>
+            )}
+            {paymentResult === 'failure' && (
+                <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50">
+                    <div className="bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg font-semibold flex items-center gap-2">
+                        <span role="img" aria-label="failure">❌</span>
+                        Payment failed or cancelled. Please try again or contact support.
+                    </div>
                 </div>
             )}
 

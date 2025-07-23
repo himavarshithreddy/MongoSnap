@@ -10,7 +10,7 @@ const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'mongosnap-client';
 function verifyToken(req, res, next) {
     let token = req.headers.authorization;
     if (!token) {
-        return res.status(401).json({ message: 'Unauthorized' });
+        return res.status(401).json({ message: 'Unauthorized: No Authorization header' });
     }
     // Remove Bearer prefix if present
     if (token.startsWith('Bearer ')) {
@@ -26,7 +26,7 @@ function verifyToken(req, res, next) {
         },
         (err, decoded) => {
             if (err) {
-                return res.status(401).json({ message: 'Unauthorized' });
+                return res.status(401).json({ message: 'Unauthorized: Invalid or expired token', error: err.message });
             }
             req.userId = decoded.id;
             

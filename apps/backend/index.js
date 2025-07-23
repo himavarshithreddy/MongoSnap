@@ -18,6 +18,7 @@ const databaseManager = require('./utils/databaseManager');
 const twoFactorRoutes = require('./routes/twofactor');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const paymentRoutes = require('./routes/payment');
 dotenv.config();
 
 const app = express();
@@ -28,6 +29,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(express.urlencoded({ extended: true })); // For PayU callback
 
 // Global rate limiter - applies to all requests
 const globalLimiter = rateLimit({
@@ -89,6 +91,7 @@ app.use('/api/bug-report', bugReportRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/twofactor', twoFactorRoutes);
 app.use('/api/test', testRoutes);
+app.use('/api/payment', paymentRoutes);
 console.log('✅ All routes registered successfully');
 
 
