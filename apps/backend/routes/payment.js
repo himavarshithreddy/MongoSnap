@@ -38,18 +38,21 @@ router.post('/payu/initiate', verifyToken, async (req, res) => {
   }
 });
 
-// Helper to handle PayU callback logic (shared by POST and GET)
-async function handlePayUCallback(params, res) {
+// PayU callback (success/failure)
+router.post('/payu/callback', async (req, res) => {
   try {
+    console.log('[PayU Callback] Received body:', req.body);
+    const body = req.body;
+    // PayU sends POST data (x-www-form-urlencoded)
     const {
       key, txnid, amount, productinfo, firstname, email, status, hash, udf1
-    } = params;
+    } = body;
     // Recreate hash string for verification (see PayU docs for response hash sequence)
-    // Correct hash sequence: salt|status|||||||||||email|firstname|productinfo|amount|txnid|key
+    // hash = sha512(salt|status|||||||||||email|firstname|productinfo|amount|txnid|key)
     const hashString = [
       process.env.PAYU_MERCHANT_SALT,
       status,
-      '', '', '', '', '', '', '', '', '', '', // 10 empty fields
+      '', '', '', '', '', '', '', '', '', '', '',
       email,
       firstname,
       productinfo,
@@ -58,19 +61,17 @@ async function handlePayUCallback(params, res) {
       key
     ].join('|');
     const expectedHash = require('crypto').createHash('sha512').update(hashString).digest('hex');
-    // Debug log for hash verification
-    console.log('[PayU Callback Debug] Params:', params);
-    console.log('[PayU Callback Debug] Hash String:', hashString);
-    console.log('[PayU Callback Debug] Expected Hash:', expectedHash);
-    console.log('[PayU Callback Debug] Received Hash:', hash);
+    console.log('[PayU Callback] Calculated hash:', expectedHash);
+    console.log('[PayU Callback] Received hash:', hash);
     if (expectedHash !== hash) {
-      console.error('PayU callback hash mismatch:', { expectedHash, hash });
+      console.error('[PayU Callback] Hash mismatch:', { expectedHash, hash });
       return res.status(400).send('Hash mismatch');
     }
     // Find user by udf1 (userId)
     const userId = udf1;
-    const user = await require('../models/User').findById(userId);
+    const user = await User.findById(userId);
     if (!user) {
+      console.error('[PayU Callback] User not found for userId:', userId);
       return res.status(404).send('User not found');
     }
     if (status === 'success') {
@@ -80,26 +81,18 @@ async function handlePayUCallback(params, res) {
       // Set expiry to 1 month from now
       user.subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       await user.save();
+      console.log('[PayU Callback] Subscription updated for user:', user.email);
       // Redirect to frontend with success
       return res.redirect('https://mongosnap.live/pricing?payment=success');
     } else {
       // Payment failed
+      console.warn('[PayU Callback] Payment failed for user:', user.email, 'Status:', status);
       return res.redirect('https://mongosnap.live/pricing?payment=failure');
     }
   } catch (err) {
-    console.error('Error in PayU callback:', err);
+    console.error('[PayU Callback] Error:', err);
     res.status(500).send('Internal server error');
   }
-}
-
-// PayU callback (success/failure) - POST
-router.post('/payu/callback', async (req, res) => {
-  await handlePayUCallback(req.body, res);
-});
-
-// PayU callback (success/failure) - GET (for browser redirects)
-router.get('/payu/callback', async (req, res) => {
-  await handlePayUCallback(req.query, res);
 });
 
 module.exports = router; 
