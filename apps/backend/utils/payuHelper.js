@@ -135,8 +135,8 @@ const getPayUUrls = (isProduction = false) => {
         };
     } else {
         return {
-            paymentUrl: 'https://test.payu.in/_payment',
-            verifyUrl: 'https://test.payu.in/merchant/postservice.php?form=2'
+            paymentUrl: 'https://secure.payu.in/_payment',
+            verifyUrl: 'https://info.payu.in/merchant/postservice.php?form=2'
         };
     }
 };

@@ -87,17 +87,25 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
 
         if (!payuKey || !payuSalt) {
             console.error('PayU configuration missing');
+            console.error('PayU Key present:', !!payuKey);
+            console.error('PayU Salt present:', !!payuSalt);
+            console.error('Environment:', process.env.NODE_ENV);
             return res.status(500).json({
                 success: false,
                 message: 'Payment configuration error'
             });
         }
 
+        console.log('PayU Configuration:');
+        console.log('Environment:', isProduction ? 'production' : 'test');
+        console.log('PayU Key (first 6 chars):', payuKey ? payuKey.substring(0, 6) + '...' : 'MISSING');
+        console.log('PayU Salt (first 6 chars):', payuSalt ? payuSalt.substring(0, 6) + '...' : 'MISSING');
+
         // Generate transaction ID
         const txnid = generateTransactionId('MONGOSNAP');
         
         // Set amount based on subscription plan
-        const amount = formatAmount(359); // SnapX price: ₹359
+        const amount = formatAmount(1); // SnapX price: ₹359
 
         // Prepare payment parameters
         const paymentParams = {
@@ -209,9 +217,23 @@ router.post('/verify', async (req, res) => {
             udf1, udf2, udf3, udf4, udf5
         } = req.body;
 
+        console.log('PayU Response Details:');
+        console.log('Transaction ID:', txnid);
+        console.log('Status:', status);
+        console.log('Unmapped Status:', unmappedstatus);
+        console.log('Error Code:', error);
+        console.log('Error Message:', error_Message);
+        console.log('Mode:', mode);
+        console.log('Bank Code:', bankcode);
+
         // Validate required fields
         if (!txnid || !status || !hash) {
             console.error('Missing required fields in PayU response');
+            console.error('Missing fields:', {
+                txnid: !txnid,
+                status: !status,
+                hash: !hash
+            });
             return res.status(400).json({
                 success: false,
                 message: 'Invalid payment response'
@@ -258,6 +280,33 @@ router.post('/verify', async (req, res) => {
         transaction.paymentDate = new Date();
 
         await transaction.save();
+
+        // Log specific failure details
+        if (status !== 'success') {
+            console.error(`Payment failed for transaction ${txnid}:`);
+            console.error('Failure details:', {
+                status,
+                unmappedstatus,
+                error,
+                error_Message,
+                bankcode,
+                mode
+            });
+            
+            // Identify specific error types
+            let userFriendlyMessage = 'Payment failed';
+            if (error_Message) {
+                if (error_Message.includes('Some Problem Occurred')) {
+                    userFriendlyMessage = `Payment gateway error: ${error_Message}. Please try again or contact support with reference: ${txnid}`;
+                } else {
+                    userFriendlyMessage = error_Message;
+                }
+            } else if (error) {
+                userFriendlyMessage = `Payment failed with error code: ${error}`;
+            }
+            
+            console.log('User-friendly error message:', userFriendlyMessage);
+        }
 
         // If payment successful, update user subscription
         if (status === 'success') {
