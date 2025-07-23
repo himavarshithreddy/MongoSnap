@@ -5,86 +5,79 @@
 </p>
 
 <p align="center">
-  <b>Effortless, AI-powered MongoDB management for teams and professionals.</b>
+  <b>Web-based MongoDB query generation and management tool.</b>
 </p>
 
 <p align="center">
-  <a href="https://mongosnap.live">🌐 Live Site</a> •
+  <a href="https://mongosnap.live">Live Site</a> •
   <a href="#user-guide">User Guide</a> •
   <a href="#technical-overview">Technical Overview</a>
 </p>
 
 ---
 
-## 🚀 At a Glance
+## Overview
 
-MongoSnap transforms the way you work with MongoDB:
-- **AI Query Generation:** Instantly convert natural language into complex MongoDB queries.
-- **Visual Data Exploration:** Browse, filter, and manage your data with a modern, intuitive UI.
-- **Enterprise Security:** Built-in 2FA, encrypted connections, and robust access controls.
-- **Seamless Payments:** Upgrade to SnapX for unlimited access and premium features.
-- **Cloud Native:** Hosted on AWS, with managed storage on MongoDB Atlas.
+MongoSnap is a web application for generating, running, and managing MongoDB queries. It provides AI-assisted query generation, a visual interface for data exploration, and secure user authentication. The platform is hosted on AWS and uses MongoDB Atlas for data storage.
 
 ---
 
-## 🧑‍💼 User Guide
+## User Guide
 
-### Key Capabilities
+### Main Features
 
-| Capability                | Description                                                                 |
-|--------------------------|-----------------------------------------------------------------------------|
-| **AI Query Generation**  | Generate MongoDB queries from plain English using integrated AI.             |
-| **Visual Query Builder** | Build, edit, and run queries with a code editor and visual tools.            |
-| **Schema Explorer**      | Instantly browse and understand your database structure.                     |
-| **Query History**        | Access, repeat, and manage all your past queries.                            |
-| **Saved Queries**        | Bookmark and organize your most-used queries.                                |
-| **Data Export**          | Export query results for reporting or analysis.                              |
-| **2FA & Security**       | Protect your account with two-factor authentication and secure sessions.     |
-| **Admin Dashboard**      | Manage bug reports and user contact submissions.                             |
-| **In-app Support**       | Report bugs or contact support directly from the interface.                  |
-| **SnapX Premium**        | Unlock unlimited queries, advanced features, and priority support.           |
+| Feature                  | Description                                                                 |
+|-------------------------|-----------------------------------------------------------------------------|
+| AI Query Generation     | Generate MongoDB queries from plain English using integrated AI.             |
+| Visual Query Builder    | Build, edit, and run queries with a code editor and visual tools.            |
+| Schema Explorer         | Browse and understand your database structure.                               |
+| Query History           | Access and repeat your past queries.                                         |
+| Saved Queries           | Bookmark and organize frequently used queries.                               |
+| Data Export             | Export query results.                                                        |
+| Two-Factor Auth (2FA)   | Add an extra layer of security to your account.                              |
+| Admin Dashboard         | View bug reports and user contact submissions.                               |
+| In-app Support          | Report bugs or contact support from within the app.                          |
+| SnapX Premium           | Remove query limits and access additional features.                          |
 
 ### Getting Started
 
-1. **Visit:** [mongosnap.live](https://mongosnap.live)
-2. **Sign Up:** Create your secure account.
-3. **Connect:** Add your MongoDB URI and credentials.
-4. **Generate & Run:** Use natural language or the visual builder to create and execute queries.
-5. **Upgrade:** Go premium with SnapX for full power and support.
+1. Go to [mongosnap.live](https://mongosnap.live)
+2. Sign up for an account.
+3. Connect your MongoDB database.
+4. Use natural language or the visual builder to generate and run queries.
+5. Upgrade to SnapX for higher limits and more features.
 
 ### Payments & Support
-- **Payments:** Securely processed via PayU. SnapX activates instantly after payment.
-- **Support:** Email [support@mongosnap.live](mailto:support@mongosnap.live) or use in-app forms.
+- Payments are processed via PayU. SnapX is activated after payment.
+- For support, email [support@mongosnap.live](mailto:support@mongosnap.live) or use the in-app forms.
 
 ---
 
-## 🏢 Technical Overview
+## Technical Overview
 
-### Architecture Summary
+### Architecture
 
 | Layer      | Technology                        |
 |------------|-----------------------------------|
 | Frontend   | React, Vite, Tailwind CSS         |
 | Backend    | Node.js, Express, Mongoose        |
-| Database   | MongoDB Atlas (cloud-hosted)      |
-| Payments   | PayU (India)                      |
+| Database   | MongoDB Atlas                     |
+| Payments   | PayU                             |
 | Email      | Nodemailer + Brevo (SMTP)         |
 | Hosting    | AWS                               |
 | Security   | JWT, CSRF, 2FA, HTTPS, Rate Limit |
 
 ### AI Query Generation
-> **How it works:**
-> - Users enter requests in plain English (e.g., "Show all orders from last month").
-> - The frontend sends this prompt to the backend, which uses an AI model to generate a valid MongoDB query.
-> - The query is returned, editable, and executable in the UI.
-> - This empowers all users—regardless of technical skill—to work with MongoDB efficiently and accurately.
+- Users can enter requests in plain English (e.g., "Show all orders from last month").
+- The frontend sends this prompt to the backend, which uses an AI model to generate a MongoDB query.
+- The query is returned to the frontend, where it can be reviewed, edited, and executed.
 
 ### Security & Compliance
 - All data in transit is encrypted (HTTPS).
-- JWT authentication, CSRF protection, and 2FA are enforced.
-- Rate limiting and CORS are active on all endpoints.
-- No database credentials are stored after session ends.
-- Privacy Policy, Terms of Service, and Refund Policy are accessible in-app.
+- JWT authentication, CSRF protection, and 2FA are available.
+- Rate limiting and CORS are enabled.
+- Database credentials are not stored after session ends.
+- Privacy Policy, Terms of Service, and Refund Policy are available in-app.
 
 ### Project Structure
 ```
@@ -97,21 +90,21 @@ MongoSnap/
   README.md
 ```
 
-### Key Backend & Frontend Modules
+### Key Modules
 - **Backend:** Models (User, PaymentTransaction), routes (auth, payment, query), utilities (mailer, PayU integration)
 - **Frontend:** Components (QueryInterface, Payment, SchemaExplorer), pages (Home, Login, Pricing, PaymentSuccess), context (UserContext), hooks, and assets
 
 ### Payment & Email Systems
-- **Payments:** All transactions are securely processed via PayU, with backend verification and instant SnapX activation.
-- **Emails:** All transactional emails (verification, reset, 2FA, login alert) are sent via Brevo SMTP, using a modern, branded template.
+- Payments are processed via PayU, with backend verification and SnapX activation.
+- Transactional emails (verification, reset, 2FA, login alert) are sent via Brevo SMTP.
 
 ### Deployment
-- **Hosting:** AWS (high availability, scalability)
-- **Database:** MongoDB Atlas (managed, secure, scalable)
+- Hosted on AWS
+- Database on MongoDB Atlas
 
 ### License
 MIT License
 
 ---
 
-<p align="center"><b>MongoSnap — The new standard for MongoDB productivity.</b></p>
+<p align="center"><b>MongoSnap — MongoDB query generation and management in your browser.</b></p>
