@@ -17,7 +17,7 @@ const passwordChecks = [
 function Login() {
     const navigate = useNavigate();
     
-    const { login, loading: userLoading, isAuthenticated } = useUser();
+    const { login, refreshUser, loading: userLoading, isAuthenticated } = useUser();
     
     useEffect(() => {
         document.title = "MongoSnap - Login";
@@ -71,11 +71,12 @@ function Login() {
             
             if (event.data.type === 'OAUTH_SUCCESS') {
                 const { token } = event.data;
-                login(token); // Use UserContext login
+                login(token);
+                refreshUser();
                 setGoogleLoading(false);
                 setGithubLoading(false);
                 setPopupWindow(null);
-                window.location.href = '/connect'; // Redirect to connect
+                window.location.href = '/connect';
             } else if (event.data.type === 'OAUTH_ERROR') {
                 setError(event.data.error || 'OAuth authentication failed');
                 setGoogleLoading(false);
@@ -86,7 +87,7 @@ function Login() {
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [login]);
+    }, [login, refreshUser]);
 
     // Check if popup is closed and handle timeout
     useEffect(() => {
@@ -156,6 +157,7 @@ function Login() {
                 } else {
                     // Use UserContext login function
                     login(data.token, data.user, data.csrfToken);
+                    await refreshUser();
                     setSuccess('Login successful! Redirecting...');
                     setRedirecting(true);
                 }
@@ -288,6 +290,7 @@ function Login() {
             
             // Login successful with 2FA
             login(data.token, data.user, data.csrfToken);
+            await refreshUser();
             setSuccess('Login successful! Redirecting...');
             setRedirecting(true);
         } catch (err) {

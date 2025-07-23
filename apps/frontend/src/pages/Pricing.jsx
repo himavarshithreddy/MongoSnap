@@ -57,11 +57,12 @@ const Pricing = () => {
         setShowPaymentModal(true);
     };
 
-    const handlePaymentSuccess = (paymentData) => {
+    const handlePaymentSuccess = async (paymentData) => {
         console.log('Payment successful:', paymentData);
         setShowPaymentModal(false);
         setPaymentSuccess(true);
-        
+        // Refresh user data to get updated subscription status
+        await refreshUser();
         // Auto-hide success message after 5 seconds
         setTimeout(() => setPaymentSuccess(false), 5000);
     };

@@ -9,7 +9,7 @@ function OAuthSuccess() {
   const [searchParams] = useSearchParams();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const { login } = useUser();
+  const { login, refreshUser } = useUser();
 
   useEffect(() => {
     const handleOAuthSuccess = async () => {
@@ -49,10 +49,9 @@ function OAuthSuccess() {
 
         // Use UserContext login function
         login(token);
-        
+        await refreshUser();
         // Small delay for user experience
         await new Promise(resolve => setTimeout(resolve, 100));
-        
         console.log('OAuth successful, navigating to connect...');
         navigate('/connect', { replace: true });
         
