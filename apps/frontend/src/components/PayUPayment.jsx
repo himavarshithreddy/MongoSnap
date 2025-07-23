@@ -1,29 +1,18 @@
 import React, { useState, useContext } from 'react';
 import { UserContext } from '../contexts/UserContext';
 import ErrorNotification from './ErrorNotification';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 const PayUPayment = ({ 
     subscriptionPlan = 'snapx', 
-    onSuccess, 
-    onFailure, 
     onClose,
     isVisible = false 
 }) => {
-    const { fetchWithAuth, refreshUser } = useContext(UserContext);
+    const { fetchWithAuth } = useContext(UserContext);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [phone, setPhone] = useState('');
-    const [paymentFormData, setPaymentFormData] = useState(null);
-
-    /**
-     * Handle phone number input
-     */
-    const handlePhoneChange = (e) => {
-        const value = e.target.value.replace(/\D/g, ''); // Remove non-digits
-        if (value.length <= 10) {
-            setPhone(value);
-        }
-    };
 
     /**
      * Create PayU payment order
@@ -33,9 +22,9 @@ const PayUPayment = ({
             setIsLoading(true);
             setError('');
 
-            // Validate phone number
-            if (!phone || phone.length !== 10) {
-                setError('Please enter a valid 10-digit phone number');
+            // Validate phone number (E.164: +countrycode + number)
+            if (!phone || phone.length < 8) {
+                setError('Please enter a valid phone number with country code');
                 return;
             }
 
@@ -61,7 +50,6 @@ const PayUPayment = ({
             console.log('Payment order created:', data);
 
             if (data.success && data.data) {
-                setPaymentFormData(data.data);
                 // Submit form to PayU
                 submitToPayU(data.data);
             } else {
@@ -108,41 +96,12 @@ const PayUPayment = ({
         }
     };
 
-    /**
-     * Handle payment success (called from success page)
-     */
-    const handlePaymentSuccess = async (paymentData) => {
-        try {
-            console.log('Handling payment success:', paymentData);
-            
-            // Refresh user data to get updated subscription
-            await refreshUser();
-            
-            if (onSuccess) {
-                onSuccess(paymentData);
-            }
-        } catch (error) {
-            console.error('Error handling payment success:', error);
-        }
-    };
-
-    /**
-     * Handle payment failure (called from failure page)
-     */
-    const handlePaymentFailure = (errorData) => {
-        console.log('Handling payment failure:', errorData);
-        
-        if (onFailure) {
-            onFailure(errorData);
-        }
-    };
-
     if (!isVisible) {
         return null;
     }
 
     return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 pointer-events-auto">
             <div className="bg-brand-secondary rounded-2xl p-8 max-w-md w-full border border-brand-quaternary shadow-2xl">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold text-white">Complete Payment</h2>
@@ -172,17 +131,20 @@ const PayUPayment = ({
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                         Phone Number *
                     </label>
-                    <input
-                        type="tel"
+                    <PhoneInput
+                        international
+                        defaultCountry="IN"
                         value={phone}
-                        onChange={handlePhoneChange}
-                        placeholder="Enter 10-digit phone number"
-                        className="w-full px-4 py-3 bg-brand-tertiary border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-brand-quaternary focus:ring-1 focus:ring-brand-quaternary"
+                        onChange={setPhone}
                         disabled={isLoading}
-                        maxLength={10}
+                        className="[&_.PhoneInput]:w-full [&_.PhoneInputInput]:w-full [&_.PhoneInputInput]:px-4 [&_.PhoneInputInput]:py-3 [&_.PhoneInputInput]:bg-brand-tertiary [&_.PhoneInputInput]:border [&_.PhoneInputInput]:border-gray-600 [&_.PhoneInputInput]:rounded-lg [&_.PhoneInputInput]:text-white [&_.PhoneInputInput]:placeholder-gray-400 [&_.PhoneInputInput]:focus:outline-none [&_.PhoneInputInput]:focus:border-brand-quaternary [&_.PhoneInputInput]:focus:ring-1 [&_.PhoneInputInput]:focus:ring-brand-quaternary [&_.PhoneInputCountrySelect]:bg-brand-tertiary [&_.PhoneInputCountrySelect]:border-gray-600 [&_.PhoneInputCountrySelect]:rounded-lg [&_.PhoneInputCountrySelect]:text-white [&_.PhoneInputCountrySelect]:focus:border-brand-quaternary [&_.PhoneInputCountrySelect]:focus:ring-1 [&_.PhoneInputCountrySelect]:focus:ring-brand-quaternary"
+                        inputComponent="input"
+                        placeholder="Enter phone number"
+                        autoComplete="tel"
+                        limitMaxLength
                     />
                     <p className="text-xs text-gray-400 mt-1">
-                        Required for payment processing and order confirmation
+                        Required for payment processing and order confirmation. Include your country code.
                     </p>
                 </div>
 
@@ -196,19 +158,6 @@ const PayUPayment = ({
                     </div>
                 )}
 
-                {/* Payment Security Info */}
-                <div className="mb-6 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-9a2 2 0 00-2-2H6a2 2 0 00-2 2v9a2 2 0 002 2zm10-12V9a4 4 0 00-8 0v2m0 0V9a4 4 0 018 0v2" />
-                        </svg>
-                        <span className="text-sm font-medium text-blue-300">Secure Payment</span>
-                    </div>
-                    <p className="text-xs text-gray-300">
-                        Powered by PayU - Your payment is processed securely with 256-bit SSL encryption
-                    </p>
-                </div>
-
                 {/* Action Buttons */}
                 <div className="flex gap-4 justify-end">
                     <button
@@ -220,7 +169,7 @@ const PayUPayment = ({
                     </button>
                     <button
                         onClick={createPaymentOrder}
-                        disabled={isLoading || !phone || phone.length !== 10}
+                        disabled={isLoading || !phone || phone.length < 8}
                         className="px-6 py-2 bg-brand-quaternary text-white rounded-lg hover:bg-brand-quaternary/90 font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                         {isLoading ? (
