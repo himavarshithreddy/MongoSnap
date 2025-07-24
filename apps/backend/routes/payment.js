@@ -72,8 +72,17 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
             });
         }
 
-        // Validate phone number
-        if (!phone || !/^\d{10}$/.test(phone)) {
+        // Validate phone number (accepts 10 digits, +91XXXXXXXXXX, or 91XXXXXXXXXX)
+        let normalized = (phone || '').toString().replace(/[^\d+]/g, '');
+        let valid = false;
+        if (normalized.startsWith('+91') && /^\+91\d{10}$/.test(normalized)) {
+            valid = true;
+        } else {
+            if (normalized.startsWith('+91')) normalized = normalized.slice(3);
+            else if (normalized.startsWith('91')) normalized = normalized.slice(2);
+            if (/^\d{10}$/.test(normalized)) valid = true;
+        }
+        if (!valid) {
             return res.status(400).json({
                 success: false,
                 message: 'Valid 10-digit phone number is required'

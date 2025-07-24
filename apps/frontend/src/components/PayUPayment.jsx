@@ -22,9 +22,19 @@ const PayUPayment = ({
             setIsLoading(true);
             setError('');
 
-            // Validate phone number (E.164: +countrycode + number)
-            if (!phone || phone.length < 8) {
-                setError('Please enter a valid phone number with country code');
+            // Robust Indian phone validation
+            let normalized = (phone || '').toString().replace(/[^\d+]/g, '');
+            console.log('Phone input:', phone, 'Normalized:', normalized);
+            let valid = false;
+            if (normalized.startsWith('+91') && /^\+91\d{10}$/.test(normalized)) {
+                valid = true;
+            } else {
+                if (normalized.startsWith('+91')) normalized = normalized.slice(3);
+                else if (normalized.startsWith('91')) normalized = normalized.slice(2);
+                if (/^\d{10}$/.test(normalized)) valid = true;
+            }
+            if (!valid) {
+                setError('Valid 10-digit phone number is required');
                 return;
             }
 
@@ -169,7 +179,7 @@ const PayUPayment = ({
                     </button>
                     <button
                         onClick={createPaymentOrder}
-                        disabled={isLoading || !phone || phone.length < 8}
+                        disabled={isLoading || !phone || (() => { let n = (phone || '').toString().replace(/[^\d+]/g, ''); if (n.startsWith('+91') && /^\+91\d{10}$/.test(n)) return false; if (n.startsWith('+91')) n = n.slice(3); else if (n.startsWith('91')) n = n.slice(2); return !/^\d{10}$/.test(n); })()}
                         className="px-6 py-2 bg-brand-quaternary text-white rounded-lg hover:bg-brand-quaternary/90 font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                         {isLoading ? (
