@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import '../App.css'
 import { Eye, EyeOff, Mail, ArrowLeft, RefreshCw } from 'lucide-react';     
@@ -51,8 +51,6 @@ function Login() {
     const [twoFactorEmail, setTwoFactorEmail] = useState('');
     const [twoFactorToken, setTwoFactorToken] = useState('');
     const [twoFactorMethod, setTwoFactorMethod] = useState('email'); // 'email' or 'totp'
-    const [totpToken, setTotpToken] = useState(''); // For 6-digit TOTP
-    const otpRefs = [useRef(), useRef(), useRef(), useRef()];
     const [twoFactorLoading, setTwoFactorLoading] = useState(false);
     const [twoFactorError, setTwoFactorError] = useState('');
     const [resendLoading, setResendLoading] = useState(false);
@@ -119,8 +117,62 @@ function Login() {
         };
     }, [popupWindow]);
 
+    const AUTO_DISMISS_MS = 5000;
+
+    // Auto-dismiss main error and success
+    useEffect(() => {
+        if (error) {
+            const timer = setTimeout(() => setError(''), AUTO_DISMISS_MS);
+            return () => clearTimeout(timer);
+        }
+    }, [error]);
+    useEffect(() => {
+        if (success) {
+            const timer = setTimeout(() => setSuccess(''), AUTO_DISMISS_MS);
+            return () => clearTimeout(timer);
+        }
+    }, [success]);
+    // Auto-dismiss forgot password errors/success
+    useEffect(() => {
+        if (forgotError) {
+            const timer = setTimeout(() => setForgotError(''), AUTO_DISMISS_MS);
+            return () => clearTimeout(timer);
+        }
+    }, [forgotError]);
+    useEffect(() => {
+        if (forgotSuccess) {
+            const timer = setTimeout(() => setForgotSuccess(''), AUTO_DISMISS_MS);
+            return () => clearTimeout(timer);
+        }
+    }, [forgotSuccess]);
+    // Auto-dismiss 2FA errors/success
+    useEffect(() => {
+        if (twoFactorError) {
+            const timer = setTimeout(() => setTwoFactorError(''), AUTO_DISMISS_MS);
+            return () => clearTimeout(timer);
+        }
+    }, [twoFactorError]);
+    useEffect(() => {
+        if (resendError) {
+            const timer = setTimeout(() => setResendError(''), AUTO_DISMISS_MS);
+            return () => clearTimeout(timer);
+        }
+    }, [resendError]);
+    useEffect(() => {
+        if (resendSuccess) {
+            const timer = setTimeout(() => setResendSuccess(''), AUTO_DISMISS_MS);
+            return () => clearTimeout(timer);
+        }
+    }, [resendSuccess]);
+
     const handleInput = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
+        if (error) setError('');
+    };
+
+    const handleForgotInput = (e) => {
+        setForgotEmail(e.target.value);
+        if (forgotError) setForgotError('');
     };
 
     const handleAuth = async (e) => {
@@ -301,47 +353,6 @@ function Login() {
         }
     };
 
-    const handleOTPInput = (e, idx) => {
-        let val = e.target.value;
-        // Only allow hex chars
-        val = val.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
-        if (val.length > 1) val = val.slice(-1);
-        const newToken = [...twoFactorToken];
-        newToken[idx] = val;
-        setTwoFactorToken(newToken);
-        if (val && idx < 3) {
-            otpRefs[idx + 1].current.focus();
-        }
-    };
-
-    const handleOTPKeyDown = (e, idx) => {
-        if (e.key === 'Backspace') {
-            if (twoFactorToken[idx]) {
-                // Clear current
-                const newToken = [...twoFactorToken];
-                newToken[idx] = '';
-                setTwoFactorToken(newToken);
-            } else if (idx > 0) {
-                otpRefs[idx - 1].current.focus();
-            }
-        } else if (e.key === 'ArrowLeft' && idx > 0) {
-            otpRefs[idx - 1].current.focus();
-        } else if (e.key === 'ArrowRight' && idx < 3) {
-            otpRefs[idx + 1].current.focus();
-        }
-    };
-
-    const handleOTPPaste = (e) => {
-        const paste = e.clipboardData.getData('text').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
-        if (paste.length === 4) {
-            setTwoFactorToken(paste.split(''));
-            setTimeout(() => {
-                otpRefs[3].current.focus();
-            }, 0);
-            e.preventDefault();
-        }
-    };
-
     const handleResendOTP = async () => {
         setResendLoading(true);
         setResendError('');
@@ -368,20 +379,10 @@ function Login() {
         }
     };
 
-    const handleTOTPInput = (e) => {
-        let val = e.target.value;
-        // Only allow digits
-        val = val.replace(/[^0-9]/g, '');
-        // Limit to 6 digits
-        if (val.length > 6) val = val.slice(0, 6);
-        setTotpToken(val);
-    };
-
     const reset2FA = () => {
         setShow2FA(false);
         setTwoFactorEmail('');
         setTwoFactorToken('');
-        setTotpToken('');
         setTwoFactorMethod('email');
         setTwoFactorError('');
         setResendError('');
@@ -436,7 +437,7 @@ function Login() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                                     </svg>
                                 </div>
-                                <p className="text-green-400 mb-4">{forgotSuccess}</p>
+                                <p className="text-green-400 mb-4" role="status" aria-live="polite">{forgotSuccess}</p>
                                 <button 
                                     onClick={resetForgotModal}
                                     className="w-full h-12 rounded-md bg-[#35c56a69] text-white text-md font-bold uppercase hover:bg-[#35c56a69] hover:scale-102 transition-all duration-300 cursor-pointer"
@@ -450,12 +451,12 @@ function Login() {
                                     type="email" 
                                     placeholder="Email Address" 
                                     value={forgotEmail}
-                                    onChange={(e) => setForgotEmail(e.target.value)}
+                                    onChange={handleForgotInput}
                                     className="w-full h-12 rounded-md border-1 border-[#35c56a69] p-2 focus:outline-none focus:border-2 focus:border-green-700 text-md text-white bg-transparent placeholder-gray-500" 
                                 />
                                 
                                 {forgotError && (
-                                    <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert">
+                                    <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert" aria-live="assertive">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
@@ -567,7 +568,7 @@ function Login() {
                             )}
                             
                             {twoFactorError && (
-                                <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert">
+                                <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert" aria-live="assertive">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
@@ -576,7 +577,7 @@ function Login() {
                             )}
                             
                             {resendSuccess && (
-                                <div className="flex items-center gap-2 bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded" role="status">
+                                <div className="flex items-center gap-2 bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded" role="status" aria-live="polite">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-400">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                     </svg>
@@ -585,7 +586,7 @@ function Login() {
                             )}
                             
                             {resendError && (
-                                <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert">
+                                <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded" role="alert" aria-live="assertive">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
@@ -795,13 +796,13 @@ function Login() {
                                 <button type="button" onClick={() => setShowForgot(true)} className='w-auto h-5 text-[#11a15e] text-sm cursor-pointer self-end hover:underline'>Forgot Password?</button>
                                 )}
                                 {error && (
-                                    <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded mb-2 animate-shake" role="alert">
+                                    <div className="flex items-center gap-2 bg-red-900/80 border border-red-500 text-red-200 px-4 py-2 rounded mb-2 animate-shake" role="alert" aria-live="assertive">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-red-400"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                         <span>{error}</span>
                                     </div>
                                 )}
                                 {success && (
-                                    <div className="flex items-center gap-2 bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded mb-2" role="status">
+                                    <div className="flex items-center gap-2 bg-green-900/80 border border-green-500 text-green-200 px-4 py-2 rounded mb-2" role="status" aria-live="polite">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-400"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                         <span>{success}</span>
                                      
