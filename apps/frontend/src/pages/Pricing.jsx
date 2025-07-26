@@ -171,9 +171,9 @@ const Pricing = () => {
                     <div className="grid md:grid-cols-2 gap-20 max-w-5xl mx-auto">
                         {/* Free Tier */}
                         <div className={`bg-brand-secondary rounded-2xl p-8 border relative transition-all duration-300 group cursor-pointer ${
-                            subscription.isSnapUser ? 'border-brand-quaternary' : 'border-brand-tertiary hover:border-brand-quaternary/50'
+                            user && subscription.isSnapUser ? 'border-brand-quaternary' : 'border-brand-tertiary hover:border-brand-quaternary/50'
                         }`}>
-                            {subscription.isSnapUser && (
+                            {user && subscription.isSnapUser && (
                                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                                     <div className="bg-green-600 text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg">
                                         Current Plan
@@ -203,20 +203,20 @@ const Pricing = () => {
                                 onClick={() => navigate('/connect')}
                                 className="w-full py-4 bg-brand-quaternary/20 text-brand-quaternary rounded-xl hover:bg-brand-quaternary hover:text-white transition-all duration-300 font-semibold text-lg group-hover:scale-105 cursor-pointer"
                             >
-                                {subscription.isSnapUser ? 'Current Plan' : 'Get Started Free'}
+                                {user && subscription.isSnapUser ? 'Current Plan' : 'Get Started Free'}
                             </button>
                         </div>
 
                         {/* Pro Tier */}
                         <div className={`bg-gradient-to-br from-brand-secondary to-brand-tertiary/20 rounded-2xl p-8 border-2 relative transition-all duration-300 group cursor-pointer ${
-                            subscription.isSnapXUser ? 'border-green-500' : 'border-brand-quaternary hover:border-brand-quaternary/80'
+                            user && subscription.isSnapXUser ? 'border-green-500' : 'border-brand-quaternary hover:border-brand-quaternary/80'
                         }`}>
                             {/* Badge */}
                             <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                                 <div className={`px-6 py-2 rounded-full text-sm font-semibold shadow-lg ${
-                                    subscription.isSnapXUser ? 'bg-green-600 text-white' : 'bg-brand-quaternary text-white'
+                                    user && subscription.isSnapXUser ? 'bg-green-600 text-white' : 'bg-brand-quaternary text-white'
                                 }`}>
-                                    {subscription.isSnapXUser ? 'Current Plan' : 'Recommended'}
+                                    {user && subscription.isSnapXUser ? 'Current Plan' : 'Recommended'}
                                 </div>
                             </div>
 
@@ -239,10 +239,10 @@ const Pricing = () => {
                             </div>
 
                             <button
-                                onClick={subscription.isSnapUser ? handleUpgradeClick : () => navigate('/settings')}
+                                onClick={user && subscription.isSnapUser ? handleUpgradeClick : () => navigate('/settings')}
                                 className="w-full py-4 bg-brand-quaternary text-white rounded-xl hover:bg-brand-quaternary/90 transition-all duration-300 font-semibold text-lg group-hover:scale-105 shadow-lg cursor-pointer"
                             >
-                                {subscription.isSnapUser ? 'Upgrade to SnapX' : 'Current Plan'}
+                                {user && subscription.isSnapUser ? 'Upgrade to SnapX' : (user && subscription.isSnapXUser ? 'Current Plan' : 'Get Started')}
                             </button>
                         </div>
                     </div>
