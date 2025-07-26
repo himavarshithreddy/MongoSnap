@@ -8,7 +8,7 @@ const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
-const { sendVerificationEmail, sendResetPasswordEmail, sendTwoFactorEmailOTP, sendLoginNotificationEmail } = require('../utils/mailer');
+const { sendVerificationEmail, sendResetPasswordEmail, sendTwoFactorEmailOTP, sendLoginNotificationEmail, sendSubscriptionCancellationEmail } = require('../utils/mailer');
 const databaseManager = require('../utils/databaseManager');
 const { 
   verifyToken, 
@@ -484,6 +484,31 @@ router.put('/cancel-subscription', generalAuthLimiter, verifyTokenAndValidateCSR
     await userUsage.save();
 
     console.log(`Subscription cancelled for user ${user.email} - access revoked immediately and limits reset to Snap plan`);
+
+    // Send cancellation email
+    try {
+      const cancellationDetails = {
+        userName: user.name,
+        planName: user.subscriptionPlan === 'snapx' ? 'SnapX (Premium)' : 'Snap (Free)',
+        cancellationDate: new Date(),
+        featuresLost: [
+          'Unlimited query history',
+          'Save & organize queries',
+          'Unlimited database connections',
+          'Unlimited executions',
+          'Enhanced AI generation',
+          'Export database schemas',
+          'Upload your own databases',
+          'Priority support'
+        ]
+      };
+
+      await sendSubscriptionCancellationEmail(user.email, cancellationDetails);
+      console.log(`Subscription cancellation email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('Error sending subscription cancellation email:', emailError);
+      // Don't fail the cancellation process if email fails
+    }
     
     res.status(200).json({ 
       success: true,

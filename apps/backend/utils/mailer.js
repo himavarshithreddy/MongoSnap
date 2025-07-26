@@ -260,6 +260,170 @@ const createLoginNotificationTemplate = (loginDetails) => {
   return createBaseTemplate(content, 'New Login Alert');
 };
 
+// Payment confirmation template
+const createPaymentConfirmationTemplate = (paymentDetails) => {
+  const { 
+    userName, 
+    amount, 
+    transactionId, 
+    subscriptionPlan, 
+    paymentDate, 
+    expiryDate,
+    paymentMethod,
+    cardLast4
+  } = paymentDetails;
+
+  const formattedAmount = `₹${amount}`;
+  const formattedPaymentDate = new Date(paymentDate).toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  const formattedExpiryDate = new Date(expiryDate).toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const content = `
+    <h2>Payment Confirmation</h2>
+    <p>Thank you for your payment! Your subscription has been successfully activated.</p>
+    
+    <div class="info-box">
+      <p><strong>Transaction ID:</strong> ${transactionId}</p>
+      <p><strong>Amount Paid:</strong> ${formattedAmount}</p>
+      <p><strong>Plan:</strong> ${subscriptionPlan.toUpperCase()}</p>
+      <p><strong>Payment Date:</strong> ${formattedPaymentDate}</p>
+      <p><strong>Subscription Expires:</strong> ${formattedExpiryDate}</p>
+      ${paymentMethod ? `<p><strong>Payment Method:</strong> ${paymentMethod}</p>` : ''}
+      ${cardLast4 ? `<p><strong>Card:</strong> **** **** **** ${cardLast4}</p>` : ''}
+    </div>
+    
+    <div style="text-align: center;">
+      <a href="https://mongosnap.live/connect" class="button">Go to Dashboard</a>
+    </div>
+    
+    <div class="info-box">
+      <h3 style="color: #3CBC6B; margin-top: 0;">What's Next?</h3>
+      <p>You now have access to all premium features including:</p>
+      <ul style="margin: 10px 0; padding-left: 20px;">
+        <li>Unlimited query history</li>
+        <li>Save & organize queries</li>
+        <li>Unlimited database connections</li>
+        <li>Unlimited executions</li>
+        <li>Enhanced AI generation</li>
+        <li>Export database schemas</li>
+        <li>Upload your own databases</li>
+        <li>Priority support</li>
+      </ul>
+    </div>
+  `;
+  
+  return createBaseTemplate(content, 'Payment Confirmation');
+};
+
+// Plan upgrade notification template
+const createPlanUpgradeTemplate = (upgradeDetails) => {
+  const { 
+    userName, 
+    oldPlan, 
+    newPlan, 
+    upgradeDate, 
+    expiryDate,
+    features
+  } = upgradeDetails;
+
+  const formattedUpgradeDate = new Date(upgradeDate).toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  const formattedExpiryDate = new Date(expiryDate).toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const content = `
+    <h2>Plan Upgrade Successful!</h2>
+    <p>Congratulations! Your MongoSnap plan has been successfully upgraded.</p>
+    
+    <div class="info-box">
+      <p><strong>Previous Plan:</strong> ${oldPlan}</p>
+      <p><strong>New Plan:</strong> ${newPlan}</p>
+      <p><strong>Upgrade Date:</strong> ${formattedUpgradeDate}</p>
+      <p><strong>Subscription Expires:</strong> ${formattedExpiryDate}</p>
+    </div>
+    
+    <div style="text-align: center;">
+      <a href="https://mongosnap.live/connect" class="button">Start Using Premium Features</a>
+    </div>
+    
+    <div class="info-box">
+      <h3 style="color: #3CBC6B; margin-top: 0;">New Features Available:</h3>
+      <ul style="margin: 10px 0; padding-left: 20px;">
+        ${features.map(feature => `<li>${feature}</li>`).join('')}
+      </ul>
+    </div>
+    
+    <p>Thank you for choosing MongoSnap! We're excited to see what you'll build with these powerful features.</p>
+  `;
+  
+  return createBaseTemplate(content, 'Plan Upgrade Successful');
+};
+
+// Subscription cancellation template
+const createSubscriptionCancellationTemplate = (cancellationDetails) => {
+  const { 
+    userName, 
+    planName, 
+    cancellationDate,
+    featuresLost
+  } = cancellationDetails;
+
+  const formattedCancellationDate = new Date(cancellationDate).toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const content = `
+    <h2>Subscription Cancelled</h2>
+    <p>Your ${planName} subscription has been cancelled as requested.</p>
+    
+    <div class="info-box">
+      <p><strong>Plan:</strong> ${planName}</p>
+      <p><strong>Cancellation Date:</strong> ${formattedCancellationDate}</p>
+      <p><strong>Status:</strong> Cancelled</p>
+    </div>
+    
+    <div style="text-align: center;">
+      <a href="https://mongosnap.live/pricing" class="button">Reactivate Subscription</a>
+    </div>
+    
+    <div class="warning">
+      <h3 style="color: #fbbf24; margin-top: 0;">Features No Longer Available:</h3>
+      <ul style="margin: 10px 0; padding-left: 20px;">
+        ${featuresLost.map(feature => `<li>${feature}</li>`).join('')}
+      </ul>
+    </div>
+    
+    <p>You can reactivate your subscription at any time to regain access to premium features.</p>
+    
+    <div class="info-box">
+      <p><strong>Need help?</strong> Contact our support team at <a href="mailto:support@mongosnap.live" style="color:#3CBC6B;text-decoration:none;">support@mongosnap.live</a></p>
+    </div>
+  `;
+  
+  return createBaseTemplate(content, 'Subscription Cancelled');
+};
+
 // Email sending functions
 const sendVerificationEmail = async (email, token) => {
   const html = createVerificationTemplate(token);
@@ -321,11 +485,44 @@ const sendLoginNotificationEmail = async (email, loginDetails) => {
   });
 };
 
+const sendPaymentConfirmationEmail = async (email, paymentDetails) => {
+  const html = createPaymentConfirmationTemplate(paymentDetails);
+  await transporter.sendMail({
+    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    to: email,
+    subject: "Payment Confirmation - MongoSnap",
+    html: html
+  });
+};
+
+const sendPlanUpgradeEmail = async (email, upgradeDetails) => {
+  const html = createPlanUpgradeTemplate(upgradeDetails);
+  await transporter.sendMail({
+    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    to: email,
+    subject: "Plan Upgrade Successful - MongoSnap",
+    html: html
+  });
+};
+
+const sendSubscriptionCancellationEmail = async (email, cancellationDetails) => {
+  const html = createSubscriptionCancellationTemplate(cancellationDetails);
+  await transporter.sendMail({
+    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    to: email,
+    subject: "Subscription Cancelled - MongoSnap",
+    html: html
+  });
+};
+
 module.exports = { 
   sendVerificationEmail, 
   sendResetPasswordEmail, 
   sendTwoFactorConfirmationEmail, 
   sendTwoFactorDisableConfirmationEmail, 
   sendTwoFactorEmailOTP,
-  sendLoginNotificationEmail
+  sendLoginNotificationEmail,
+  sendPaymentConfirmationEmail,
+  sendPlanUpgradeEmail,
+  sendSubscriptionCancellationEmail
 };

@@ -14,6 +14,7 @@ const {
     getPayUUrls,
     sanitizeResponse
 } = require('../utils/payuHelper');
+const { sendPaymentConfirmationEmail, sendPlanUpgradeEmail } = require('../utils/mailer');
 
 // Rate limiters for payment operations
 const paymentLimiter = rateLimit({
@@ -321,6 +322,9 @@ router.post('/verify', async (req, res) => {
         if (status === 'success') {
             const user = await User.findById(transaction.userId);
             if (user) {
+                const oldPlan = user.subscriptionPlan;
+                const oldStatus = user.subscriptionStatus;
+                
                 user.subscriptionPlan = transaction.subscriptionPlan;
                 user.subscriptionStatus = 'active';
                 user.subscriptionExpiresAt = new Date(Date.now() + transaction.subscriptionDuration * 24 * 60 * 60 * 1000);
@@ -332,6 +336,50 @@ router.post('/verify', async (req, res) => {
                 await userUsage.save();
 
                 console.log(`Subscription updated for user ${user.email}: ${transaction.subscriptionPlan}`);
+
+                // Send payment confirmation email
+                try {
+                    const paymentDetails = {
+                        userName: user.name,
+                        amount: transaction.amount,
+                        transactionId: transaction.txnid,
+                        subscriptionPlan: transaction.subscriptionPlan,
+                        paymentDate: transaction.paymentDate || new Date(),
+                        expiryDate: user.subscriptionExpiresAt,
+                        paymentMethod: transaction.mode,
+                        cardLast4: transaction.cardnum
+                    };
+
+                    await sendPaymentConfirmationEmail(user.email, paymentDetails);
+                    console.log(`Payment confirmation email sent to ${user.email}`);
+
+                    // Send plan upgrade email if upgrading from free plan
+                    if (oldPlan === 'snap' && oldStatus !== 'active') {
+                        const upgradeDetails = {
+                            userName: user.name,
+                            oldPlan: 'Snap (Free)',
+                            newPlan: 'SnapX (Premium)',
+                            upgradeDate: new Date(),
+                            expiryDate: user.subscriptionExpiresAt,
+                            features: [
+                                'Unlimited query history',
+                                'Save & organize queries',
+                                'Unlimited database connections',
+                                'Unlimited executions',
+                                'Enhanced AI generation',
+                                'Export database schemas',
+                                'Upload your own databases',
+                                'Priority support'
+                            ]
+                        };
+
+                        await sendPlanUpgradeEmail(user.email, upgradeDetails);
+                        console.log(`Plan upgrade email sent to ${user.email}`);
+                    }
+                } catch (emailError) {
+                    console.error('Error sending payment confirmation emails:', emailError);
+                    // Don't fail the payment process if email fails
+                }
             }
         }
 
@@ -406,11 +454,58 @@ router.post('/webhook', webhookLimiter, async (req, res) => {
             if (status === 'success' && transaction.subscriptionPlan === 'snapx') {
                 const user = await User.findById(transaction.userId);
                 if (user && !user.isSnapXUser()) {
+                    const oldPlan = user.subscriptionPlan;
+                    const oldStatus = user.subscriptionStatus;
+                    
                     user.subscriptionPlan = 'snapx';
                     user.subscriptionStatus = 'active';
                     user.subscriptionExpiresAt = new Date(Date.now() + transaction.subscriptionDuration * 24 * 60 * 60 * 1000);
                     await user.save();
                     console.log(`Webhook activated SnapX subscription for user: ${user.email}`);
+
+                    // Send payment confirmation email via webhook
+                    try {
+                        const paymentDetails = {
+                            userName: user.name,
+                            amount: transaction.amount,
+                            transactionId: transaction.txnid,
+                            subscriptionPlan: transaction.subscriptionPlan,
+                            paymentDate: transaction.paymentDate || new Date(),
+                            expiryDate: user.subscriptionExpiresAt,
+                            paymentMethod: transaction.mode,
+                            cardLast4: transaction.cardnum
+                        };
+
+                        await sendPaymentConfirmationEmail(user.email, paymentDetails);
+                        console.log(`Webhook: Payment confirmation email sent to ${user.email}`);
+
+                        // Send plan upgrade email if upgrading from free plan
+                        if (oldPlan === 'snap' && oldStatus !== 'active') {
+                            const upgradeDetails = {
+                                userName: user.name,
+                                oldPlan: 'Snap (Free)',
+                                newPlan: 'SnapX (Premium)',
+                                upgradeDate: new Date(),
+                                expiryDate: user.subscriptionExpiresAt,
+                                features: [
+                                    'Unlimited query history',
+                                    'Save & organize queries',
+                                    'Unlimited database connections',
+                                    'Unlimited executions',
+                                    'Enhanced AI generation',
+                                    'Export database schemas',
+                                    'Upload your own databases',
+                                    'Priority support'
+                                ]
+                            };
+
+                            await sendPlanUpgradeEmail(user.email, upgradeDetails);
+                            console.log(`Webhook: Plan upgrade email sent to ${user.email}`);
+                        }
+                    } catch (emailError) {
+                        console.error('Webhook: Error sending payment confirmation emails:', emailError);
+                        // Don't fail the webhook process if email fails
+                    }
                 }
             }
         }
