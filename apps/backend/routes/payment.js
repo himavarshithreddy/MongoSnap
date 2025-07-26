@@ -353,29 +353,27 @@ router.post('/verify', async (req, res) => {
                     await sendPaymentConfirmationEmail(user.email, paymentDetails);
                     console.log(`Payment confirmation email sent to ${user.email}`);
 
-                    // Send plan upgrade email if upgrading from free plan
-                    if (oldPlan === 'snap' && oldStatus !== 'active') {
-                        const upgradeDetails = {
-                            userName: user.name,
-                            oldPlan: 'Snap (Free)',
-                            newPlan: 'SnapX (Premium)',
-                            upgradeDate: new Date(),
-                            expiryDate: user.subscriptionExpiresAt,
-                            features: [
-                                'Unlimited query history',
-                                'Save & organize queries',
-                                'Unlimited database connections',
-                                'Unlimited executions',
-                                'Enhanced AI generation',
-                                'Export database schemas',
-                                'Upload your own databases',
-                                'Priority support'
-                            ]
-                        };
+                    // Send plan upgrade email for any successful payment
+                    const upgradeDetails = {
+                        userName: user.name,
+                        oldPlan: oldPlan === 'snap' ? 'Snap (Free)' : 'Previous Plan',
+                        newPlan: 'SnapX (Premium)',
+                        upgradeDate: new Date(),
+                        expiryDate: user.subscriptionExpiresAt,
+                        features: [
+                            'Unlimited query history',
+                            'Save & organize queries',
+                            'Unlimited database connections',
+                            'Unlimited executions',
+                            'Enhanced AI generation',
+                            'Export database schemas',
+                            'Upload your own databases',
+                            'Priority support'
+                        ]
+                    };
 
-                        await sendPlanUpgradeEmail(user.email, upgradeDetails);
-                        console.log(`Plan upgrade email sent to ${user.email}`);
-                    }
+                    await sendPlanUpgradeEmail(user.email, upgradeDetails);
+                    console.log(`Plan upgrade email sent to ${user.email}`);
                 } catch (emailError) {
                     console.error('Error sending payment confirmation emails:', emailError);
                     // Don't fail the payment process if email fails
@@ -479,29 +477,27 @@ router.post('/webhook', webhookLimiter, async (req, res) => {
                         await sendPaymentConfirmationEmail(user.email, paymentDetails);
                         console.log(`Webhook: Payment confirmation email sent to ${user.email}`);
 
-                        // Send plan upgrade email if upgrading from free plan
-                        if (oldPlan === 'snap' && oldStatus !== 'active') {
-                            const upgradeDetails = {
-                                userName: user.name,
-                                oldPlan: 'Snap (Free)',
-                                newPlan: 'SnapX (Premium)',
-                                upgradeDate: new Date(),
-                                expiryDate: user.subscriptionExpiresAt,
-                                features: [
-                                    'Unlimited query history',
-                                    'Save & organize queries',
-                                    'Unlimited database connections',
-                                    'Unlimited executions',
-                                    'Enhanced AI generation',
-                                    'Export database schemas',
-                                    'Upload your own databases',
-                                    'Priority support'
-                                ]
-                            };
+                        // Send plan upgrade email for any successful payment
+                        const upgradeDetails = {
+                            userName: user.name,
+                            oldPlan: oldPlan === 'snap' ? 'Snap (Free)' : 'Previous Plan',
+                            newPlan: 'SnapX (Premium)',
+                            upgradeDate: new Date(),
+                            expiryDate: user.subscriptionExpiresAt,
+                            features: [
+                                'Unlimited query history',
+                                'Save & organize queries',
+                                'Unlimited database connections',
+                                'Unlimited executions',
+                                'Enhanced AI generation',
+                                'Export database schemas',
+                                'Upload your own databases',
+                                'Priority support'
+                            ]
+                        };
 
-                            await sendPlanUpgradeEmail(user.email, upgradeDetails);
-                            console.log(`Webhook: Plan upgrade email sent to ${user.email}`);
-                        }
+                        await sendPlanUpgradeEmail(user.email, upgradeDetails);
+                        console.log(`Webhook: Plan upgrade email sent to ${user.email}`);
                     } catch (emailError) {
                         console.error('Webhook: Error sending payment confirmation emails:', emailError);
                         // Don't fail the webhook process if email fails
