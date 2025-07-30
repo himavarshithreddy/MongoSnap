@@ -25,8 +25,7 @@ const PaymentSuccess = () => {
         const paymentParams = extractPaymentData();
         console.log('Payment success page - received params:', paymentParams);
 
-        // CashFree returns order_id and payment_id in the URL
-        if (paymentParams.order_id || paymentParams.payment_id) {
+        if (paymentParams.txnid && paymentParams.status) {
             setPaymentData(paymentParams);
             verifyPayment(paymentParams);
         } else {
@@ -45,17 +44,13 @@ const PaymentSuccess = () => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    cf_order_id: paymentParams.order_id,
-                    cf_payment_id: paymentParams.payment_id,
-                    payment_status: paymentParams.payment_status
-                })
+                body: JSON.stringify(paymentParams)
             });
 
             const result = await response.json();
             console.log('Payment verification result:', result);
 
-            if (result.success && result.data.payment_status === 'SUCCESS') {
+            if (result.success && result.data.status === 'success') {
                 setVerificationStatus('success');
                 
                 // Refresh user data to get updated subscription
@@ -80,7 +75,7 @@ const PaymentSuccess = () => {
             navigate('/connect', { 
                 state: { 
                     paymentSuccess: true,
-                    subscriptionPlan: paymentData?.subscription_plan 
+                    subscriptionPlan: paymentData?.subscriptionPlan 
                 }
             });
         } else {
@@ -92,7 +87,7 @@ const PaymentSuccess = () => {
         navigate('/contact', { 
             state: { 
                 subject: 'Payment Issue',
-                message: `Payment verification failed for order: ${paymentData?.cf_order_id || 'N/A'}`
+                message: `Payment verification failed for transaction: ${paymentData?.txnid || 'N/A'}`
             }
         });
     };
@@ -152,23 +147,17 @@ const PaymentSuccess = () => {
                                         <h3 className="text-sm font-semibold text-gray-300 mb-2">Payment Details</h3>
                                         <div className="space-y-1 text-sm text-gray-400">
                                             <div className="flex justify-between">
-                                                <span>Order ID:</span>
-                                                <span className="font-mono">{paymentData.cf_order_id}</span>
+                                                <span>Transaction ID:</span>
+                                                <span className="font-mono">{paymentData.txnid}</span>
                                             </div>
-                                            {paymentData.cf_payment_id && (
+                                            <div className="flex justify-between">
+                                                <span>Amount:</span>
+                                                <span>₹{paymentData.amount}</span>
+                                            </div>
+                                            {paymentData.mihpayid && (
                                                 <div className="flex justify-between">
                                                     <span>Payment ID:</span>
-                                                    <span className="font-mono">{paymentData.cf_payment_id}</span>
-                                                </div>
-                                            )}
-                                            <div className="flex justify-between">
-                                                <span>Status:</span>
-                                                <span className="capitalize text-green-400">{paymentData.payment_status}</span>
-                                            </div>
-                                            {paymentData.subscription_plan && (
-                                                <div className="flex justify-between">
-                                                    <span>Plan:</span>
-                                                    <span className="capitalize">{paymentData.subscription_plan}</span>
+                                                    <span className="font-mono">{paymentData.mihpayid}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -187,10 +176,10 @@ const PaymentSuccess = () => {
                                 </p>
                                 
                                 {/* Transaction Details for Failed Payment */}
-                                {paymentData?.cf_order_id && (
+                                {paymentData?.txnid && (
                                     <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-4">
                                         <p className="text-sm text-red-300">
-                                            Order ID: <span className="font-mono">{paymentData.cf_order_id}</span>
+                                            Transaction ID: <span className="font-mono">{paymentData.txnid}</span>
                                         </p>
                                         <p className="text-xs text-red-400 mt-1">
                                             Please save this ID for support inquiries
