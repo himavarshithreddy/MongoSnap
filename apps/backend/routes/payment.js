@@ -9,7 +9,7 @@ const {
     createOrder,
     getOrder,
     getOrderPayments,
-    verifyWebhookSignature,
+    verifyWebhookAuthenticity,
     generateOrderId,
     generateCustomerId,
     validateOrderParams,
@@ -379,19 +379,13 @@ router.post('/webhook', webhookLimiter, async (req, res) => {
         console.log('CashFree webhook received');
         console.log('Webhook body:', sanitizeResponse(req.body));
 
-        const signature = req.headers['x-webhook-signature'];
-        if (!signature) {
-            console.error('Missing webhook signature');
-            return res.status(400).send('Missing signature');
-        }
-
         const isProduction = process.env.NODE_ENV === 'production';
         
-        // Verify webhook signature
-        const isSignatureValid = verifyWebhookSignature(req.body, signature, isProduction);
-        if (!isSignatureValid) {
-            console.error('Webhook signature verification failed');
-            return res.status(400).send('Invalid signature');
+        // Verify webhook authenticity by checking with CashFree API
+        const isAuthentic = await verifyWebhookAuthenticity(req.body, isProduction);
+        if (!isAuthentic) {
+            console.error('Webhook authenticity verification failed');
+            return res.status(400).send('Invalid webhook');
         }
 
         const { type, data } = req.body;
@@ -417,7 +411,6 @@ router.post('/webhook', webhookLimiter, async (req, res) => {
 
         // Mark webhook as verified
         transaction.webhook_verified = true;
-        transaction.webhook_signature = signature;
         
         // Update order status
         if (order.order_status) {
@@ -558,9 +551,7 @@ router.get('/test-config', (req, res) => {
             environment: isProduction ? 'production' : 'test',
             client_id_configured: !!clientId,
             client_secret_configured: !!clientSecret,
-            webhook_secret_configured: !!(isProduction 
-                ? process.env.CASHFREE_WEBHOOK_SECRET_PROD 
-                : process.env.CASHFREE_WEBHOOK_SECRET_TEST)
+                    webhook_configured: true
         }
     });
 });

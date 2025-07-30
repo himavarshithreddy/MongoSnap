@@ -174,11 +174,6 @@ const paymentTransactionSchema = new mongoose.Schema({
         default: false
     },
     
-    webhook_signature: {
-        type: String,
-        default: null
-    },
-    
     // Timestamps
     created_at: {
         type: Date,

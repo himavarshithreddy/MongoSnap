@@ -190,41 +190,54 @@ const getOrderPayments = async (orderId, isProduction = false) => {
 };
 
 /**
- * Verify webhook signature
+ * Verify webhook authenticity
+ * Note: CashFree doesn't use webhook secrets like other payment gateways
+ * Instead, we verify the webhook by checking the order status with CashFree API
  * @param {Object} webhookData - Webhook payload
- * @param {string} signature - Webhook signature
  * @param {boolean} isProduction - Whether to use production environment
- * @returns {boolean} Signature verification result
+ * @returns {Promise<boolean>} Verification result
  */
-const verifyWebhookSignature = (webhookData, signature, isProduction = false) => {
+const verifyWebhookAuthenticity = async (webhookData, isProduction = false) => {
     try {
-        const config = getCashFreeConfig(isProduction);
-        const webhookSecret = isProduction 
-            ? process.env.CASHFREE_WEBHOOK_SECRET_PROD 
-            : process.env.CASHFREE_WEBHOOK_SECRET_TEST;
-        
-        if (!webhookSecret) {
-            console.error('CashFree webhook secret not configured');
+        const { data } = webhookData;
+        if (!data || !data.order || !data.order.order_id) {
+            console.error('Invalid webhook data structure');
             return false;
         }
+
+        const orderId = data.order.order_id;
         
-        // Create signature string
-        const signatureString = JSON.stringify(webhookData);
-        const expectedSignature = crypto
-            .createHmac('sha256', webhookSecret)
-            .update(signatureString)
-            .digest('hex');
+        // Verify webhook by fetching order details from CashFree
+        const orderResponse = await getOrder(orderId, isProduction);
         
-        console.log('Webhook signature verification:', {
-            received: signature,
-            expected: expectedSignature,
-            matches: signature === expectedSignature
+        if (!orderResponse.success) {
+            console.error('Failed to verify webhook with CashFree API:', orderResponse.error);
+            return false;
+        }
+
+        const orderData = orderResponse.data;
+        
+        // Compare critical fields to ensure webhook authenticity
+        const webhookOrder = data.order;
+        const apiOrder = orderData;
+        
+        const isAuthentic = (
+            webhookOrder.order_id === apiOrder.order_id &&
+            webhookOrder.order_amount === apiOrder.order_amount &&
+            webhookOrder.order_currency === apiOrder.order_currency
+        );
+
+        console.log('Webhook authenticity verification:', {
+            orderId,
+            isAuthentic,
+            webhookAmount: webhookOrder.order_amount,
+            apiAmount: apiOrder.order_amount
         });
-        
-        return signature === expectedSignature;
-        
+
+        return isAuthentic;
+
     } catch (error) {
-        console.error('Error verifying webhook signature:', error);
+        console.error('Error verifying webhook authenticity:', error);
         return false;
     }
 };
@@ -367,7 +380,7 @@ module.exports = {
     createOrder,
     getOrder,
     getOrderPayments,
-    verifyWebhookSignature,
+    verifyWebhookAuthenticity,
     processPayment,
     validateOrderParams,
     formatAmount,
