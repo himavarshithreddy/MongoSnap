@@ -81,8 +81,8 @@ const CashFreePayment = ({
         try {
             console.log('Redirecting to CashFree checkout:', paymentData.payment_session_id);
 
-            // Redirect to CashFree checkout using the payment session ID
-            const checkoutUrl = `https://api.cashfree.com/pg/orders/sessions/${paymentData.payment_session_id}`;
+            // Redirect to CashFree checkout page
+            const checkoutUrl = `https://payments.cashfree.com/order/#${paymentData.payment_session_id}`;
             console.log('Redirecting to:', checkoutUrl);
             
             // Use window.location for redirect

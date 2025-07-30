@@ -98,7 +98,7 @@ Response → Returns payment_session_id
 
 ### 2. Payment Processing
 ```
-Frontend → Redirects to CashFree checkout with payment_session_id
+Frontend → Redirects to CashFree checkout page with payment_session_id
 CashFree → Processes payment
 CashFree → Redirects to return_url with order details
 ```
