@@ -53,10 +53,6 @@ The payment gateway has been successfully migrated from PayU to CashFree Payment
 Add the following environment variables to your `.env` file:
 
 ```bash
-# CashFree Test Environment
-CASHFREE_CLIENT_ID_TEST=your_test_client_id
-CASHFREE_CLIENT_SECRET_TEST=your_test_client_secret
-
 # CashFree Production Environment
 CASHFREE_CLIENT_ID_PROD=your_production_client_id
 CASHFREE_CLIENT_SECRET_PROD=your_production_client_secret
@@ -76,8 +72,7 @@ CASHFREE_CLIENT_SECRET_PROD=your_production_client_secret
 ### 2. Environment Configuration
 
 1. Add the environment variables listed above
-2. Set `NODE_ENV=production` for production environment
-3. Ensure your domain is whitelisted in CashFree dashboard
+2. Ensure your domain is whitelisted in CashFree dashboard
 
 ### 3. Database Migration
 

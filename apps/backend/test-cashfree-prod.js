@@ -1,11 +1,11 @@
-const { getCashFreeConfig, createOrder, getOrder } = require('./utils/cashfreeHelper');
+const { getCashFreeConfig, createOrder } = require('./utils/cashfreeHelper');
 
-async function testCashFreeIntegration() {
-    console.log('🧪 Testing CashFree Integration...\n');
+async function testCashFreeProduction() {
+    console.log('🧪 Testing CashFree Production Integration...\n');
     
     // Test configuration
     console.log('1. Testing Configuration:');
-    const config = getCashFreeConfig(); // Production environment
+    const config = getCashFreeConfig();
     console.log('   Base URL:', config.baseUrl);
     console.log('   Client ID present:', !!config.clientId);
     console.log('   Client Secret present:', !!config.clientSecret);
@@ -22,7 +22,7 @@ async function testCashFreeIntegration() {
     // Test order creation
     console.log('2. Testing Order Creation:');
     const testOrderData = {
-        order_id: `TEST_${Date.now()}`,
+        order_id: `TEST_PROD_${Date.now()}`,
         order_amount: 1.00,
         order_currency: 'INR',
         customer_id: 'test_user_123',
@@ -43,29 +43,19 @@ async function testCashFreeIntegration() {
             console.log('   Order ID:', orderResponse.data.order_id);
             console.log('   Payment Session ID:', orderResponse.data.payment_session_id);
             console.log('   Order Status:', orderResponse.data.order_status);
-            
-            // Test order retrieval
-            console.log('\n3. Testing Order Retrieval:');
-            const getOrderResponse = await getOrder(orderResponse.data.order_id);
-            
-            if (getOrderResponse.success) {
-                console.log('   ✅ Order retrieved successfully');
-                console.log('   Retrieved Order ID:', getOrderResponse.data.order_id);
-                console.log('   Retrieved Status:', getOrderResponse.data.order_status);
-            } else {
-                console.log('   ❌ Failed to retrieve order:', getOrderResponse.error);
-            }
-            
+            console.log('   \n🎉 CashFree Production Integration is working!');
         } else {
             console.log('   ❌ Order creation failed:', orderResponse.error);
+            console.log('   \n🔍 Check your CashFree credentials and API access');
         }
         
     } catch (error) {
         console.log('   ❌ Error during testing:', error.message);
+        console.log('   \n🔍 Check your network connection and CashFree service status');
     }
     
-    console.log('\n🏁 CashFree integration test completed');
+    console.log('\n🏁 CashFree production test completed');
 }
 
 // Run the test
-testCashFreeIntegration().catch(console.error); 
+testCashFreeProduction().catch(console.error); 

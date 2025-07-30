@@ -84,7 +84,7 @@ const CashFreePayment = ({
             // Create form element for CashFree checkout
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = 'https://sandbox.cashfree.com/pg/orders/sessions'; // Will be updated based on environment
+            form.action = 'https://api.cashfree.com/pg/orders/sessions'; // Will be updated based on environment
             form.target = '_self';
 
             // Add payment session ID

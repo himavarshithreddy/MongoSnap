@@ -2,11 +2,10 @@ const crypto = require('crypto');
 const axios = require('axios');
 
 /**
- * Get CashFree configuration based on environment
- * @param {boolean} isProduction - Whether to use production URLs
+ * Get CashFree configuration (production only)
  * @returns {Object} CashFree configuration
  */
-const getCashFreeConfig = (isProduction = false) => {
+const getCashFreeConfig = () => {
     const baseUrl = 
         'https://api.cashfree.com/pg';
       
@@ -67,12 +66,11 @@ const generateOrderId = (prefix = 'MONGOSNAP') => {
 /**
  * Create CashFree order
  * @param {Object} orderData - Order data
- * @param {boolean} isProduction - Whether to use production environment
  * @returns {Promise<Object>} Order creation response
  */
-const createOrder = async (orderData, isProduction = false) => {
+const createOrder = async (orderData) => {
     try {
-        const config = getCashFreeConfig(isProduction);
+        const config = getCashFreeConfig();
         const headers = generateHeaders(config, orderData.order_id);
         
         const orderPayload = {
@@ -129,12 +127,11 @@ const createOrder = async (orderData, isProduction = false) => {
 /**
  * Get order details from CashFree
  * @param {string} orderId - CashFree order ID
- * @param {boolean} isProduction - Whether to use production environment
  * @returns {Promise<Object>} Order details
  */
-const getOrder = async (orderId, isProduction = false) => {
+const getOrder = async (orderId) => {
     try {
-        const config = getCashFreeConfig(isProduction);
+        const config = getCashFreeConfig();
         const headers = generateHeaders(config);
         
         const response = await axios.get(
@@ -159,12 +156,11 @@ const getOrder = async (orderId, isProduction = false) => {
 /**
  * Get payments for an order
  * @param {string} orderId - CashFree order ID
- * @param {boolean} isProduction - Whether to use production environment
  * @returns {Promise<Object>} Payments list
  */
-const getOrderPayments = async (orderId, isProduction = false) => {
+const getOrderPayments = async (orderId) => {
     try {
-        const config = getCashFreeConfig(isProduction);
+        const config = getCashFreeConfig();
         const headers = generateHeaders(config);
         
         const response = await axios.get(
@@ -191,12 +187,11 @@ const getOrderPayments = async (orderId, isProduction = false) => {
  * @param {string} timestamp - Webhook timestamp
  * @param {string} signature - Webhook signature
  * @param {string} rawBody - Raw request body
- * @param {boolean} isProduction - Whether to use production environment
  * @returns {boolean} Signature verification result
  */
-const verifyWebhookSignature = (timestamp, signature, rawBody, isProduction = false) => {
+const verifyWebhookSignature = (timestamp, signature, rawBody) => {
     try {
-        const config = getCashFreeConfig(isProduction);
+        const config = getCashFreeConfig();
         const expectedSignature = crypto
             .createHmac('sha256', config.clientSecret)
             .update(timestamp + rawBody)

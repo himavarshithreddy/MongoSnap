@@ -92,15 +92,13 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
         }
 
         // Check CashFree configuration
-        const isProduction = process.env.NODE_ENV === 'production';
         const clientId = process.env.CASHFREE_CLIENT_ID_PROD;
-        const clientSecret =process.env.CASHFREE_CLIENT_SECRET_PROD;
+        const clientSecret = process.env.CASHFREE_CLIENT_SECRET_PROD;
 
         if (!clientId || !clientSecret) {
             console.error('CashFree configuration missing');
             console.error('CashFree Client ID present:', !!clientId);
             console.error('CashFree Client Secret present:', !!clientSecret);
-            console.error('Environment:', process.env.NODE_ENV);
             return res.status(500).json({
                 success: false,
                 message: 'Payment configuration error'
@@ -108,7 +106,7 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
         }
 
         console.log('CashFree Configuration:');
-        console.log('Environment:', isProduction ? 'production' : 'test');
+        console.log('Environment: production');
         console.log('CashFree Client ID (first 6 chars):', clientId ? clientId.substring(0, 6) + '...' : 'MISSING');
         console.log('CashFree Client Secret (first 6 chars):', clientSecret ? clientSecret.substring(0, 6) + '...' : 'MISSING');
 
@@ -145,7 +143,7 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
         }
 
         // Create order in CashFree
-        const orderResponse = await createOrder(orderData, isProduction);
+        const orderResponse = await createOrder(orderData);
         
         if (!orderResponse.success) {
             console.error('CashFree order creation failed:', orderResponse.error);
@@ -237,8 +235,7 @@ router.post('/verify', async (req, res) => {
         }
 
         // Get order details from CashFree
-        const isProduction = process.env.NODE_ENV === 'production';
-        const orderResponse = await getOrder(order_id, isProduction);
+        const orderResponse = await getOrder(order_id);
         
         if (!orderResponse.success) {
             console.error('Failed to fetch order from CashFree:', orderResponse.error);
@@ -251,7 +248,7 @@ router.post('/verify', async (req, res) => {
         const cashfreeOrder = orderResponse.data;
         
         // Get payments for the order
-        const paymentsResponse = await getOrderPayments(order_id, isProduction);
+        const paymentsResponse = await getOrderPayments(order_id);
         let paymentDetails = null;
         
         if (paymentsResponse.success && paymentsResponse.data.length > 0) {
@@ -360,8 +357,7 @@ router.post('/webhook', webhookLimiter, captureRawBody, async (req, res) => {
         }
 
         // Verify webhook signature
-        const isProduction = process.env.NODE_ENV === 'production';
-        const isSignatureValid = verifyWebhookSignature(timestamp, signature, rawBody, isProduction);
+        const isSignatureValid = verifyWebhookSignature(timestamp, signature, rawBody);
         
         if (!isSignatureValid) {
             console.error('Webhook signature verification failed');
@@ -472,9 +468,7 @@ router.post('/webhook', webhookLimiter, captureRawBody, async (req, res) => {
 router.get('/order-status/:orderId', async (req, res) => {
     try {
         const { orderId } = req.params;
-        const isProduction = process.env.NODE_ENV === 'production';
-
-        const orderResponse = await getOrder(orderId, isProduction);
+        const orderResponse = await getOrder(orderId);
         
         if (!orderResponse.success) {
             return res.status(404).json({
@@ -503,17 +497,16 @@ router.get('/order-status/:orderId', async (req, res) => {
  */
 router.get('/test-config', async (req, res) => {
     try {
-        const isProduction = process.env.NODE_ENV === 'production';
         const clientId = process.env.CASHFREE_CLIENT_ID_PROD;
-        const clientSecret =process.env.CASHFREE_CLIENT_SECRET_PROD;
+        const clientSecret = process.env.CASHFREE_CLIENT_SECRET_PROD;
 
         res.status(200).json({
             success: true,
             data: {
-                environment: isProduction ? 'production' : 'test',
+                environment: 'production',
                 clientIdPresent: !!clientId,
                 clientSecretPresent: !!clientSecret,
-                baseUrl: isProduction ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg'
+                baseUrl: 'https://api.cashfree.com/pg'
             }
         });
 
