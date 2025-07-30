@@ -81,22 +81,12 @@ const CashFreePayment = ({
         try {
             console.log('Redirecting to CashFree checkout:', paymentData.payment_session_id);
 
-            // Create form element for CashFree checkout
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = 'https://api.cashfree.com/pg/orders/sessions'; // Will be updated based on environment
-            form.target = '_self';
-
-            // Add payment session ID
-            const sessionInput = document.createElement('input');
-            sessionInput.type = 'hidden';
-            sessionInput.name = 'payment_session_id';
-            sessionInput.value = paymentData.payment_session_id;
-            form.appendChild(sessionInput);
-
-            // Append form to body and submit
-            document.body.appendChild(form);
-            form.submit();
+            // Redirect to CashFree checkout using the payment session ID
+            const checkoutUrl = `https://api.cashfree.com/pg/orders/sessions/${paymentData.payment_session_id}`;
+            console.log('Redirecting to:', checkoutUrl);
+            
+            // Use window.location for redirect
+            window.location.href = checkoutUrl;
 
         } catch (error) {
             console.error('Error redirecting to CashFree:', error);

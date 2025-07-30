@@ -41,6 +41,8 @@ const generateHeaders = (config, idempotencyKey = null) => {
         headers['x-idempotency-key'] = idempotencyKey;
     }
     
+
+    
     return headers;
 };
 
@@ -98,6 +100,8 @@ const createOrder = async (orderData) => {
             amount: orderData.order_amount,
             customer_id: orderData.customer_id
         });
+        
+
         
         const response = await axios.post(
             `${config.baseUrl}/orders`,
@@ -284,7 +288,7 @@ const getTestCredentials = () => {
     return {
         clientId: 'TEST_CLIENT_ID',
         clientSecret: 'TEST_CLIENT_SECRET',
-        baseUrl: 'https://sandbox.cashfree.com/pg'
+        baseUrl: 'https://api.cashfree.com/pg'
     };
 };
 
