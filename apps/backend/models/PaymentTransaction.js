@@ -8,221 +8,210 @@ const paymentTransactionSchema = new mongoose.Schema({
         required: true
     },
     
-    // PayU Transaction details
-    txnid: {
+    // CashFree Order details
+    cf_order_id: {
         type: String,
         required: true,
         unique: true
     },
     
+    payment_session_id: {
+        type: String,
+        required: true
+    },
+    
     // Order information
-    amount: {
+    order_amount: {
         type: Number,
         required: true
     },
     
-    productinfo: {
+    order_currency: {
         type: String,
-        required: true
+        default: 'INR'
     },
     
-    firstname: {
+    order_status: {
         type: String,
-        required: true
+        enum: ['ACTIVE', 'PAID', 'EXPIRED', 'TERMINATION_REQUESTED', 'TERMINATED'],
+        default: 'ACTIVE'
     },
     
-    email: {
-        type: String,
-        required: true
+    // Customer details
+    customer_details: {
+        customer_id: {
+            type: String,
+            required: true
+        },
+        customer_phone: {
+            type: String,
+            required: true
+        },
+        customer_name: {
+            type: String,
+            required: true
+        },
+        customer_email: {
+            type: String,
+            required: true
+        }
     },
     
-    phone: {
-        type: String,
-        required: true
-    },
-    
-    // PayU response fields
-    mihpayid: {
-        type: String,
-        default: null
-    },
-    
-    mode: {
-        type: String,
-        default: null
-    },
-    
-    status: {
-        type: String,
-        enum: ['pending', 'success', 'failure', 'cancelled', 'refunded'],
-        default: 'pending'
-    },
-    
-    unmappedstatus: {
+    // CashFree Payment details
+    cf_payment_id: {
         type: String,
         default: null
     },
     
-    key: {
+    payment_status: {
         type: String,
-        required: true
+        enum: ['PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUNDED'],
+        default: 'PENDING'
     },
     
-    keyid: {
-        type: String,
-        default: null
-    },
-    
-    hash: {
-        type: String,
-        required: true
-    },
-    
-    field1: {
+    payment_method: {
         type: String,
         default: null
     },
     
-    field2: {
+    payment_channel: {
         type: String,
         default: null
     },
     
-    field3: {
-        type: String,
-        default: null
+    // Payment gateway details
+    payment_gateway_details: {
+        gateway_order_id: {
+            type: String,
+            default: null
+        },
+        gateway_payment_id: {
+            type: String,
+            default: null
+        },
+        gateway_status: {
+            type: String,
+            default: null
+        },
+        gateway_time: {
+            type: Date,
+            default: null
+        },
+        bank_reference: {
+            type: String,
+            default: null
+        },
+        auth_id: {
+            type: String,
+            default: null
+        },
+        authorization: {
+            type: Object,
+            default: null
+        }
     },
     
-    field4: {
-        type: String,
-        default: null
+    // Error details (for failed payments)
+    error_details: {
+        error_code: {
+            type: String,
+            default: null
+        },
+        error_description: {
+            type: String,
+            default: null
+        },
+        error_reason: {
+            type: String,
+            default: null
+        },
+        error_source: {
+            type: String,
+            default: null
+        },
+        error_type: {
+            type: String,
+            default: null
+        }
     },
     
-    field5: {
-        type: String,
-        default: null
+    // Order metadata
+    order_meta: {
+        return_url: {
+            type: String,
+            default: null
+        },
+        notify_url: {
+            type: String,
+            default: null
+        },
+        payment_methods: {
+            type: String,
+            default: null
+        }
     },
     
-    field6: {
-        type: String,
-        default: null
-    },
-    
-    field7: {
-        type: String,
-        default: null
-    },
-    
-    field8: {
-        type: String,
-        default: null
-    },
-    
-    field9: {
-        type: String,
-        default: null
-    },
-    
-    PG_TYPE: {
-        type: String,
-        default: null
-    },
-    
-    bank_ref_num: {
-        type: String,
-        default: null
-    },
-    
-    bankcode: {
-        type: String,
-        default: null
-    },
-    
-    error: {
-        type: String,
-        default: null
-    },
-    
-    error_Message: {
-        type: String,
-        default: null
-    },
-    
-    name_on_card: {
-        type: String,
-        default: null
-    },
-    
-    cardnum: {
-        type: String,
-        default: null
-    },
-    
-    cardhash: {
-        type: String,
-        default: null
-    },
-    
-    payment_source: {
-        type: String,
-        default: null
-    },
-    
-    PG_TYPE: {
-        type: String,
-        default: null
-    },
-    
-    bank_ref_num: {
-        type: String,
-        default: null
-    },
-    
-    // Additional tracking fields
-    subscriptionPlan: {
-        type: String,
-        enum: ['snap', 'snapx'],
-        required: true
-    },
-    
-    // Subscription duration for SnapX plans
-    subscriptionDuration: {
-        type: Number, // Duration in days
-        default: 30
+    // Order tags for additional data
+    order_tags: {
+        subscription_plan: {
+            type: String,
+            enum: ['snap', 'snapx'],
+            required: true
+        },
+        subscription_duration: {
+            type: Number, // Duration in days
+            default: 30
+        },
+        user_id: {
+            type: String,
+            required: true
+        }
     },
     
     // Webhook verification
-    webhookVerified: {
+    webhook_verified: {
         type: Boolean,
         default: false
     },
     
+    webhook_signature: {
+        type: String,
+        default: null
+    },
+    
     // Timestamps
-    createdAt: {
+    created_at: {
         type: Date,
         default: Date.now
     },
     
-    updatedAt: {
+    updated_at: {
         type: Date,
         default: Date.now
     },
     
-    paymentDate: {
+    payment_date: {
+        type: Date,
+        default: null
+    },
+    
+    order_expiry_time: {
         type: Date,
         default: null
     }
 });
 
-// Update the updatedAt field before saving
+// Update the updated_at field before saving
 paymentTransactionSchema.pre('save', function(next) {
-    this.updatedAt = Date.now();
+    this.updated_at = Date.now();
     next();
 });
 
 // Index for efficient queries
-paymentTransactionSchema.index({ userId: 1, status: 1 });
-paymentTransactionSchema.index({ mihpayid: 1 });
-paymentTransactionSchema.index({ createdAt: -1 });
+paymentTransactionSchema.index({ userId: 1, payment_status: 1 });
+paymentTransactionSchema.index({ cf_order_id: 1 });
+paymentTransactionSchema.index({ cf_payment_id: 1 });
+paymentTransactionSchema.index({ created_at: -1 });
+paymentTransactionSchema.index({ 'customer_details.customer_id': 1 });
 
 module.exports = mongoose.model('PaymentTransaction', paymentTransactionSchema); 

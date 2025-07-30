@@ -23,35 +23,37 @@ const PaymentFailure = () => {
         
         setPaymentData(paymentParams);
         
-        // Determine failure reason
-        if (paymentParams.error_Message) {
-            setErrorReason(paymentParams.error_Message);
-        } else if (paymentParams.error) {
-            setErrorReason(paymentParams.error);
-        } else if (paymentParams.status === 'failure') {
+        // Determine failure reason for CashFree
+        if (paymentParams.error_description) {
+            setErrorReason(paymentParams.error_description);
+        } else if (paymentParams.error_code) {
+            setErrorReason(`Error: ${paymentParams.error_code}`);
+        } else if (paymentParams.payment_status === 'FAILED') {
             setErrorReason('Payment was declined by your bank or payment provider');
+        } else if (paymentParams.order_status === 'EXPIRED') {
+            setErrorReason('Payment session expired. Please try again.');
         } else {
             setErrorReason('Payment could not be completed');
         }
     }, [searchParams]);
 
     const getFailureIcon = () => {
-        if (paymentData?.status === 'cancelled') {
+        if (paymentData?.order_status === 'EXPIRED') {
             return <AlertTriangle size={32} className="text-yellow-400" />;
         }
         return <XCircle size={32} className="text-red-400" />;
     };
 
     const getFailureTitle = () => {
-        if (paymentData?.status === 'cancelled') {
-            return 'Payment Cancelled';
+        if (paymentData?.order_status === 'EXPIRED') {
+            return 'Payment Expired';
         }
         return 'Payment Failed';
     };
 
     const getFailureMessage = () => {
-        if (paymentData?.status === 'cancelled') {
-            return 'You have cancelled the payment process. No amount has been charged.';
+        if (paymentData?.order_status === 'EXPIRED') {
+            return 'Your payment session has expired. No amount has been charged.';
         }
         return errorReason || 'Your payment could not be processed. Please try again.';
     };
@@ -63,7 +65,9 @@ const PaymentFailure = () => {
             'Bank declined the transaction',
             'Network connectivity issues',
             'Daily transaction limit exceeded',
-            'OTP verification failed'
+            'OTP verification failed',
+            'Payment session expired',
+            'Invalid payment method'
         ];
     };
 
@@ -71,7 +75,7 @@ const PaymentFailure = () => {
         navigate('/pricing', { 
             state: { 
                 retryPayment: true,
-                previousTxnId: paymentData?.txnid 
+                previousOrderId: paymentData?.order_id 
             }
         });
     };
@@ -80,7 +84,7 @@ const PaymentFailure = () => {
         navigate('/contact', { 
             state: { 
                 subject: 'Payment Failed',
-                message: `Payment failed for transaction: ${paymentData?.txnid || 'N/A'}\nError: ${errorReason}`
+                message: `Payment failed for order: ${paymentData?.order_id || 'N/A'}\nError: ${errorReason}`
             }
         });
     };
@@ -94,7 +98,7 @@ const PaymentFailure = () => {
                     {/* Status Icon */}
                     <div className="mb-6">
                         <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center ${
-                            paymentData?.status === 'cancelled' 
+                            paymentData?.order_status === 'EXPIRED' 
                                 ? 'bg-yellow-600' 
                                 : 'bg-red-600'
                         }`}>
@@ -112,27 +116,27 @@ const PaymentFailure = () => {
                         </p>
                         
                         {/* Transaction Details */}
-                        {paymentData?.txnid && (
+                        {paymentData?.order_id && (
                             <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-4">
-                                <h3 className="text-sm font-semibold text-red-300 mb-2">Transaction Details</h3>
+                                <h3 className="text-sm font-semibold text-red-300 mb-2">Order Details</h3>
                                 <div className="space-y-1 text-sm text-red-400">
                                     <div className="flex justify-between">
-                                        <span>Transaction ID:</span>
-                                        <span className="font-mono">{paymentData.txnid}</span>
+                                        <span>Order ID:</span>
+                                        <span className="font-mono">{paymentData.order_id}</span>
                                     </div>
-                                    {paymentData.amount && (
+                                    {paymentData.payment_id && (
                                         <div className="flex justify-between">
-                                            <span>Amount:</span>
-                                            <span>₹{paymentData.amount}</span>
+                                            <span>Payment ID:</span>
+                                            <span className="font-mono">{paymentData.payment_id}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between">
                                         <span>Status:</span>
-                                        <span className="capitalize">{paymentData.status || 'Failed'}</span>
+                                        <span className="capitalize">{paymentData.payment_status || paymentData.order_status || 'Failed'}</span>
                                     </div>
                                 </div>
                                 <p className="text-xs text-red-400 mt-2">
-                                    Please save this Transaction ID for support inquiries
+                                    Please save this Order ID for support inquiries
                                 </p>
                             </div>
                         )}

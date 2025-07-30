@@ -1,0 +1,723 @@
+Here’s a **complete Markdown documentation** for integrating **Cashfree Payment Gateway v2023‑08‑01** (previous version). I’ve cut the fluff. Strong, direct, forward-thinking, and ready for implementation.
+
+---
+
+# Cashfree Payments API Documentation – v2023‑08‑01
+
+## 🚀 Overview
+
+* **Version**: v2023‑08‑01 (use `x-api-version: 2023-08-01`) ([Cashfree][1], [Cashfree][2])
+* **Base URLs**:
+
+  * Sandbox: `https://sandbox.cashfree.com/pg`
+  * Production: `https://api.cashfree.com/pg` ([Cashfree][1])
+* **Auth**: Use `x-client-id`, `x-client-secret`, and `x-api-version`. Provide `x-request-id` and `x-idempotency-key` for tracing/idempotency. Only `/orders/sessions` does **not** require auth. ([Cashfree][1])
+
+---
+
+## 🆕 Release Notes & Visual Breaks
+
+* All `cf_*` IDs (`cf_order_id`, `cf_payment_id`, `cf_refund_id`) are strings now—no numeric IDs. ([Cashfree][3])
+* New header in every response: `x-deprecated-at` indicates version deprecation date. ([Cashfree][3])
+* Removed `notify_url` from Create Order API; use webhooks configured in dashboard. ([Cashfree][3])
+* New features released: Order Termination, Customer APIs, SPOS, Global Collections. ([Cashfree][3])
+
+---
+
+## 🧾 Authentication & Credential Validation
+
+### `POST /api/v1/credentials/verify`
+
+Use to verify your `AppId` & `SecretKey` before proceeding. (Merchant dashboard credentials check.) ([Cashfree][4])
+
+---
+
+## 📦 Orders Module
+
+### Create Order
+
+**POST** `/orders`
+
+**Headers**:
+
+```
+x-client-id  
+x-client-secret  
+x-api-version: 2023-08-01  
+x-idempotency-key: <UUID> (optional)  
+x-request-id: <unique> (optional)
+```
+
+**Body** (JSON): include:
+
+```json
+{
+  "order_currency": "INR",
+  "order_amount": 100.50,
+  "customer_details": { "customer_id": "123", "customer_phone": "9876543210", ... },
+  "order_meta": { "return_url": "https://yourapp.com/thankyou", ... },
+  "order_tags": {},
+  "cart_details": {}
+}
+```
+
+**Returns**: `cf_order_id`, `payment_session_id`, `order_status`, and more. ([Cashfree][5], [Cashfree][6])
+
+### Get Order
+
+**GET** `/orders/{order_id}`
+
+**Purpose**: Retrieve order status/details any time—after creation or post-payment redirection. ([Cashfree][6])
+
+### Terminate Order
+
+**PATCH** `/orders/{order_id}/terminate`
+
+**Purpose**: Request cancellation; status becomes `TERMINATION_REQUESTED` or `TERMINATED`. ([Cashfree][3])
+
+---
+
+## 💳 Payments Module
+
+### Order Pay (Backend / Server‑to‑Server)
+
+**POST** `/orders/sessions`
+
+**Headers**:
+`x-api-version: 2023-08-01`
+(idempotency/request headers optional)
+
+**Body**:
+
+```json
+{
+  "payment_session_id": "...",
+  "payment_method": {
+    "card": { "card_number": "...", "card_expiry_mm": "...", ... }
+  }
+}
+```
+
+**Flow**: For headless / S2S payment processing. PCI‑DSS must be enabled for cardflows. Returns `cf_payment_id`, `data.url` (redirect), etc. ([Cashfree][7])
+
+### Submit or Resend OTP
+
+**POST** `/payments/authenticate/{cf_payment_id}`
+
+**Body**:
+
+```json
+{ "otp": "123456", "action": "SUBMIT_OTP" }
+```
+
+Used for headless OTP flows. Supports `RESEND_OTP`. ([Cashfree][8])
+
+### Get Payments for an Order
+
+**GET** `/orders/{order_id}/payments`
+
+**Purpose**: List all payments tied to an order. Returns array with status, errors, payment\_method, etc. ([Cashfree][9])
+
+### Get Payment by ID
+
+**GET** `/orders/{order_id}/payments/{cf_payment_id}`
+
+**Purpose**: Specific payment details including authorization object, bank reference, message, timestamps. ([Cashfree][8])
+
+---
+
+## 🔔 Webhooks
+
+Cashfree sends three webhook event types for payment lifecycle events. ([Cashfree][10])
+
+### Event Types
+
+* `PAYMENT_SUCCESS_WEBHOOK`
+* `PAYMENT_FAILED_WEBHOOK`
+* `PAYMENT_USER_DROPPED_WEBHOOK`
+
+Each payload includes `order`, `payment`, `customer_details`, `payment_gateway_details`, and `error_details` when applicable. Sample payloads for all flows are in docs. ([Cashfree][10])
+
+**Tips**:
+Verify `x-webhook-signature`; treat raw JSON carefully to avoid signature mismatches. ([Cashfree][11])
+
+---
+
+## 💰 Settlements & Reconciliation
+
+### Get Settlements by Order ID
+
+**POST** `/settlement/recon` with `"filters": { "cf_settlement_ids": [...], "settlement_utrs": [...], "start_date": "...", "end_date": "..." }` & optional pagination cursor. ([Cashfree][2])
+
+### Get All Settlements
+
+Same endpoint supports full-run reconciliations based on date, UTR, or settlement ID filters. ([Cashfree][2])
+
+### PG-level Reconciliation
+
+Use `/reconciliation/pg` endpoint (POST) to fetch high-level gateway reconciliation data. ([Cashfree][2])
+
+---
+
+## 🔗 Payment Links
+
+* **POST** `/paylinks` — Create a payment link (`link_url`, `link_id`)
+* **GET** `/paylinks/{link_id}` — Get link details/status
+* **GET** `/paylinks/{link_id}/orders` — List orders via that link
+* **DELETE** `/paylinks/{link_id}` — Cancel the link ([Cashfree][1])
+
+---
+
+## 🧾 Offers & Eligibility (optional enhancements)
+
+### GET Eligible Offers
+
+**POST** `/eligibility/offers` with amount queries to retrieve applicable active offers for an order. Useful for UX. ([Cashfree][12])
+
+Also includes benefits for Paylater, EMI, cardless EMI via similar endpoints in `/eligibility/`. ([Cashfree][10])
+
+---
+
+## 🌐 Global Collections (Partners / Cross‑Border)
+
+### Overview
+
+For partner setups managing multiple merchants in cross-border flow. Use `x-partner-api-key` & `x-partner-merchantid` instead of merchant-client keys. ([Cashfree][13])
+
+### Key Endpoints
+
+* **GET** `/gc/transactions` — List partner transactions
+* **POST** `/gc/transactions/emulate` — Simulate funding in sandbox
+* **POST** `/gc/transactions/...` — Upload matching invoice details
+* **Webhook** specific to GC events ([Cashfree][14], [Cashfree][13], [Cashfree][15])
+
+---
+
+## 📁 Implementation Flow (Recommended)
+
+1. **Verify** credentials via `/api/v1/credentials/verify`
+2. **Create Order** → get `payment_session_id`
+3. **Client-side**: launch checkout using SDK or redirect
+4. **Server-side**: process S2S pay via `/orders/sessions`
+5. **Handle OTP flows** if headless: `/authenticate/{cf_payment_id}`
+6. **Listen to webhooks** to update statuses reliably
+7. **Query payments** with `/orders/{id}/payments` or by ID
+8. **Reconcile settlements** and perform financial sync regularly
+9. Optionally, **generate payment links** or offer eligibility calls
+10. If Partner/Cross‑Border use, integrate GC endpoints
+
+---
+
+## 🧩 Summary Table
+
+| Module             | Endpoint(s)                                                                                                    | Purpose                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Authentication     | `/api/v1/credentials/verify`                                                                                   | Validate credentials                                   |
+| Orders             | `POST /orders`, `GET /orders/{id}`, `PATCH /orders/{id}/terminate`                                             | Create, fetch, terminate orders                        |
+| Payments           | `POST /orders/sessions`, `POST /payments/authenticate/{id}`, `GET /orders/{id}/payments`, `GET /payments/{id}` | Process, authenticate, list, get payments              |
+| Webhooks           | Configured via dashboard                                                                                       | Payment success/failure/user-drop events               |
+| Payment Links      | `/paylinks` CRUD                                                                                               | Create/manage manual link flows                        |
+| Offers/Eligibility | `/eligibility/offers`, others                                                                                  | Fetch available PAY offers/EMI/PLater                  |
+| Settlements        | `/settlement/recon`, `/reconciliation/pg`                                                                      | Settlement & gateway reconciliation                    |
+| Token Vault        | Customer & instrument APIs under `/customers/.../instruments/...`                                              | Vaulting card/UPI instruments (overview, not detailed) |
+| Global Collections | `/gc/transactions`, simulation, invoice upload                                                                 | Partner cross-border collections flows                 |
+
+---
+
+## ✅ Key Notes & Best Practices
+
+* **Always** include `x-idempotency-key` on state‑changing calls to avoid duplicates.
+* **Don’t rely** on `cf_*` IDs as integers—they’re strings now. ([Cashfree][4], [Cashfree][5], [docs.cashfree.com][16], [Cashfree][8], [Cashfree][10], [Cashfree][12], [Cashfree][2])
+* **Configure webhooks** in dashboard; no `notify_url` in Order Create API.
+* **Use eligibility/offers** to improve UX and conversion.
+* **Log `cf_payment_id`**, use OTP endpoints if required for headless flows.
+* **Implement signature verification** of webhooks to avoid fraud. ([Cashfree][11])
+
+---
+
+This is your no‑nonsense, forward‑thinking, implementation‑ready documentation. Want full JSON schema blocks, SDK examples (Node/Python/Java), webhook handlers, or sample logging and error‑handling code next? Just say it.
+
+[1]: https://www.cashfree.com/docs/reference/pg-new-apis-endpoint?utm_source=chatgpt.com "Payment Gateway end points"
+[2]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/settlements/settlement-reconciliation?utm_source=chatgpt.com "Settlement Reconciliation"
+[3]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/release-notes?utm_source=chatgpt.com "Release Notes: v2023-08-01"
+[4]: https://www.cashfree.com/docs/api-reference/payments/latest/subscription/endpoints?utm_source=chatgpt.com "End Points"
+[5]: https://www.cashfree.com/docs/reference/pgcreateorder?utm_source=chatgpt.com "Create Order"
+[6]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/orders/get?utm_source=chatgpt.com "Get Order"
+[7]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/pay?utm_source=chatgpt.com "Order Pay"
+[8]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/get?utm_source=chatgpt.com "Get Payment by ID"
+[9]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/get-payments-for-order?utm_source=chatgpt.com "Get Payments for an Order"
+[10]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/webhooks?utm_source=chatgpt.com "Payment Webhooks"
+[11]: https://www.cashfree.com/docs/api-reference/payments/latest/payments/webhooks?utm_source=chatgpt.com "Payment Webhooks"
+[12]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payment-methods/get-offers-for-order?utm_source=chatgpt.com "Get Eligible Offers for an Order"
+[13]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/cross-border/global-collections/overview?utm_source=chatgpt.com "Overview"
+[14]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/cross-border/global-collections/partner/get-transactions?utm_source=chatgpt.com "Get Transactions"
+[15]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/cross-border/global-collections/endpoints?utm_source=chatgpt.com "End Points"
+[16]: https://docs.cashfree.com/reference/pgpayorder?utm_source=chatgpt.com "Order Pay"
+
+
+Here’s a full **Markdown reference guide** to integrate Cashfree Payment Gateway — **v2023‑08‑01 (“previous” version)** APIs, based on official endpoints and release notes. I’m skeptical and precise—no fluff. Let's get to it:
+
+---
+
+## 💡 Overview
+
+* API version: **v2023‑08‑01** (Latest was v4 in August 1 2023; v5 available 2025‑01‑01) ([Cashfree][1], [Cashfree][2])
+* Base URLs:
+
+  * **Sandbox/Test**: `https://sandbox.cashfree.com/pg`
+  * **Production**: `https://api.cashfree.com/pg` ([Cashfree][1])
+* Authentication: Include `x-client-id`, `x-client-secret` and `x-api-version: 2023‑08‑01` in headers. Use `x-request-id` and `x-idempotency-key` for tracing and idempotency. The `/orders/sessions` endpoint is unauthenticated (client-side) ([Cashfree][3])
+* Responses are in JSON. IDs like `cf_order_id`, `cf_payment_id`, `cf_refund_id` are strings (breaking change) ([Cashfree][4])
+
+---
+
+## 🧾 Authentication & Setup
+
+### Verify Credentials
+
+```
+POST /api/v1/credentials/verify
+Headers: x-client-id, x-client-secret, x-api-version
+```
+
+Use this to validate your AppId & SecretKey. Upper-level trust setup. ([Cashfree][5])
+
+---
+
+## 📦 Orders
+
+### Create Order
+
+```
+POST /orders
+Headers: x-client-id, x-client-secret, x-api-version
+Body: order_amount, order_currency, customer_details, order_meta, order_tags, cart_details
+```
+
+Returns `cf_order_id`, `payment_session_id`, `order_status`, etc. Use session ID to launch checkout via JS or hosted SDK. ([cashfreepayments-d00050e9-pay-method.mintlify.app][6])
+
+### Get Order
+
+```
+GET /orders/{order_id}
+```
+
+Fetch complete order details. Ideal post-redirection or on-demand status check. ([Cashfree][7])
+
+### Terminate Order
+
+```
+PATCH /orders/{order_id}/terminate
+```
+
+Requests termination; sets `order_status = TERMINATION_REQUESTED` or `TERMINATED`. ([Cashfree][4])
+
+---
+
+## 💳 Payments
+
+### Order Pay (payment processing via backend)
+
+```
+POST /orders/sessions
+Headers: x-api-version (authenticated not required)
+Body: { payment_method: {...}, payment_session_id }
+```
+
+Processes payment using session ID. Requires S2S enabled; for card payments PCI‑DSS compliance required. ([Cashfree][3])
+
+### Submit / Resend OTP (for headless OTP flows)
+
+```
+POST /orders/pay/authenticate/{cf_payment_id}
+Body: { otp, action: "SUBMIT_OTP" or "RESEND_OTP" }
+```
+
+Used if OTP is captured on merchant side. Requires headless OTP enabled on account. ([Cashfree][8])
+
+### Get Payments for an Order
+
+```
+GET /orders/{order_id}/payments
+```
+
+Lists all payments linked to a specific order. ([Cashfree][1])
+
+### Get Payment by ID
+
+```
+GET /orders/{order_id}/payments/{cf_payment_id}
+```
+
+Fetch details of one specific payment. Returns status, method, time, auth, error details. ([Cashfree][9])
+
+---
+
+## 🧾 Webhooks
+
+Cashfree triggers three webhook events (v2023‑08‑01):
+
+* `PAYMENT_SUCCESS_WEBHOOK`
+* `PAYMENT_FAILED_WEBHOOK`
+* `PAYMENT_USER_DROPPED_WEBHOOK`
+
+Each payload includes order, payment, customer, gateway and error details where applicable. Use these to drive order status updates, fulfillment, retries, notifications. ([Cashfree][10])
+
+---
+
+## 📬 Settlements & Reconciliation
+
+### Get Settlements by Order ID
+
+```
+GET /settlements?order_id={...}
+```
+
+Lists settlements related to a specific order. ([Cashfree][1])
+
+### Get All Settlements or by Date Range
+
+```
+GET /settlements
+?settlement_id=... or utr=... or date_from & date_to
+```
+
+Full settlement reconciliation across orders. ([Cashfree][1])
+
+### PG Reconciliation
+
+```
+GET /reconciliation/pg
+?date_from=...&date_to=...
+```
+
+High-level gateway reconciliation details over a date range. ([Cashfree][1])
+
+---
+
+## 🔗 Payment Links
+
+Endpoints to create and manage manual payment links:
+
+* `POST /paylinks` — generate link, returns `link_url`
+* `GET /paylinks/{link_id}` — view link status
+* `GET /paylinks/{link_id}/orders` — fetch all orders created via that link
+* `DELETE /paylinks/{link_id}` — cancel an active link
+  ([Cashfree][1])
+
+---
+
+## 🧠 Token Vault
+
+Manage saved instruments per customer:
+
+* `GET /customers/{customer_id}/instruments` — fetch all
+* `GET /customers/{customer_id}/instruments/{instrument_id}` — single
+* `DELETE …/instruments/...` — delete saved instrument
+* `GET …/instruments/.../cryptogram` — fetch token, expiry, cryptogram
+  Used for vaulting cards, UPI instruments. ([Cashfree][1])
+
+---
+
+## 🌐 Global Collections (for Partner + Cross-Border)
+
+These endpoints apply if integrating as a partner (GC module):
+
+* `GET /gc/transactions` — list transactions for partner merchants
+* `POST /gc/transactions/emulate` — simulate funding in sandbox testing
+* `POST /gc/transactions/<add details>` — upload invoices to match transaction amount
+* Partner webhook support for GC events
+  ([Cashfree][11], [Cashfree][12], [Cashfree][13])
+
+Headers: `x-partner-api-key`, `x-partner-merchantid`, `x-api-version` rather than client-side keys. ([Cashfree][12])
+
+---
+
+## ⚙️ Implementation Flow
+
+1. **Verify credentials** (`/credentials/verify`)
+2. **Create order** → get `payment_session_id`
+3. **Launch checkout** via JS SDK or redirect using session ID
+4. **Backend calls** `/orders/sessions` optionally for server-side processing
+5. **If needed**, accept OTP and call `/authenticate/{cf_payment_id}`
+6. Listen for **webhooks** to update order status
+7. Provide **order/payment detail APIs** for status queries
+8. Use **settlement** and **reconciliation** endpoints for backend finance sync
+9. Optionally, set up GC (global collections) if cross-border partner model
+
+---
+
+## ⚠️ Breaking Changes (from older v3/V1–V2 to v4/v2023‑08‑01)
+
+* IDs (`cf_order_id`, etc.) are strings (no numeric) ([Cashfree][14], [PyPI][15], [cashfreepayments-d00050e9-pay-method.mintlify.app][6], [Cashfree][3], [Cashfree][8], [Cashfree][4])
+* `payment_session_id` replaces previous `order_token`/`payment_link`; required for SDK workflows ([cashfreepayments-d00050e9-pay-method.mintlify.app][6])
+* `notify_url` in Create Order API removed; use webhooks from dashboard instead ([Cashfree][4])
+* New APIs: Customer management, Order termination, SPOS, Global collections ([Cashfree][4])
+
+---
+
+## ✅ Sample cURL Examples
+
+### Create Order (Sandbox)
+
+```bash
+curl -X POST https://sandbox.cashfree.com/pg/orders \
+  -H 'Content-Type: application/json' \
+  -H 'x-client-id: YOUR_CLIENT_ID' \
+  -H 'x-client-secret: YOUR_SECRET' \
+  -H 'x-api-version: 2023-08-01' \
+  -d '{"order_amount":100,"order_currency":"INR","customer_details":{...},"order_meta":{...}}'
+```
+
+### Order Pay (Backend)
+
+```bash
+curl -X POST https://sandbox.cashfree.com/pg/orders/sessions \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-version: 2023-08-01' \
+  -d '{"payment_method":{...},"payment_session_id":"..."}'
+```
+
+### Webhook: Payment Success Payload snippet
+
+```json
+{
+  "type":"PAYMENT_SUCCESS_WEBHOOK",
+  "data":{"order":{"order_id":"..."},"payment":{"cf_payment_id":"...","payment_status":"SUCCESS", ...}}
+}
+```
+
+---
+
+## 🧩 Summary Table
+
+| Module             | Endpoint                                                                     | Purpose                              |
+| ------------------ | ---------------------------------------------------------------------------- | ------------------------------------ |
+| Credentials        | `/api/v1/credentials/verify`                                                 | Initial setup check                  |
+| Orders             | `/orders`, `/orders/{id}`, `/terminate`                                      | Create, fetch, terminate             |
+| Payments           | `/orders/sessions`, `/authenticate/{cf_payment_id}`, `/orders/{id}/payments` | Process Pay, OTP, fetch payments     |
+| Webhooks           | n/a (configured via dashboard)                                               | Payment success/failure/user-dropped |
+| Payment Links      | `/paylinks`, `/{id}`, `/.../orders`, `/.../cancel`                           | Create & manage pay-links            |
+| Token Vault        | `/customers/.../instruments/...`                                             | Manage saved payment methods         |
+| Settlements        | `/settlements`, `/reconciliation/pg`                                         | Financial reconciliation             |
+| Global Collections | `/gc/transactions`, `/gc/.../emulate`                                        | Partner cross-border management      |
+
+---
+
+That's your end‑to‑end automation blueprint in Markdown. It’s thorough, no sugarcoating—ready for documentation or code generation. Let me know if you need sample JSON schema definitions or SDK integration examples next!
+
+[1]: https://www.cashfree.com/docs/reference/pg-new-apis-endpoint?utm_source=chatgpt.com "Payment Gateway end points"
+[2]: https://www.cashfree.com/docs/api-reference/payments/latest/subscription/endpoints?utm_source=chatgpt.com "End Points"
+[3]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/pay?utm_source=chatgpt.com "Order Pay"
+[4]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/release-notes?utm_source=chatgpt.com "Release Notes: v2023-08-01"
+[5]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/subscription/endpoints?utm_source=chatgpt.com "End Points"
+[6]: https://cashfreepayments-d00050e9-pay-method.mintlify.app/payments/migration/overview?utm_source=chatgpt.com "Migration - Cashfree Payments Developer Documentation"
+[7]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/orders/get?utm_source=chatgpt.com "Get Order"
+[8]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/authenticate?utm_source=chatgpt.com "Submit or Resend OTP"
+[9]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/get?utm_source=chatgpt.com "Get Payment by ID"
+[10]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/webhooks?utm_source=chatgpt.com "Payment Webhooks"
+[11]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/cross-border/global-collections/partner/simulate-transaction?utm_source=chatgpt.com "Simulate Transaction"
+[12]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/cross-border/global-collections/partner/get-transactions?utm_source=chatgpt.com "Get Transactions"
+[13]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/cross-border/global-collections/overview?utm_source=chatgpt.com "Overview"
+[14]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/split/end-points?utm_source=chatgpt.com "End Points"
+[15]: https://pypi.org/project/cashfree-pg/?utm_source=chatgpt.com "Cashfree PG Python SDK"
+
+
+Here’s a direct, no‑nonsense, Markdown-style comprehensive integration guide for Cashfree **v2023‑08‑01 Payments API**, covering all core endpoints and workflows — ready to paste into your docs (or code).
+
+---
+
+## 🚀 Cashfree Payments API (v2023‑08‑01)
+
+**Base URLs**
+
+* **Sandbox (test)**: `https://sandbox.cashfree.com/pg`
+* **Production**: `https://api.cashfree.com/pg`  ([Cashfree][1], [Cashfree][2])
+
+**Headers (required for most APIs)**
+
+```
+x-client-id: <your client ID>
+x-client-secret: <your client secret>
+x-api-version: 2023-08-01
+x-request-id: <optional, unique per call>
+x-idempotency-key: <UUID> — to safely retry operations
+Content-Type: application/json
+```
+
+**Note**: API responses include `x-deprecated-at` header to signal version deprecation date. ([Cashfree][3])
+
+---
+
+## 📦 Orders
+
+### ### `POST /orders` — Create Order
+
+Create an order with amount, currency, customer details, and metadata. Returns `order_id` (string) and `payment_session_id`. ([Cashfree][2])
+
+### ### `GET /orders/{order_id}` — Get Order
+
+Retrieve full order info: amount, status, customer, session ID, expiry etc. Use to check payment status or after return from checkout. ([Cashfree][2])
+
+### ### `PATCH /orders/{order_id}` — Terminate Order
+
+Request termination of an active order. The response will show `order_status` changed to `TERMINATION_REQUESTED` or `TERMINATED`. ([Cashfree][3])
+
+---
+
+## 💳 Payments
+
+### ### `POST /orders/sessions` — Order Pay (process payment)
+
+Trigger payment using `payment_session_id`. Include payload: payment\_method object (e.g. card/upi etc). Only endpoint NOT requiring auth headers. ([Cashfree][4])
+
+Example body:
+
+```json
+{
+  "payment_method": { "card": { ... } },
+  "payment_session_id": "<SESSION_ID>"
+}
+```
+
+### ### `GET /orders/{order_id}/payments` — Get Payments for Order
+
+Returns list of payment attempts, their statuses, amounts, channels. ([docs.cashfree.com][5])
+
+### ### `GET /orders/{order_id}/payments/{cf_payment_id}` — Get Payment by ID
+
+Fetch detailed info on a specific payment: status, timestamps, bank reference, UPI details or card, captured status. ([Cashfree][6])
+
+---
+
+## 🔔 Webhooks — **Always process asynchronously**
+
+Cashfree will POST to your listener with events:
+
+* `PAYMENT_SUCCESS_WEBHOOK`
+* `PAYMENT_FAILED_WEBHOOK`
+* `PAYMENT_USER_DROPPED_WEBHOOK`
+
+Always parse signature headers (`x-webhook-signature`, version `2023‑08‑01`) for security. Payload includes `order`, `payment`, `customer_details`, `payment_gateway_details`, plus optional `payment_offers`. ([Cashfree][7])
+
+---
+
+## 💰 Settlements & Reconciliation
+
+### ### `GET /orders/{order_id}/settlements` — Settlements by Order
+
+Inspect settlement events for that order: status, amounts, UTR, service charges, refund info. ([Cashfree][8])
+
+### ### `POST /settlement/recon` — Settlement Reconciliation
+
+Query using settlement IDs, UTRs, or date range. Returns granular itemized entries (refund, fees, adjustments). ([Cashfree][9])
+
+---
+
+## 🧩 Additional Modules (not exhaustive but essentials)
+
+* **Payment Links**:
+  `POST /payment-links`, `GET /payment-links/{id}`, `GET /payment-links/{id}/orders`, `DELETE /payment-links/{id}` ([Cashfree][1])
+
+* **Token Vault**:
+  Fetch or manage saved instruments for customers & fetch cryptogram/token metadata. APIs:
+  `GET /token-vault/customers/{customer_id}/instruments`, etc. ([Cashfree][1])
+
+* **Customer Management**:
+  Create/manage customers, obtain `customer_uid`. Required if you plan to issue UPI or card token flows. ([cashfreepayments-d00050e9-pay-method.mintlify.app][10])
+
+* **Easy-Split (Marketplace payouts)**:
+  APIs to configure vendors, create split settlements, fetch by order ID. Includes on‑demand balance transfer. ([Cashfree][11])
+
+* **Refunds, Offers, Disputes, Cross-border, softPOS, Subscription, VBA, etc.**
+  All modules available; follow similar pattern under the same base URL. ([Cashfree][1])
+
+---
+
+## 🧠 Integration Flow Summary
+
+```text
+[Backend → POST /orders] → get order_id + payment_session_id
+[Frontend/web or mobile SDK → use session_id to initiate payment flow]
+                ↓
+[Cashfree Checkout → webhooks success/failure/user_dropped → Backend listener]
+                ↓
+[Backend → GET /orders/{order_id} or /payments/{...} to confirm status]
+                ↓
+[Backend → GET /orders/{order_id}/settlements] to reconcile
+                ↓
+[Optional → POST /settlement/recon for bulk reconciliation]
+```
+
+---
+
+## 🔧 Best Practices & Gotchas
+
+* **IDs are now strings** (`cf_order_id`, `cf_payment_id`, `cf_refund_id`) — breaking change from prior versions. ([Cashfree][3])
+* `payments`, `refunds`, `settlements` links **removed** from order entity JSON → use dedicated endpoints. ([Cashfree][3])
+* `notify_url` no longer used in create order → rely on **webhooks** instead. ([Cashfree][3])
+* Whitelist your domain or mobile package before going live. ([cashfreepayments-d00050e9-pay-method.mintlify.app][10])
+
+---
+
+## 📋 Sample Doc Structure (Markdown)
+
+```md
+# Cashfree Payment Gateway Integration (v2023‑08‑01)
+
+## Overview
+- Base URLs
+- Authentication & headers
+
+## Orders
+### POST /orders
+### GET /orders/{order_id}
+### PATCH /orders/{order_id}
+
+## Payments
+### POST /orders/sessions
+### GET /orders/{order_id}/payments
+### GET /orders/{order_id}/payments/{cf_payment_id}
+
+## Webhooks
+### PAYMENT_SUCCESS_WEBHOOK
+### PAYMENT_FAILED_WEBHOOK
+### PAYMENT_USER_DROPPED_WEBHOOK
+- Signature validation
+
+## Settlements & Reconciliation
+### GET /orders/{order_id}/settlements
+### POST /settlement/recon
+
+## Additional Modules
+- Payment Links
+- Token Vault
+- Customers
+- Easy‑Split, etc.
+
+## Migration Notes
+- ID types, removed fields, new termination API
+
+## SDK Examples
+- Node/Python/Java etc.
+
+## Error codes & limits
+- Rate limits
+- Common error responses
+```
+
+---
+
+Need code samples for **Python**, **Node**, or mobile SDK? I can dump fully-functional, ready-to-run implementations (not just snippets). Let me know what language/stack you’re using, and I’ll generate it.
+
+[1]: https://www.cashfree.com/docs/reference/pg-new-apis-endpoint?utm_source=chatgpt.com "Payment Gateway end points"
+[2]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/orders/get?utm_source=chatgpt.com "Get Order"
+[3]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/release-notes?utm_source=chatgpt.com "Release Notes: v2023-08-01"
+[4]: https://www.cashfree.com/docs/android-integration?utm_source=chatgpt.com "Android Integration"
+[5]: https://docs.cashfree.com/reference/pgpayorder?utm_source=chatgpt.com "Order Pay"
+[6]: https://www.cashfree.com/docs/api-reference/payments/latest/payments/webhooks?utm_source=chatgpt.com "Payment Webhooks"
+[7]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/webhooks?utm_source=chatgpt.com "Payment Webhooks"
+[8]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/settlements/settlements-for-order?utm_source=chatgpt.com "Get Settlements by Order ID"
+[9]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/settlements/settlement-reconciliation?utm_source=chatgpt.com "Settlement Reconciliation"
+[10]: https://cashfreepayments-d00050e9-pay-method.mintlify.app/payments/migration/overview?utm_source=chatgpt.com "Migration - Cashfree Payments Developer Documentation"
+[11]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/split/settlements/overview?utm_source=chatgpt.com "Settlements Overview"
