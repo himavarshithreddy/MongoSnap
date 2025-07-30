@@ -4,7 +4,7 @@ import ErrorNotification from './ErrorNotification';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
-const CashFreePayment = ({ 
+const PayUPayment = ({ 
     subscriptionPlan = 'snapx', 
     onClose,
     isVisible = false 
@@ -15,7 +15,7 @@ const CashFreePayment = ({
     const [phone, setPhone] = useState('');
 
     /**
-     * Create CashFree payment order
+     * Create PayU payment order
      */
     const createPaymentOrder = async () => {
         try {
@@ -38,7 +38,7 @@ const CashFreePayment = ({
                 return;
             }
 
-            console.log('Creating CashFree payment order...');
+            console.log('Creating PayU payment order...');
 
             const response = await fetchWithAuth('/api/payment/create-order', {
                 method: 'POST',
@@ -60,8 +60,8 @@ const CashFreePayment = ({
             console.log('Payment order created:', data);
 
             if (data.success && data.data) {
-                // Redirect to CashFree checkout
-                redirectToCashFree(data.data);
+                // Submit form to PayU
+                submitToPayU(data.data);
             } else {
                 throw new Error('Invalid response from payment service');
             }
@@ -75,21 +75,33 @@ const CashFreePayment = ({
     };
 
     /**
-     * Redirect to CashFree checkout
+     * Submit payment form to PayU
      */
-    const redirectToCashFree = (paymentData) => {
+    const submitToPayU = (paymentData) => {
         try {
-            console.log('Redirecting to CashFree checkout:', paymentData.payment_session_id);
+            console.log('Submitting to PayU:', paymentData.paymentUrl);
 
-            // Redirect to CashFree checkout page
-            const checkoutUrl = `https://payments.cashfree.com/order/#${paymentData.payment_session_id}`;
-            console.log('Redirecting to:', checkoutUrl);
-            
-            // Use window.location for redirect
-            window.location.href = checkoutUrl;
+            // Create form element
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = paymentData.paymentUrl;
+            form.target = '_self'; // Open in same window
+
+            // Add form fields
+            Object.keys(paymentData.formData).forEach(key => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = paymentData.formData[key];
+                form.appendChild(input);
+            });
+
+            // Append form to body and submit
+            document.body.appendChild(form);
+            form.submit();
 
         } catch (error) {
-            console.error('Error redirecting to CashFree:', error);
+            console.error('Error submitting to PayU:', error);
             setError('Failed to redirect to payment gateway');
         }
     };
@@ -180,7 +192,7 @@ const CashFreePayment = ({
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                 </svg>
-                                Pay ₹1
+                                Pay ₹359
                             </>
                         )}
                     </button>
@@ -202,4 +214,4 @@ const CashFreePayment = ({
     );
 };
 
-export default CashFreePayment; 
+export default PayUPayment; 

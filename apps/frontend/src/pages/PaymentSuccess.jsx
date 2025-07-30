@@ -25,7 +25,7 @@ const PaymentSuccess = () => {
         const paymentParams = extractPaymentData();
         console.log('Payment success page - received params:', paymentParams);
 
-        if (paymentParams.order_id && paymentParams.payment_session_id) {
+        if (paymentParams.txnid && paymentParams.status) {
             setPaymentData(paymentParams);
             verifyPayment(paymentParams);
         } else {
@@ -44,16 +44,13 @@ const PaymentSuccess = () => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    order_id: paymentParams.order_id,
-                    payment_session_id: paymentParams.payment_session_id
-                })
+                body: JSON.stringify(paymentParams)
             });
 
             const result = await response.json();
             console.log('Payment verification result:', result);
 
-            if (result.success && result.data.payment_status === 'SUCCESS') {
+            if (result.success && result.data.status === 'success') {
                 setVerificationStatus('success');
                 
                 // Refresh user data to get updated subscription
@@ -90,7 +87,7 @@ const PaymentSuccess = () => {
         navigate('/contact', { 
             state: { 
                 subject: 'Payment Issue',
-                message: `Payment verification failed for order: ${paymentData?.order_id || 'N/A'}`
+                message: `Payment verification failed for transaction: ${paymentData?.txnid || 'N/A'}`
             }
         });
     };
@@ -150,17 +147,17 @@ const PaymentSuccess = () => {
                                         <h3 className="text-sm font-semibold text-gray-300 mb-2">Payment Details</h3>
                                         <div className="space-y-1 text-sm text-gray-400">
                                             <div className="flex justify-between">
-                                                <span>Order ID:</span>
-                                                <span className="font-mono">{paymentData.order_id}</span>
+                                                <span>Transaction ID:</span>
+                                                <span className="font-mono">{paymentData.txnid}</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span>Amount:</span>
                                                 <span>₹{paymentData.amount}</span>
                                             </div>
-                                            {paymentData.cf_payment_id && (
+                                            {paymentData.mihpayid && (
                                                 <div className="flex justify-between">
                                                     <span>Payment ID:</span>
-                                                    <span className="font-mono">{paymentData.cf_payment_id}</span>
+                                                    <span className="font-mono">{paymentData.mihpayid}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -179,10 +176,10 @@ const PaymentSuccess = () => {
                                 </p>
                                 
                                 {/* Transaction Details for Failed Payment */}
-                                {paymentData?.order_id && (
+                                {paymentData?.txnid && (
                                     <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-4">
                                         <p className="text-sm text-red-300">
-                                            Order ID: <span className="font-mono">{paymentData.order_id}</span>
+                                            Transaction ID: <span className="font-mono">{paymentData.txnid}</span>
                                         </p>
                                         <p className="text-xs text-red-400 mt-1">
                                             Please save this ID for support inquiries
