@@ -47,7 +47,7 @@ MongoSnap is a web application for generating, running, and managing MongoDB que
 5. Upgrade to SnapX for higher limits and more features.
 
 ### Payments & Support
-- Payments are processed via PayU. SnapX is activated after payment.
+- Payments are processed via CashFree. SnapX is activated after payment.
 - For support, email [support@mongosnap.live](mailto:support@mongosnap.live) or use the in-app forms.
 
 ---
@@ -61,7 +61,7 @@ MongoSnap is a web application for generating, running, and managing MongoDB que
 | Frontend   | React, Vite, Tailwind CSS         |
 | Backend    | Node.js, Express, Mongoose        |
 | Database   | MongoDB Atlas                     |
-| Payments   | PayU                             |
+| Payments   | CashFree                         |
 | Email      | Nodemailer + Brevo (SMTP)         |
 | Hosting    | AWS                               |
 | Security   | JWT, CSRF, 2FA, HTTPS, Rate Limit |

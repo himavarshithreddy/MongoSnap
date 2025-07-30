@@ -9,7 +9,7 @@ import { useContext } from 'react';
 import { UserContext } from '../contexts/UserContext';
 import { useState } from 'react';
 import ErrorNotification from '../components/ErrorNotification';
-import PayUPayment from '../components/PayUPayment';
+import CashFreePayment from '../components/PayUPayment';
 
 const Pricing = () => {
     const navigate = useNavigate();
@@ -249,8 +249,8 @@ const Pricing = () => {
                 </div>
             </section>
 
-            {/* PayU Payment Modal */}
-            <PayUPayment
+                            {/* CashFree Payment Modal */}
+                <CashFreePayment
                 subscriptionPlan="snapx"
                 onSuccess={handlePaymentSuccess}
                 onFailure={handlePaymentFailure}

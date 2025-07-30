@@ -8,8 +8,8 @@ const paymentTransactionSchema = new mongoose.Schema({
         required: true
     },
     
-    // PayU Transaction details
-    txnid: {
+    // CashFree Order details
+    order_id: {
         type: String,
         required: true,
         unique: true
@@ -41,7 +41,35 @@ const paymentTransactionSchema = new mongoose.Schema({
         required: true
     },
     
-    // PayU response fields
+    // CashFree response fields
+    cf_payment_id: {
+        type: String,
+        default: null
+    },
+    
+    payment_session_id: {
+        type: String,
+        default: null
+    },
+    
+    order_status: {
+        type: String,
+        enum: ['ACTIVE', 'PAID', 'EXPIRED', 'TERMINATED', 'TERMINATION_REQUESTED'],
+        default: 'ACTIVE'
+    },
+    
+    payment_status: {
+        type: String,
+        enum: ['SUCCESS', 'FAILED', 'PENDING', 'USER_DROPPED'],
+        default: 'PENDING'
+    },
+    
+    // Legacy PayU fields (for backward compatibility)
+    txnid: {
+        type: String,
+        default: null
+    },
+    
     mihpayid: {
         type: String,
         default: null
@@ -65,7 +93,7 @@ const paymentTransactionSchema = new mongoose.Schema({
     
     key: {
         type: String,
-        required: true
+        default: null
     },
     
     keyid: {
@@ -75,9 +103,56 @@ const paymentTransactionSchema = new mongoose.Schema({
     
     hash: {
         type: String,
-        required: true
+        default: null
     },
     
+    // CashFree specific fields
+    payment_method: {
+        type: String,
+        default: null
+    },
+    
+    payment_gateway_details: {
+        type: Object,
+        default: null
+    },
+    
+    bank_reference: {
+        type: String,
+        default: null
+    },
+    
+    upi_id: {
+        type: String,
+        default: null
+    },
+    
+    card_number: {
+        type: String,
+        default: null
+    },
+    
+    card_network: {
+        type: String,
+        default: null
+    },
+    
+    card_type: {
+        type: String,
+        default: null
+    },
+    
+    card_country: {
+        type: String,
+        default: null
+    },
+    
+    card_bank_name: {
+        type: String,
+        default: null
+    },
+    
+    // Legacy PayU fields (for backward compatibility)
     field1: {
         type: String,
         default: null
@@ -168,16 +243,6 @@ const paymentTransactionSchema = new mongoose.Schema({
         default: null
     },
     
-    PG_TYPE: {
-        type: String,
-        default: null
-    },
-    
-    bank_ref_num: {
-        type: String,
-        default: null
-    },
-    
     // Additional tracking fields
     subscriptionPlan: {
         type: String,
@@ -195,6 +260,13 @@ const paymentTransactionSchema = new mongoose.Schema({
     webhookVerified: {
         type: Boolean,
         default: false
+    },
+    
+    // CashFree webhook event type
+    webhookEventType: {
+        type: String,
+        enum: ['PAYMENT_SUCCESS_WEBHOOK', 'PAYMENT_FAILED_WEBHOOK', 'PAYMENT_USER_DROPPED_WEBHOOK'],
+        default: null
     },
     
     // Timestamps
@@ -221,8 +293,12 @@ paymentTransactionSchema.pre('save', function(next) {
 });
 
 // Index for efficient queries
-paymentTransactionSchema.index({ userId: 1, status: 1 });
-paymentTransactionSchema.index({ mihpayid: 1 });
+paymentTransactionSchema.index({ userId: 1, payment_status: 1 });
+paymentTransactionSchema.index({ order_id: 1 });
+paymentTransactionSchema.index({ cf_payment_id: 1 });
 paymentTransactionSchema.index({ createdAt: -1 });
+
+// Note: txnid field is maintained for backward compatibility
+// No virtual needed as txnid is a real field in the schema
 
 module.exports = mongoose.model('PaymentTransaction', paymentTransactionSchema); 

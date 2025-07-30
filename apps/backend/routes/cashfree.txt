@@ -721,3 +721,149 @@ Need code samples for **Python**, **Node**, or mobile SDK? I can dump fully-func
 [9]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/settlements/settlement-reconciliation?utm_source=chatgpt.com "Settlement Reconciliation"
 [10]: https://cashfreepayments-d00050e9-pay-method.mintlify.app/payments/migration/overview?utm_source=chatgpt.com "Migration - Cashfree Payments Developer Documentation"
 [11]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/split/settlements/overview?utm_source=chatgpt.com "Settlements Overview"
+
+
+Here’s the **Markdown documentation for the Webhooks module**, tailored for **Cashfree Payments API v2023‑08‑01**. This clean, direct, implementation‑ready section plugs into your reference guide — logical, detailed, skeptical, and future‑proof.
+
+---
+
+## 🔔 Webhooks — Cashfree Payments v2023‑08‑01
+
+### ⚙️ Overview
+
+Cashfree sends **asynchronous HTTP POST** events to your server for key payment-state changes ([Cashfree][1]). Set up webhook endpoints via the Merchant Dashboard (`Developers → Webhooks`) to receive:
+
+* **PAYMENT\_SUCCESS\_WEBHOOK**
+* **PAYMENT\_FAILED\_WEBHOOK**
+* **PAYMENT\_USER\_DROPPED\_WEBHOOK**
+
+---
+
+### 🧩 Configuration & Dashboard Setup
+
+1. Navigate to *Payment Gateway → Developers → Webhooks* in your dashboard.
+2. Select **API version: 2023‑08‑01**, add your endpoint URL, and test the connection.
+3. Pick relevant events: success, failed, user dropped payment. Save it.
+4. Configure retry policy (default: 3 tries at 2, 10, 30 minutes; or fixed / exponential / custom) ([Cashfree][2], [Cashfree][3]).
+
+**Logs & Resend**
+
+* Use the *Logs* tab to view webhook delivery attempts.
+* Resend missed ones manually using *Batch Resend*, filtering by transaction IDs or time period ([Cashfree][4]).
+
+---
+
+### ✅ Webhook Payloads & Events
+
+#### **PAYMENT\_SUCCESS\_WEBHOOK**
+
+Triggered when a payment completes successfully. Use it as the final confirmation before fulfillment or status update:
+
+* `data.order`: includes `order_id`, `order_amount`, `order_currency`
+* `data.payment`: contains `cf_payment_id`, `payment_status: "SUCCESS"`, `payment_amount`, `payment_time`, optional `bank_reference`, plus `payment_method` details
+* `data.customer_details` & `payment_gateway_details`
+* `event_time`, `type: PAYMENT_SUCCESS_WEBHOOK` ([Cashfree][1])
+
+#### **PAYMENT\_FAILED\_WEBHOOK**
+
+Sent when a transaction fails (e.g. bank rejection). Useful for logging, notifying the customer, or triggering retry logic. Fields mirror success payload, but `payment_status: "FAILED"` ([Cashfree][1]).
+
+#### **PAYMENT\_USER\_DROPPED\_WEBHOOK**
+
+Dispatched when the user abandons the checkout flow. Useful for analytics or recovery campaigns (e.g. email, SMS nudges) with contextual info like `order_id`, `payment_session_id`, `customer_details`.
+
+---
+
+### 🔐 Signature & Security
+
+* Every webhook includes headers: `x-webhook-signature`, `x-webhook-timestamp`, `x-webhook-version`, `x-webhook-attempt`, `x-idempotency-key` ([Cashfree][5]).
+* **Signature computed** as HMAC-SHA256 over `<timestamp><raw_payload>` and then Base64‑encoded using your *client secret key*. Always verify before processing.
+* **Important**: Use **raw request body** while computing signature — parsing or modifying formats (e.g. decimals) can invalidate signature. Example: `payment_amount: 170.00` vs `170` ([Cashfree][3], [Cashfree][5]).
+
+---
+
+### 🧠 Idempotency & Duplicate Handling
+
+* Cashfree delivers with **at-least-once** intent — duplicates may occur.
+* Recommend deduplicating using `cf_payment_id` in your database.
+* **Only** treat `payment_status = SUCCESS` as final. Other statuses (`FAILED`, `PENDING`, etc.) are transitional and should not mark order paid ([Cashfree][6]).
+* If your webhook version supports `x-idempotency-key` (from 2025-01-01 onward), use it — but v2023-08-01 does not support it yet ([Cashfree][3]).
+
+---
+
+### 🛠 Troubleshooting & Best Practices
+
+* **Webhook didn’t trigger?**
+
+  * Ensure the endpoint responded with HTTP 200.
+  * Check Logs → Batch Resend if needed.
+  * Verify you’ve subscribed to the right event types ([Cashfree][4], [Cashfree][2]).
+
+* **Duplicate webhook events?**
+
+  * Caused by retries on failure or multiple subscriptions.
+  * Dedupe using `cf_payment_id` or monitor `x-idempotency-key` (if supported) ([Cashfree][4]).
+
+* **Configure intelligent retries or exponential backoff** inside your webhook logic to guard against duplicate handling.
+
+---
+
+### 📘 Example Flow & Code Snippet
+
+#### Workflow Summary
+
+1. Configure webhook endpoint in Dashboard for version **2023‑08‑01**.
+2. Receive POST payload with encrypted headers.
+3. Verify signature: `HMAC_SHA256(x-webhook-timestamp + raw_body)` vs `x-webhook-signature`.
+4. Parse and check `data.payment.payment_status === "SUCCESS"` **and** ensure `cf_payment_id` hasn't been handled already.
+5. Update order status, trigger fulfillment, send receipts, etc.
+6. Respond with HTTP 200 (no retry!). Else, Cashfree will resend.
+
+#### Pseudo‑code (Node.js/Express)
+
+```js
+app.post('/webhook', (req, res) => {
+  const ts = req.headers['x-webhook-timestamp'];
+  const sig = req.headers['x-webhook-signature'];
+  const raw = req.rawBody; // ⚠ raw body needed
+  const expected = crypto.createHmac('sha256', CLIENT_SECRET)
+                   .update(ts + raw).digest('base64');
+  if (sig !== expected) return res.status(400).end();
+
+  const event = JSON.parse(raw);
+  if (event.type === 'PAYMENT_SUCCESS_WEBHOOK') {
+    const p = event.data.payment;
+    if (p.payment_status === 'SUCCESS' && !db.has(p.cf_payment_id)) {
+      db.record(p.cf_payment_id);
+      updateOrder(event.data.order.order_id, 'PAID');
+      fulfillOrder(event.data.order.order_id);
+    }
+  }
+  res.status(200).end();
+});
+```
+
+---
+
+### 📋 Summary Table
+
+| Feature                | Details                                                                |
+| ---------------------- | ---------------------------------------------------------------------- |
+| Supported events       | `PAYMENT_SUCCESS`, `PAYMENT_FAILED`, `USER_DROPPED`                    |
+| Verification           | HMAC-SHA256 over raw payload prepended with timestamp using secret key |
+| Deduplication key      | `cf_payment_id` (store and check)                                      |
+| FINAL status threshold | Only treat `SUCCESS` as final                                          |
+| Retry policy control   | Set via dashboard retries or custom backoff in your logic              |
+| Logs & Resend          | Available via Dashboard under Developer → Webhooks                     |
+| Signature caveat       | Don’t parse payload before signature generation — use raw body         |
+
+---
+
+This webhook documentation is uncompromising, complete, and vocally practical. Implement securely, avoid assumptions, guard against duplicates, and rely only on trusted events. Need sample payloads for other payment methods or a combined full‑scope Markdown doc merging this with the endpoints guide? Say the word.
+
+[1]: https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/payments/webhooks?utm_source=chatgpt.com "Payment Webhooks"
+[2]: https://www.cashfree.com/docs/payments/online/webhooks/configure?utm_source=chatgpt.com "Overview"
+[3]: https://www.cashfree.com/docs/payments/online/webhooks/overview?utm_source=chatgpt.com "Overview"
+[4]: https://www.cashfree.com/docs/payments/online/webhooks/troubleshooting?utm_source=chatgpt.com "Overview"
+[5]: https://www.cashfree.com/docs/api-reference/payments/latest/payments/webhooks?utm_source=chatgpt.com "Payment Webhooks"
+[6]: https://www.cashfree.com/docs/payments/online/webhooks/webhook-indempotency?utm_source=chatgpt.com "Webhook Idempotency- Handling Duplicate Events and ..."

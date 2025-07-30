@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const User = require('../models/User');
 const { updateTokenUsage } = require('../utils/tokengeneration');
+const crypto = require('crypto');
 dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_ISSUER = process.env.JWT_ISSUER || 'mongosnap';
@@ -162,11 +163,29 @@ const checkUserSubscription = async (req, res, next) => {
     }
 };
 
+/**
+ * Middleware to capture raw body for webhook signature verification
+ */
+const captureRawBody = (req, res, next) => {
+    let data = '';
+    req.setEncoding('utf8');
+    
+    req.on('data', chunk => {
+        data += chunk;
+    });
+    
+    req.on('end', () => {
+        req.rawBody = data;
+        next();
+    });
+};
+
 module.exports = { 
     verifyToken, 
     generateCSRFToken, 
     validateCSRFToken,
     verifyTokenAndGenerateCSRF,
     verifyTokenAndValidateCSRF,
-    checkUserSubscription
+    checkUserSubscription,
+    captureRawBody
 };
