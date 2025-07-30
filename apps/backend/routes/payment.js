@@ -174,6 +174,7 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
             field1: subscriptionPlan,
             field2: userId.toString(),
             field3: '30'
+            // Note: txnid is not set for CashFree transactions (will be null by default)
         });
 
         await transaction.save();

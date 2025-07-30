@@ -67,7 +67,8 @@ const paymentTransactionSchema = new mongoose.Schema({
     // Legacy PayU fields (for backward compatibility)
     txnid: {
         type: String,
-        default: null
+        default: null,
+        sparse: true // Allow multiple null values
     },
     
     mihpayid: {
@@ -297,6 +298,9 @@ paymentTransactionSchema.index({ userId: 1, payment_status: 1 });
 paymentTransactionSchema.index({ order_id: 1 });
 paymentTransactionSchema.index({ cf_payment_id: 1 });
 paymentTransactionSchema.index({ createdAt: -1 });
+
+// Sparse index for txnid to handle null values properly
+paymentTransactionSchema.index({ txnid: 1 }, { sparse: true });
 
 // Note: txnid field is maintained for backward compatibility
 // No virtual needed as txnid is a real field in the schema
