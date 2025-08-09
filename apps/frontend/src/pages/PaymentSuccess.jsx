@@ -20,7 +20,7 @@ const PaymentSuccess = () => {
         if (orderId) {
             verifyPayment({ order_id: orderId });
         } else {
-            // Fallback for legacy PayU if present
+           
             if (params.txnid && params.status) {
                 // Legacy path unsupported in new flow; user should navigate pricing
                 setError('Legacy payment callback detected. Please contact support if amount was deducted.');

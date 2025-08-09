@@ -5,16 +5,8 @@ const { verifyToken, verifyTokenAndValidateCSRF } = require('./middleware');
 const PaymentTransaction = require('../models/PaymentTransaction');
 const User = require('../models/User');
 const UserUsage = require('../models/UserUsage');
-// PayU utilities (legacy) – keep imports for backward compatibility if needed
-const {
-    generatePaymentHash,
-    verifyResponseHash,
-    generateTransactionId,
-    validatePaymentParams,
-    formatAmount,
-    getPayUUrls,
-    sanitizeResponse
-} = require('../utils/payuHelper');
+// Utilities
+const { generateTransactionId, formatAmount } = require('../utils/PaymentHelper');
 // Cashfree utilities (new)
 const { createOrder: cfCreateOrder, getOrder: cfGetOrder, verifyWebhookSignature } = require('../utils/cashfree');
 const { sendPaymentConfirmationEmail, sendPlanUpgradeEmail } = require('../utils/mailer');
@@ -49,7 +41,7 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
         const userId = req.userId;
         const { subscriptionPlan, phone } = req.body;
 
-        console.log('Creating PayU payment order:', { userId, subscriptionPlan, phone });
+        console.log('Creating Cashfree payment order:', { userId, subscriptionPlan, phone });
 
         // Validate subscription plan
         if (!subscriptionPlan || !['snapx'].includes(subscriptionPlan)) {
@@ -475,57 +467,8 @@ router.get('/history', verifyToken, async (req, res) => {
     }
 });
 
-/**
- * GET /api/payment/test-config
- * Get test configuration for development
- */
-router.get('/test-config', (req, res) => {
-    if (process.env.NODE_ENV === 'production') {
-        return res.status(404).json({
-            success: false,
-            message: 'Not available in production'
-        });
-    }
+// (Optional) test-config endpoint removed; Cashfree testing uses sandbox mode with live URL
 
-    const { getTestCardDetails, getPayUUrls } = require('../utils/payuHelper');
-
-    res.status(200).json({
-        success: true,
-        data: {
-            testCards: getTestCardDetails(),
-            payuUrls: getPayUUrls(false),
-            environment: 'test'
-        }
-    });
-});
-
-// Legacy PayU callback endpoints (kept for backward compatibility during migration)
-router.post('/success', async (req, res) => {
-    try {
-        console.log('PayU /success callback received. Raw body:', req.body);
-        // Optionally, verify payment here or just redirect
-        const params = req.body;
-        const query = new URLSearchParams(params).toString();
-        console.log('Redirecting to frontend with query:', query);
-        // Redirect to frontend success page with query params
-        res.redirect(302, `${process.env.FRONTEND_URL}/payment/success?${query}`);
-    } catch (error) {
-        console.error('Error in /api/payment/success callback:', error);
-        res.redirect(302, `${process.env.FRONTEND_URL}/payment/success?error=callback_error`);
-    }
-});
-
-router.post('/failure', async (req, res) => {
-    try {
-        console.log('PayU /failure callback received. Raw body:', req.body);
-        const params = req.body;
-        const query = new URLSearchParams(params).toString();
-        console.log('Redirecting to frontend with query:', query);
-        res.redirect(302, `${process.env.FRONTEND_URL}/payment/failure?${query}`);
-    } catch (error) {
-        console.error('Error in /api/payment/failure callback:', error);
-        res.redirect(302, `${process.env.FRONTEND_URL}/payment/failure?error=callback_error`);
-    }
-});
+// Legacy callback endpoints removed
 
 module.exports = router; 

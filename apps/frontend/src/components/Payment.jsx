@@ -4,7 +4,7 @@ import ErrorNotification from './ErrorNotification';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
-const PayUPayment = ({ 
+const CashfreePayment = ({ 
     subscriptionPlan = 'snapx', 
     onClose,
     isVisible = false 
@@ -32,7 +32,7 @@ const PayUPayment = ({
     }, [isVisible]);
 
     /**
-     * Create PayU payment order
+     * Create Cashfree payment order
      */
     const createPaymentOrder = async () => {
         try {
@@ -213,4 +213,4 @@ const PayUPayment = ({
     );
 };
 
-export default PayUPayment; 
+export default CashfreePayment; 

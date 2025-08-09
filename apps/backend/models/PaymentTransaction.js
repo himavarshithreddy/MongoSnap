@@ -41,7 +41,7 @@ const paymentTransactionSchema = new mongoose.Schema({
         required: true
     },
     
-    // Gateway response fields (PayU / Cashfree)
+    
     mihpayid: {
         type: String,
         default: null
