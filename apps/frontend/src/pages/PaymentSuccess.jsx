@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useCallback } from 'react';
+import React, { useEffect, useState, useContext, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { UserContext } from '../contexts/UserContext';
 import { Check, Loader2, AlertCircle } from 'lucide-react';
@@ -11,16 +11,20 @@ const PaymentSuccess = () => {
     const [verificationStatus, setVerificationStatus] = useState('verifying'); // 'verifying', 'success', 'failed'
     const [paymentData, setPaymentData] = useState(null);
     const [error, setError] = useState('');
+    const verifyPaymentRef = useRef();
 
     useEffect(() => {
+        console.log('PaymentSuccess component mounted');
         // For Cashfree, we expect order_id in the return URL
         const params = Object.fromEntries([...searchParams.entries()]);
+        console.log('URL params:', params);
         setPaymentData(params);
         const orderId = params.order_id;
         if (orderId) {
-            verifyPayment({ order_id: orderId });
+            console.log('Found order_id, starting verification:', orderId);
+            verifyPaymentRef.current({ order_id: orderId });
         } else {
-           
+            console.log('No order_id found in URL params');
             if (params.txnid && params.status) {
                 // Legacy path unsupported in new flow; user should navigate pricing
                 setError('Legacy payment callback detected. Please contact support if amount was deducted.');
@@ -29,7 +33,7 @@ const PaymentSuccess = () => {
             }
             setVerificationStatus('failed');
         }
-    }, [searchParams, verifyPayment]);
+    }, [searchParams]); // Remove verifyPayment from deps to avoid circular dependency
 
     const verifyPayment = useCallback(async ({ order_id }) => {
         try {
@@ -82,6 +86,9 @@ const PaymentSuccess = () => {
             setError('Failed to verify payment. Please contact support.');
         }
     }, [fetchWithAuth, refreshUser]);
+
+    // Assign the function to ref for use in useEffect
+    verifyPaymentRef.current = verifyPayment;
 
     const handleContinue = () => {
         if (verificationStatus === 'success') {
