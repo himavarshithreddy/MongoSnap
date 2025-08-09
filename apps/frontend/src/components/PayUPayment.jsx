@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { UserContext } from '../contexts/UserContext';
 import ErrorNotification from './ErrorNotification';
 import PhoneInput from 'react-phone-number-input';
@@ -13,6 +13,23 @@ const PayUPayment = ({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [phone, setPhone] = useState('');
+    const hasLoadedSdk = useRef(false);
+
+    useEffect(() => {
+        if (!isVisible) return;
+        if (hasLoadedSdk.current) return;
+        // Ensure Cashfree SDK is available (added in index.html for Vite apps)
+        if (!window.Cashfree) {
+            const script = document.createElement('script');
+            script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+            script.async = true;
+            script.onload = () => { hasLoadedSdk.current = true; };
+            script.onerror = () => { setError('Failed to load payment SDK'); };
+            document.body.appendChild(script);
+        } else {
+            hasLoadedSdk.current = true;
+        }
+    }, [isVisible]);
 
     /**
      * Create PayU payment order
@@ -38,7 +55,7 @@ const PayUPayment = ({
                 return;
             }
 
-            console.log('Creating PayU payment order...');
+            console.log('Creating Cashfree payment order...');
 
             const response = await fetchWithAuth('/api/payment/create-order', {
                 method: 'POST',
@@ -59,9 +76,8 @@ const PayUPayment = ({
             const data = await response.json();
             console.log('Payment order created:', data);
 
-            if (data.success && data.data) {
-                // Submit form to PayU
-                submitToPayU(data.data);
+            if (data.success && data.data?.gateway === 'cashfree') {
+                await submitToCashfree(data.data);
             } else {
                 throw new Error('Invalid response from payment service');
             }
@@ -74,35 +90,18 @@ const PayUPayment = ({
         }
     };
 
-    /**
-     * Submit payment form to PayU
-     */
-    const submitToPayU = (paymentData) => {
+    // Submit to Cashfree checkout
+    const submitToCashfree = async (paymentData) => {
         try {
-            console.log('Submitting to PayU:', paymentData.paymentUrl);
-
-            // Create form element
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = paymentData.paymentUrl;
-            form.target = '_self'; // Open in same window
-
-            // Add form fields
-            Object.keys(paymentData.formData).forEach(key => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = key;
-                input.value = paymentData.formData[key];
-                form.appendChild(input);
+            if (!window.Cashfree) throw new Error('Payment SDK not loaded');
+            const cashfree = window.Cashfree({ mode: import.meta.env.PROD ? 'production' : 'sandbox' });
+            await cashfree.checkout({
+                paymentSessionId: paymentData.paymentSessionId,
+                redirectTarget: '_self'
             });
-
-            // Append form to body and submit
-            document.body.appendChild(form);
-            form.submit();
-
         } catch (error) {
-            console.error('Error submitting to PayU:', error);
-            setError('Failed to redirect to payment gateway');
+            console.error('Error submitting to Cashfree:', error);
+            setError('Failed to open payment checkout');
         }
     };
 
@@ -131,7 +130,7 @@ const PayUPayment = ({
                     <h3 className="text-lg font-semibold text-white mb-2">MongoSnap SnapX</h3>
                     <div className="text-gray-300 space-y-1">
                         <p>Monthly Subscription</p>
-                        <p className="text-2xl font-bold text-brand-quaternary">₹1</p>
+                        <p className="text-2xl font-bold text-brand-quaternary">₹359</p>
                         <p className="text-sm">Includes all premium features</p>
                     </div>
                 </div>

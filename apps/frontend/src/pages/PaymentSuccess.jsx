@@ -13,39 +13,29 @@ const PaymentSuccess = () => {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        // Extract payment parameters from URL
-        const extractPaymentData = () => {
-            const data = {};
-            for (const [key, value] of searchParams.entries()) {
-                data[key] = value;
-            }
-            return data;
-        };
-
-        const paymentParams = extractPaymentData();
-        console.log('Payment success page - received params:', paymentParams);
-
-        if (paymentParams.txnid && paymentParams.status) {
-            setPaymentData(paymentParams);
-            verifyPayment(paymentParams);
+        // For Cashfree, we expect order_id in the return URL
+        const params = Object.fromEntries([...searchParams.entries()]);
+        setPaymentData(params);
+        const orderId = params.order_id;
+        if (orderId) {
+            verifyPayment({ order_id: orderId });
         } else {
-            console.error('Missing required payment parameters');
-            setError('Invalid payment response received');
+            // Fallback for legacy PayU if present
+            if (params.txnid && params.status) {
+                // Legacy path unsupported in new flow; user should navigate pricing
+                setError('Legacy payment callback detected. Please contact support if amount was deducted.');
+            } else {
+                setError('Invalid payment response received');
+            }
             setVerificationStatus('failed');
         }
     }, [searchParams]);
 
-    const verifyPayment = async (paymentParams) => {
+    const verifyPayment = async ({ order_id }) => {
         try {
-            console.log('Verifying payment with backend...');
+            console.log('Verifying Cashfree payment with backend...');
 
-            const response = await fetchWithAuth('/api/payment/verify', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(paymentParams)
-            });
+            const response = await fetchWithAuth(`/api/payment/cf/verify?order_id=${encodeURIComponent(order_id)}`);
 
             const result = await response.json();
             console.log('Payment verification result:', result);
@@ -147,8 +137,8 @@ const PaymentSuccess = () => {
                                         <h3 className="text-sm font-semibold text-gray-300 mb-2">Payment Details</h3>
                                         <div className="space-y-1 text-sm text-gray-400">
                                             <div className="flex justify-between">
-                                                <span>Transaction ID:</span>
-                                                <span className="font-mono">{paymentData.txnid}</span>
+                                                <span>Order ID:</span>
+                                                <span className="font-mono">{paymentData.order_id}</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span>Amount:</span>

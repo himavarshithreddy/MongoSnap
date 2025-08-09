@@ -48,6 +48,7 @@ function App() {
         <Route path="/contact" element={<Contact />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/payment/cf-return" element={<PaymentSuccess />} />
         <Route path="/payment/failure" element={<PaymentFailure />} />
         <Route path="/privacy-policy" element={<Prolicy />} />
         <Route path="/terms-of-service" element={<Teervice />} />

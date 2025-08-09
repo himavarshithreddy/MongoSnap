@@ -9,30 +9,11 @@ const PaymentFailure = () => {
     const [errorReason, setErrorReason] = useState('');
 
     useEffect(() => {
-        // Extract payment parameters from URL
-        const extractPaymentData = () => {
-            const data = {};
-            for (const [key, value] of searchParams.entries()) {
-                data[key] = value;
-            }
-            return data;
-        };
-
-        const paymentParams = extractPaymentData();
-        console.log('Payment failure page - received params:', paymentParams);
-        
-        setPaymentData(paymentParams);
-        
-        // Determine failure reason
-        if (paymentParams.error_Message) {
-            setErrorReason(paymentParams.error_Message);
-        } else if (paymentParams.error) {
-            setErrorReason(paymentParams.error);
-        } else if (paymentParams.status === 'failure') {
-            setErrorReason('Payment was declined by your bank or payment provider');
-        } else {
-            setErrorReason('Payment could not be completed');
-        }
+        const params = Object.fromEntries([...searchParams.entries()]);
+        console.log('Payment failure page - received params:', params);
+        setPaymentData(params);
+        const reason = params.reason || params.error || params.error_Message || 'Payment could not be completed';
+        setErrorReason(reason);
     }, [searchParams]);
 
     const getFailureIcon = () => {
@@ -139,7 +120,7 @@ const PaymentFailure = () => {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="space-y-3 mb-6">
+            <div className="space-y-3 mb-6">
                         <button
                             onClick={handleRetryPayment}
                             className="w-full px-6 py-3 bg-brand-quaternary text-white rounded-lg hover:bg-brand-quaternary/90 font-semibold transition-all cursor-pointer flex items-center justify-center gap-2"

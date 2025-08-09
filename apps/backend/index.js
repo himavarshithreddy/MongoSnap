@@ -27,8 +27,11 @@ app.use(cors({
   credentials: true,
   sameSite: 'lax'
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // <-- Add this line
+// JSON parser; keep raw body for Cashfree webhook route only
+app.use((req, res, next) => {
+  if (req.path === '/api/payment/cf/webhook') return next();
+  express.json()(req, res, () => express.urlencoded({ extended: true })(req, res, next));
+});
 app.use(cookieParser());
 
 // Global rate limiter - applies to all requests

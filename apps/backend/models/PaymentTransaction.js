@@ -8,7 +8,7 @@ const paymentTransactionSchema = new mongoose.Schema({
         required: true
     },
     
-    // PayU Transaction details
+    // Gateway Transaction details
     txnid: {
         type: String,
         required: true,
@@ -41,7 +41,7 @@ const paymentTransactionSchema = new mongoose.Schema({
         required: true
     },
     
-    // PayU response fields
+    // Gateway response fields (PayU / Cashfree)
     mihpayid: {
         type: String,
         default: null
@@ -178,6 +178,11 @@ const paymentTransactionSchema = new mongoose.Schema({
         default: null
     },
     
+    // Cashfree identifiers
+    cf_order_id: { type: String, default: null },
+    cf_payment_session_id: { type: String, default: null },
+    cf_order_status: { type: String, default: null },
+
     // Additional tracking fields
     subscriptionPlan: {
         type: String,
@@ -212,6 +217,11 @@ const paymentTransactionSchema = new mongoose.Schema({
         type: Date,
         default: null
     }
+});
+
+// Track if upgrade email sent (idempotency across webhooks)
+paymentTransactionSchema.add({
+    upgradeEmailSent: { type: Boolean, default: false }
 });
 
 // Update the updatedAt field before saving

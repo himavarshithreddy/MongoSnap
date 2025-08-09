@@ -5,6 +5,7 @@ const { verifyToken, verifyTokenAndValidateCSRF } = require('./middleware');
 const PaymentTransaction = require('../models/PaymentTransaction');
 const User = require('../models/User');
 const UserUsage = require('../models/UserUsage');
+// PayU utilities (legacy) – keep imports for backward compatibility if needed
 const {
     generatePaymentHash,
     verifyResponseHash,
@@ -14,6 +15,8 @@ const {
     getPayUUrls,
     sanitizeResponse
 } = require('../utils/payuHelper');
+// Cashfree utilities (new)
+const { createOrder: cfCreateOrder, getOrder: cfGetOrder, verifyWebhookSignature } = require('../utils/cashfree');
 const { sendPaymentConfirmationEmail, sendPlanUpgradeEmail } = require('../utils/mailer');
 
 // Rate limiters for payment operations
@@ -39,7 +42,7 @@ const webhookLimiter = rateLimit({
 
 /**
  * POST /api/payment/create-order
- * Create PayU payment order
+ * Create Cashfree payment order
  */
 router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (req, res) => {
     try {
@@ -90,106 +93,69 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
             });
         }
 
-        // Get PayU configuration
-        const payuKey = process.env.PAYU_KEY;
-        const payuSalt = process.env.PAYU_SALT;
-        const isProduction = process.env.NODE_ENV === 'production';
-
-        if (!payuKey || !payuSalt) {
-            console.error('PayU configuration missing');
-            console.error('PayU Key present:', !!payuKey);
-            console.error('PayU Salt present:', !!payuSalt);
-            console.error('Environment:', process.env.NODE_ENV);
+        // Cashfree configuration check
+        if (!process.env.CASHFREE_CLIENT_ID || !process.env.CASHFREE_CLIENT_SECRET) {
+            console.error('Cashfree configuration missing');
             return res.status(500).json({
                 success: false,
                 message: 'Payment configuration error'
             });
         }
 
-        console.log('PayU Configuration:');
-        console.log('Environment:', isProduction ? 'production' : 'test');
-        console.log('PayU Key (first 6 chars):', payuKey ? payuKey.substring(0, 6) + '...' : 'MISSING');
-        console.log('PayU Salt (first 6 chars):', payuSalt ? payuSalt.substring(0, 6) + '...' : 'MISSING');
-
-        // Generate transaction ID
+        // Generate transaction ID (internal reference)
         const txnid = generateTransactionId('MONGOSNAP');
-        
-        // Set amount based on subscription plan
-        const amount = formatAmount(1); // SnapX price: ₹359
 
-        // Prepare payment parameters
-        const paymentParams = {
-            key: payuKey,
+        // Set amount based on subscription plan (INR)
+        const amount = parseFloat(formatAmount(359));
+
+        // Create Cashfree order
+        const cfOrder = await cfCreateOrder({
+            amount,
+            currency: 'INR',
+            customer: {
+                id: userId.toString(),
+                email: user.email,
+                phone: normalized,
+                name: user.name,
+            },
+            returnUrl: `${process.env.FRONTEND_URL}/payment/cf-return?order_id={order_id}`,
+        });
+
+        // Save transaction to database (pending)
+        const transaction = new PaymentTransaction({
+            userId: userId,
             txnid: txnid,
             amount: amount,
             productinfo: `MongoSnap ${subscriptionPlan.toUpperCase()} Subscription`,
             firstname: user.name,
             email: user.email,
-            phone: phone,
-            surl: `${process.env.BACKEND_URL}/api/payment/success`,
-            furl: `${process.env.BACKEND_URL}/api/payment/failure`,
-            udf1: subscriptionPlan,
-            udf2: userId.toString(),
-            udf3: '30', // Subscription duration in days
-            udf4: '',
-            udf5: ''
-        };
-
-        // Validate payment parameters
-        const validation = validatePaymentParams(paymentParams);
-        if (!validation.isValid) {
-            console.error('Payment parameter validation failed:', validation.missing);
-            return res.status(400).json({
-                success: false,
-                message: 'Payment parameter validation failed',
-                missing: validation.missing
-            });
-        }
-
-        // Generate hash
-        const hash = generatePaymentHash(paymentParams, payuSalt);
-
-        // Save transaction to database
-        const transaction = new PaymentTransaction({
-            userId: userId,
-            txnid: txnid,
-            amount: parseFloat(amount),
-            productinfo: paymentParams.productinfo,
-            firstname: paymentParams.firstname,
-            email: paymentParams.email,
-            phone: phone,
-            key: payuKey,
-            hash: hash,
+            phone: normalized,
+            key: 'cashfree',
+            hash: 'cf',
             subscriptionPlan: subscriptionPlan,
             subscriptionDuration: 30,
-            field1: paymentParams.udf1,
-            field2: paymentParams.udf2,
-            field3: paymentParams.udf3,
+            field1: subscriptionPlan,
+            field2: userId.toString(),
+            field3: '30',
             status: 'pending'
         });
 
+        transaction.cf_order_id = cfOrder.order_id;
+        transaction.cf_payment_session_id = cfOrder.payment_session_id;
+
         await transaction.save();
 
-        // Get PayU URLs
-        const payuUrls = getPayUUrls(isProduction);
-
-        // Return payment form data
-        const paymentFormData = {
-            ...paymentParams,
-            hash: hash,
-            service_provider: 'payu_paisa'
-        };
-
-        console.log('Payment order created successfully:', { txnid, amount, subscriptionPlan });
+        console.log('Cashfree order created successfully:', { txnid, cf_order_id: cfOrder.order_id });
 
         res.status(200).json({
             success: true,
             message: 'Payment order created successfully',
             data: {
-                paymentUrl: payuUrls.paymentUrl,
-                formData: paymentFormData,
-                txnid: txnid
-            }
+                gateway: 'cashfree',
+                orderId: cfOrder.order_id,
+                paymentSessionId: cfOrder.payment_session_id,
+                txnid,
+            },
         });
 
     } catch (error) {
@@ -202,124 +168,38 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
 });
 
 /**
- * POST /api/payment/verify
- * Verify PayU payment response
+ * GET /api/payment/cf/verify
+ * Verify Cashfree order status by order_id
  */
-router.post('/verify', async (req, res) => {
+router.get('/cf/verify', async (req, res) => {
     try {
-        console.log('PayU payment verification request received');
-        console.log('Request body:', sanitizeResponse(req.body));
-
-        const payuSalt = process.env.PAYU_SALT;
-        if (!payuSalt) {
-            console.error('PayU salt not configured');
-            return res.status(500).json({
-                success: false,
-                message: 'Payment configuration error'
-            });
+        console.log('Cashfree verification request received');
+        const { order_id } = req.query;
+        if (!order_id) {
+            return res.status(400).json({ success: false, message: 'order_id is required' });
         }
 
-        // Extract PayU response parameters
-        const {
-            key, txnid, amount, productinfo, firstname, email, phone,
-            mihpayid, mode, status, unmappedstatus, hash, bank_ref_num,
-            bankcode, error, error_Message, cardnum, cardhash,
-            udf1, udf2, udf3, udf4, udf5
-        } = req.body;
-
-        console.log('PayU Response Details:');
-        console.log('Transaction ID:', txnid);
-        console.log('Status:', status);
-        console.log('Unmapped Status:', unmappedstatus);
-        console.log('Error Code:', error);
-        console.log('Error Message:', error_Message);
-        console.log('Mode:', mode);
-        console.log('Bank Code:', bankcode);
-
-        // Validate required fields
-        if (!txnid || !status || !hash) {
-            console.error('Missing required fields in PayU response');
-            console.error('Missing fields:', {
-                txnid: !txnid,
-                status: !status,
-                hash: !hash
-            });
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid payment response'
-            });
-        }
-
-        // Find transaction in database
-        const transaction = await PaymentTransaction.findOne({ txnid });
+        // Find transaction by Cashfree order id
+        const transaction = await PaymentTransaction.findOne({ cf_order_id: order_id });
         if (!transaction) {
-            console.error('Transaction not found:', txnid);
+            console.error('Transaction not found for order_id:', order_id);
             return res.status(404).json({
                 success: false,
                 message: 'Transaction not found'
             });
         }
-
-        // Verify hash
-        const isHashValid = verifyResponseHash(req.body, payuSalt);
-        if (!isHashValid) {
-            console.error('Hash verification failed for transaction:', txnid);
-            
-            // Update transaction with failure
-            transaction.status = 'failure';
-            transaction.error = 'Hash verification failed';
-            await transaction.save();
-
-            return res.status(400).json({
-                success: false,
-                message: 'Payment verification failed'
-            });
-        }
-
-        // Update transaction with PayU response
-        transaction.mihpayid = mihpayid;
-        transaction.mode = mode;
-        transaction.status = status === 'success' ? 'success' : 'failure';
-        transaction.unmappedstatus = unmappedstatus;
-        transaction.bank_ref_num = bank_ref_num;
-        transaction.bankcode = bankcode;
-        transaction.error = error;
-        transaction.error_Message = error_Message;
-        transaction.cardnum = cardnum ? cardnum.slice(-4) : null; // Store only last 4 digits
-        transaction.cardhash = cardhash;
+        // Query Cashfree for latest order status
+        const cfOrder = await cfGetOrder(order_id);
+        transaction.cf_order_status = cfOrder.order_status;
         transaction.paymentDate = new Date();
 
+        // Map Cashfree statuses
+        const isPaid = cfOrder.order_status === 'PAID';
+        transaction.status = isPaid ? 'success' : (cfOrder.order_status === 'FAILED' ? 'failure' : 'pending');
         await transaction.save();
 
-        // Log specific failure details
-        if (status !== 'success') {
-            console.error(`Payment failed for transaction ${txnid}:`);
-            console.error('Failure details:', {
-                status,
-                unmappedstatus,
-                error,
-                error_Message,
-                bankcode,
-                mode
-            });
-            
-            // Identify specific error types
-            let userFriendlyMessage = 'Payment failed';
-            if (error_Message) {
-                if (error_Message.includes('Some Problem Occurred')) {
-                    userFriendlyMessage = `Payment gateway error: ${error_Message}. Please try again or contact support with reference: ${txnid}`;
-                } else {
-                    userFriendlyMessage = error_Message;
-                }
-            } else if (error) {
-                userFriendlyMessage = `Payment failed with error code: ${error}`;
-            }
-            
-            console.log('User-friendly error message:', userFriendlyMessage);
-        }
-
         // If payment successful, update user subscription
-        if (status === 'success') {
+        if (isPaid) {
             const user = await User.findById(transaction.userId);
             if (user) {
                 const oldPlan = user.subscriptionPlan;
@@ -342,11 +222,11 @@ router.post('/verify', async (req, res) => {
                     const paymentDetails = {
                         userName: user.name,
                         amount: transaction.amount,
-                        transactionId: transaction.txnid,
+                        transactionId: transaction.cf_order_id || transaction.txnid,
                         subscriptionPlan: transaction.subscriptionPlan,
                         paymentDate: transaction.paymentDate || new Date(),
                         expiryDate: user.subscriptionExpiresAt,
-                        paymentMethod: transaction.mode,
+                        paymentMethod: 'Cashfree',
                         cardLast4: transaction.cardnum
                     };
 
@@ -381,22 +261,21 @@ router.post('/verify', async (req, res) => {
             }
         }
 
-        console.log('Payment verification completed:', { txnid, status, mihpayid });
+        console.log('Cashfree verification completed:', { order_id, status: transaction.status });
 
         res.status(200).json({
             success: true,
-            message: status === 'success' ? 'Payment successful' : 'Payment failed',
+            message: transaction.status === 'success' ? 'Payment successful' : 'Payment pending/failed',
             data: {
-                txnid: txnid,
-                status: status,
-                mihpayid: mihpayid,
-                amount: amount,
+                order_id,
+                status: transaction.status,
+                amount: transaction.amount,
                 subscriptionPlan: transaction.subscriptionPlan
             }
         });
 
     } catch (error) {
-        console.error('Error verifying payment:', error);
+        console.error('Error verifying Cashfree payment:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error during payment verification'
@@ -405,49 +284,44 @@ router.post('/verify', async (req, res) => {
 });
 
 /**
- * POST /api/payment/webhook
- * Handle PayU webhook notifications
+ * POST /api/payment/cf/webhook
+ * Handle Cashfree webhook notifications
  */
-router.post('/webhook', webhookLimiter, async (req, res) => {
+router.post('/cf/webhook', webhookLimiter, express.raw({ type: '*/*' }), async (req, res) => {
     try {
-        console.log('PayU webhook received');
-        console.log('Webhook body:', sanitizeResponse(req.body));
-
-        const payuSalt = process.env.PAYU_SALT;
-        if (!payuSalt) {
-            console.error('PayU salt not configured for webhook');
-            return res.status(500).send('Webhook configuration error');
+        console.log('Cashfree webhook received');
+        const signature = req.header('x-webhook-signature');
+        const timestamp = req.header('x-webhook-timestamp');
+        const raw = req.body; // Buffer
+        const verified = verifyWebhookSignature(raw, timestamp, signature);
+        if (!verified) {
+            console.error('Invalid Cashfree webhook signature');
+            return res.status(400).send('Invalid signature');
+        }
+        const payload = JSON.parse(raw.toString());
+        const orderId = payload?.data?.order?.order_id || payload?.data?.order_id;
+        if (!orderId) {
+            return res.status(400).send('Invalid payload');
         }
 
-        const { txnid, status, hash } = req.body;
-
-        if (!txnid || !status || !hash) {
-            console.error('Invalid webhook data received');
-            return res.status(400).send('Invalid webhook data');
-        }
-
-        // Verify hash
-        const isHashValid = verifyResponseHash(req.body, payuSalt);
-        if (!isHashValid) {
-            console.error('Webhook hash verification failed for transaction:', txnid);
-            return res.status(400).send('Hash verification failed');
-        }
-
-        // Find and update transaction
-        const transaction = await PaymentTransaction.findOne({ txnid });
+        // Find and update transaction by cf_order_id
+        const transaction = await PaymentTransaction.findOne({ cf_order_id: orderId });
         if (!transaction) {
-            console.error('Transaction not found in webhook:', txnid);
+            console.error('Transaction not found in Cashfree webhook:', orderId);
             return res.status(404).send('Transaction not found');
         }
 
         // Mark webhook as verified
         transaction.webhookVerified = true;
         
-        // Update status if different
+        // Query latest status from Cashfree
+        const cfOrder = await cfGetOrder(orderId);
+        transaction.cf_order_status = cfOrder.order_status;
+        const status = cfOrder.order_status === 'PAID' ? 'success' : (cfOrder.order_status === 'FAILED' ? 'failure' : 'pending');
         if (transaction.status !== status) {
             console.log(`Updating transaction status from ${transaction.status} to ${status}`);
             transaction.status = status;
-            
+
             // Update user subscription based on webhook status
             if (status === 'success' && transaction.subscriptionPlan === 'snapx') {
                 const user = await User.findById(transaction.userId);
@@ -459,23 +333,23 @@ router.post('/webhook', webhookLimiter, async (req, res) => {
                     user.subscriptionStatus = 'active';
                     user.subscriptionExpiresAt = new Date(Date.now() + transaction.subscriptionDuration * 24 * 60 * 60 * 1000);
                     await user.save();
-                    console.log(`Webhook activated SnapX subscription for user: ${user.email}`);
+                    console.log(`Cashfree webhook activated SnapX subscription for user: ${user.email}`);
 
                     // Send payment confirmation email via webhook
                     try {
                         const paymentDetails = {
                             userName: user.name,
                             amount: transaction.amount,
-                            transactionId: transaction.txnid,
+                            transactionId: transaction.cf_order_id || transaction.txnid,
                             subscriptionPlan: transaction.subscriptionPlan,
                             paymentDate: transaction.paymentDate || new Date(),
                             expiryDate: user.subscriptionExpiresAt,
-                            paymentMethod: transaction.mode,
+                            paymentMethod: 'Cashfree',
                             cardLast4: transaction.cardnum
                         };
 
                         await sendPaymentConfirmationEmail(user.email, paymentDetails);
-                        console.log(`Webhook: Payment confirmation email sent to ${user.email}`);
+                        console.log(`Cashfree Webhook: Payment confirmation email sent to ${user.email}`);
 
                         // Send plan upgrade email for any successful payment
                         const upgradeDetails = {
@@ -494,16 +368,16 @@ router.post('/webhook', webhookLimiter, async (req, res) => {
                                 'Upload your own databases',
                                 'Priority support'
                             ]
-                                                };
+                        };
 
                         // Check if upgrade email already sent
                         if (!transaction.upgradeEmailSent) {
                             await sendPlanUpgradeEmail(user.email, upgradeDetails);
-                            console.log(`Webhook: Plan upgrade email sent to ${user.email}`);
+                            console.log(`Cashfree Webhook: Plan upgrade email sent to ${user.email}`);
                             transaction.upgradeEmailSent = true;
                         }
                     } catch (emailError) {
-                        console.error('Webhook: Error sending payment confirmation emails:', emailError);
+                        console.error('Cashfree Webhook: Error sending payment confirmation emails:', emailError);
                         // Don't fail the webhook process if email fails
                     }
                 }
@@ -512,11 +386,11 @@ router.post('/webhook', webhookLimiter, async (req, res) => {
 
         await transaction.save();
 
-        console.log('Webhook processed successfully:', { txnid, status });
+        console.log('Cashfree webhook processed successfully:', { orderId, status: transaction.status });
         res.status(200).send('Webhook processed successfully');
 
     } catch (error) {
-        console.error('Error processing webhook:', error);
+        console.error('Error processing Cashfree webhook:', error);
         res.status(500).send('Webhook processing error');
     }
 });
@@ -621,7 +495,7 @@ router.get('/test-config', (req, res) => {
     });
 });
 
-// Add PayU callback endpoints
+// Legacy PayU callback endpoints (kept for backward compatibility during migration)
 router.post('/success', async (req, res) => {
     try {
         console.log('PayU /success callback received. Raw body:', req.body);
