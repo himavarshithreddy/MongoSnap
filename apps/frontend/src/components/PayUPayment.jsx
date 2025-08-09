@@ -130,7 +130,7 @@ const PayUPayment = ({
                     <h3 className="text-lg font-semibold text-white mb-2">MongoSnap SnapX</h3>
                     <div className="text-gray-300 space-y-1">
                         <p>Monthly Subscription</p>
-                        <p className="text-2xl font-bold text-brand-quaternary">₹359</p>
+                        <p className="text-2xl font-bold text-brand-quaternary">₹1</p>
                         <p className="text-sm">Includes all premium features</p>
                     </div>
                 </div>
