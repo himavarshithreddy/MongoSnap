@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { UserContext } from '../contexts/UserContext';
 import { Check, Loader2, AlertCircle } from 'lucide-react';
@@ -29,9 +29,9 @@ const PaymentSuccess = () => {
             }
             setVerificationStatus('failed');
         }
-    }, [searchParams]);
+    }, [searchParams, verifyPayment]);
 
-    const verifyPayment = async ({ order_id }) => {
+    const verifyPayment = useCallback(async ({ order_id }) => {
         try {
             console.log('Verifying Cashfree payment with backend...');
 
@@ -58,7 +58,7 @@ const PaymentSuccess = () => {
             setVerificationStatus('failed');
             setError('Failed to verify payment. Please contact support.');
         }
-    };
+    }, [fetchWithAuth, refreshUser]);
 
     const handleContinue = () => {
         if (verificationStatus === 'success') {

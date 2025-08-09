@@ -222,7 +222,7 @@ const Pricing = () => {
 
                             <div className="text-center mb-10">
                                 <h3 className="text-3xl font-bold text-white mb-3">SnapX</h3>
-                                <div className="text-5xl font-bold text-white mb-3">₹1</div>
+                                <div className="text-5xl font-bold text-white mb-3">₹299</div>
                                 <p className="text-gray-400 text-lg">per month</p>
                             </div>
 

@@ -105,7 +105,7 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
         const txnid = generateTransactionId('MONGOSNAP');
 
         // Set amount based on subscription plan (INR)
-        const amount = parseFloat(formatAmount(1));
+        const amount = parseFloat(formatAmount(299));
 
         // Create Cashfree order
         const cfOrder = await cfCreateOrder({
