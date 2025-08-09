@@ -2,13 +2,14 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 function getBaseUrl() {
-  const isProd = process.env.CASHFREE_ENV === 'production';
+  const env = (process.env.CASHFREE_ENV || process.env.CASHFREE_ENVIRONMENT || '').toLowerCase();
+  const isProd = env === 'production' || env === 'prod';
   return isProd ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg';
 }
 
 function getAuthHeaders() {
-  const clientId = process.env.CASHFREE_CLIENT_ID;
-  const clientSecret = process.env.CASHFREE_CLIENT_SECRET;
+  const clientId = process.env.CASHFREE_CLIENT_ID || process.env.CASHFREE_APP_ID;
+  const clientSecret = process.env.CASHFREE_CLIENT_SECRET || process.env.CASHFREE_SECRET_KEY;
   if (!clientId || !clientSecret) {
     throw new Error('Cashfree credentials missing');
   }

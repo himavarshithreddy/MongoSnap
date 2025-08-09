@@ -93,9 +93,13 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
             });
         }
 
-        // Cashfree configuration check
-        if (!process.env.CASHFREE_CLIENT_ID || !process.env.CASHFREE_CLIENT_SECRET) {
+        // Cashfree configuration check (supports alias env names)
+        const cfClientId = process.env.CASHFREE_CLIENT_ID || process.env.CASHFREE_APP_ID;
+        const cfClientSecret = process.env.CASHFREE_CLIENT_SECRET || process.env.CASHFREE_SECRET_KEY;
+        if (!cfClientId || !cfClientSecret) {
             console.error('Cashfree configuration missing');
+            console.error('CASHFREE_CLIENT_ID/CASHFREE_APP_ID present:', !!cfClientId);
+            console.error('CASHFREE_CLIENT_SECRET/CASHFREE_SECRET_KEY present:', !!cfClientSecret);
             return res.status(500).json({
                 success: false,
                 message: 'Payment configuration error'
