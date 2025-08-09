@@ -313,6 +313,19 @@ router.post('/cf/webhook', webhookLimiter, express.raw({ type: '*/*' }), async (
         // Mark webhook as verified
         transaction.webhookVerified = true;
         
+        // Handle USER_DROPPED event explicitly
+        const eventType = payload?.type;
+        const paymentStatus = payload?.data?.payment?.payment_status;
+        if (eventType === 'PAYMENT_USER_DROPPED_WEBHOOK' || paymentStatus === 'USER_DROPPED') {
+            transaction.cf_order_status = paymentStatus || transaction.cf_order_status || 'USER_DROPPED';
+            transaction.unmappedstatus = paymentStatus || eventType;
+            transaction.status = 'cancelled';
+            transaction.paymentDate = new Date();
+            await transaction.save();
+            console.log('Cashfree webhook: USER_DROPPED → marked transaction cancelled', { orderId, txnid: transaction.txnid });
+            return res.status(200).send('Webhook processed successfully');
+        }
+        
         // Query latest status from Cashfree
         const cfOrder = await cfGetOrder(orderId);
         transaction.cf_order_status = cfOrder.order_status;
