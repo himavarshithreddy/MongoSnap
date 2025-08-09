@@ -37,6 +37,20 @@ const PaymentSuccess = () => {
 
             const response = await fetchWithAuth(`/api/payment/cf/verify?order_id=${encodeURIComponent(order_id)}`);
 
+            if (!response) {
+                console.error('No response from fetchWithAuth - likely authentication failed');
+                setVerificationStatus('failed');
+                setError('Authentication failed. Please login and try again.');
+                return;
+            }
+
+            if (!response.ok) {
+                console.error('Response not ok:', response.status, response.statusText);
+                setVerificationStatus('failed');
+                setError(`Server error: ${response.status}. Please try again or contact support.`);
+                return;
+            }
+
             const result = await response.json();
             console.log('Payment verification result:', result);
 
