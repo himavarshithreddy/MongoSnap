@@ -105,7 +105,7 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
         const txnid = generateTransactionId('MONGOSNAP');
 
         // Set amount based on subscription plan (INR)
-        const amount = parseFloat(formatAmount(299));
+        const amount = parseFloat(formatAmount(1));
 
         // Create Cashfree order
         const cfOrder = await cfCreateOrder({
@@ -196,7 +196,7 @@ router.get('/cf/verify', async (req, res) => {
         let mappedStatus = 'pending';
         if (cfOrder.order_status === 'PAID') mappedStatus = 'success';
         else if (cfOrder.order_status === 'FAILED') mappedStatus = 'failure';
-        else if (cfOrder.order_status === 'CANCELLED' || cfOrder.order_status === 'USER_DROPPED') mappedStatus = 'cancelled';
+        else if (cfOrder.order_status === 'CANCELLED' || cfOrder.order_status === 'USER_DROPPED' ||cfOrder.order_status === 'ACTIVE') mappedStatus = 'cancelled';
         transaction.status = mappedStatus;
         await transaction.save();
 

@@ -47,7 +47,7 @@ router.post('/send-payment-email', async (req, res) => {
 
     const paymentDetails = {
       userName: 'Test User',
-      amount: 299,
+      amount: 1,
       transactionId: 'TEST_TXN_123456',
       subscriptionPlan: 'snapx',
       paymentDate: new Date(),

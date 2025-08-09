@@ -132,7 +132,7 @@ const CashfreePayment = ({
                     <h3 className="text-lg font-semibold text-white mb-2">MongoSnap SnapX</h3>
                     <div className="text-gray-300 space-y-1">
                         <p>Monthly Subscription</p>
-                        <p className="text-2xl font-bold text-brand-quaternary">₹299</p>
+                        <p className="text-2xl font-bold text-brand-quaternary">₹1</p>
                         <p className="text-sm">Includes all premium features</p>
                     </div>
                 </div>
@@ -193,7 +193,7 @@ const CashfreePayment = ({
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                 </svg>
-                                Pay ₹299
+                                Pay ₹1
                             </>
                         )}
                     </button>
