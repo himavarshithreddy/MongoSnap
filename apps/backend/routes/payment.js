@@ -193,8 +193,11 @@ router.get('/cf/verify', async (req, res) => {
         transaction.paymentDate = new Date();
 
         // Map Cashfree statuses
-        const isPaid = cfOrder.order_status === 'PAID';
-        transaction.status = isPaid ? 'success' : (cfOrder.order_status === 'FAILED' ? 'failure' : 'pending');
+        let mappedStatus = 'pending';
+        if (cfOrder.order_status === 'PAID') mappedStatus = 'success';
+        else if (cfOrder.order_status === 'FAILED') mappedStatus = 'failure';
+        else if (cfOrder.order_status === 'CANCELLED' || cfOrder.order_status === 'USER_DROPPED') mappedStatus = 'cancelled';
+        transaction.status = mappedStatus;
         await transaction.save();
 
         // If payment successful, update user subscription
@@ -269,7 +272,8 @@ router.get('/cf/verify', async (req, res) => {
                 order_id,
                 status: transaction.status,
                 amount: transaction.amount,
-                subscriptionPlan: transaction.subscriptionPlan
+                subscriptionPlan: transaction.subscriptionPlan,
+                cf_order_status: transaction.cf_order_status
             }
         });
 

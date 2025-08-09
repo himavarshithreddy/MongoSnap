@@ -50,7 +50,16 @@ const PaymentSuccess = () => {
                 setPaymentData(result.data);
             } else {
                 setVerificationStatus('failed');
-                setError(result.message || 'Payment verification failed');
+                const cfStatus = result?.data?.cf_order_status;
+                if (cfStatus === 'USER_DROPPED' || cfStatus === 'CANCELLED') {
+                    setError('You canceled or abandoned the payment. No charges were made.');
+                } else if (result?.data?.status === 'pending') {
+                    setError('Payment is still pending. If you closed the payment window, please try again.');
+                } else {
+                    setError(result.message || 'Payment verification failed');
+                }
+                // Store data for reference on failure view
+                setPaymentData(result.data);
             }
 
         } catch (error) {
