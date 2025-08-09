@@ -201,6 +201,7 @@ router.get('/cf/verify', async (req, res) => {
         await transaction.save();
 
         // If payment successful, update user subscription
+        const isPaid = mappedStatus === 'success';
         if (isPaid) {
             const user = await User.findById(transaction.userId);
             if (user) {
