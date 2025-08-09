@@ -41,8 +41,11 @@ router.post('/create-order', paymentLimiter, verifyTokenAndValidateCSRF, async (
         const userId = req.userId;
         const { subscriptionPlan, phone } = req.body;
 
-        console.log('Creating Cashfree payment order:', { userId, subscriptionPlan, phone });
-
+        console.log('Creating Cashfree payment order:', {
+            userId,
+            subscriptionPlan,
+            phone: phone ? `***${String(phone).slice(-2)}` : undefined
+        });
         // Validate subscription plan
         if (!subscriptionPlan || !['snapx'].includes(subscriptionPlan)) {
             return res.status(400).json({

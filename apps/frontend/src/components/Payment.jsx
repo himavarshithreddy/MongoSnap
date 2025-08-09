@@ -41,7 +41,9 @@ const CashfreePayment = ({
 
             // Robust Indian phone validation
             let normalized = (phone || '').toString().replace(/[^\d+]/g, '');
-            console.log('Phone input:', phone, 'Normalized:', normalized);
+            if (import.meta.env && import.meta.env.DEV) {
+                console.log('Phone input:', phone, 'Normalized:', normalized);
+            }
             let valid = false;
             if (normalized.startsWith('+91') && /^\+91\d{10}$/.test(normalized)) {
                 valid = true;
@@ -64,7 +66,7 @@ const CashfreePayment = ({
                 },
                 body: JSON.stringify({
                     subscriptionPlan,
-                    phone
+                    phone: normalized
                 })
             });
 

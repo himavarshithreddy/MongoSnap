@@ -1,12 +1,16 @@
+const crypto = require('crypto');
+
 /**
- * Generate unique transaction ID
+ * Generate unique, non-predictable transaction ID
  * @param {string} prefix - Optional prefix for transaction ID
  * @returns {string} Unique transaction ID
  */
 const generateTransactionId = (prefix = 'TXN') => {
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `${prefix}_${timestamp}_${random}`;
+    const uniqueComponent =
+        typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : crypto.randomBytes(16).toString('hex');
+    return `${prefix}_${uniqueComponent}`;
 };
 
 /**
