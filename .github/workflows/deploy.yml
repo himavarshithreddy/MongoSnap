@@ -14,5 +14,5 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /home/ubuntu/MongoSnap
+            cd /var/www/mongosnap
             ./deploy.sh
