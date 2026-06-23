@@ -48,9 +48,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
     const fetch2FAStatus = useCallback(async () => {
         try {
             const res = await fetchWithAuth('/api/twofactor/status', {
-                headers: { 
-                    'Authorization': `Bearer ${token}`
-                }
+                
             });
             
             if (res.ok) {
@@ -87,9 +85,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
     const fetchBackupCodesStatus = async () => {
         try {
             const res = await fetchWithAuth('/api/twofactor/backup-codes-status', {
-                headers: { 
-                    'Authorization': `Bearer ${token}`
-                }
+                
             });
             
             if (res.ok) {
@@ -110,9 +106,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
             const res = await fetchWithAuth('/api/twofactor/regenerate-backup-codes', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
+                    'Content-Type': 'application/json'
+}
             });
             
             const data = await res.json();
@@ -144,9 +139,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
             const res = await fetchWithAuth('/api/auth/request-password-change', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
+                    'Content-Type': 'application/json'
+}
             });
             
             const data = await res.json();
@@ -172,9 +166,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
             const res = await fetchWithAuth('/api/twofactor/enable-email-two-factor', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
+                    'Content-Type': 'application/json'
+}
             });
             
             const data = await res.json();
@@ -202,9 +195,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
             const res = await fetchWithAuth('/api/twofactor/disable-email-two-factor', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
+                    'Content-Type': 'application/json'
+}
             });
             
             const data = await res.json();
@@ -232,9 +224,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
             const res = await fetchWithAuth('/api/twofactor/enable-totp-verification', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
+                    'Content-Type': 'application/json'
+}
             });
             
             const data = await res.json();
@@ -267,9 +258,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
             const res = await fetchWithAuth('/api/twofactor/verify-totp-verification', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                    'Content-Type': 'application/json'
+},
                 body: JSON.stringify({ token: totpVerificationCode })
             });
             
@@ -307,9 +297,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
             const res = await fetchWithAuth('/api/twofactor/disable-totp-verification', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
+                    'Content-Type': 'application/json'
+}
             });
             
             const data = await res.json();
@@ -335,9 +324,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
                 await fetchWithAuth('/api/twofactor/cancel-totp-setup', {
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    }
+                        'Content-Type': 'application/json'
+}
                 });
             } catch (error) {
                 console.error('Failed to cancel TOTP setup:', error);
@@ -361,9 +349,8 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
             const res = await fetchWithAuth('/api/auth/update-login-notifications', {
                 method: 'PUT',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                    'Content-Type': 'application/json'
+},
                 body: JSON.stringify({ loginNotificationsEnabled: !loginNotificationsEnabled })
             });
             
