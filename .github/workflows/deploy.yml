@@ -15,4 +15,4 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /var/www/mongosnap
-            ./deploy.sh
+            bash deploy.sh
