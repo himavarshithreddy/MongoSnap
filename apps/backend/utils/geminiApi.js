@@ -2,18 +2,18 @@ const axios = require('axios');
 
 class GeminiAPI {
     constructor() {
-        this.apiKey = process.env.GEMINI_API_KEY;
-        this.baseURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent';
+        this.apiKey = process.env.OPENROUTER_KEY;
+        this.baseURL = 'https://openrouter.ai/api/v1/chat/completions';
     }
 
     async generateMongoQuery(naturalLanguage, schema = null) {
         try {
             if (!this.apiKey) {
-                console.warn('GEMINI_API_KEY is not configured, using fallback');
-                throw new Error('GEMINI_API_KEY is not configured');
+                console.warn('OPENROUTER_KEY is not configured, using fallback');
+                throw new Error('OPENROUTER_KEY is not configured');
             }
 
-            console.log('Generating MongoDB query with Gemini API:', { 
+            console.log('Generating MongoDB query with OpenRouter API:', { 
                 naturalLanguage, 
                 hasSchema: !!schema,
                 schemaInfo: schema ? {
@@ -30,47 +30,42 @@ class GeminiAPI {
             // Build the prompt with context
             let prompt = this.buildPrompt(naturalLanguage, schema);
             
-            const response = await axios.post(`${this.baseURL}?key=${this.apiKey}`, {
-                contents: [{
-                    parts: [{
-                        text: prompt
-                    }]
-                }],
-                generationConfig: {
-                    temperature: 0.1,
-                    topK: 40,
-                    topP: 0.95,
-                    maxOutputTokens: 1024,
-                }
+            const response = await axios.post(this.baseURL, {
+                model: "google/gemini-2.5-flash",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.1,
+                top_p: 0.95,
+                max_tokens: 1024,
             }, {
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiKey}`
                 },
                 timeout: 30000 // 30 seconds timeout
             });
 
-            if (response.data && response.data.candidates && response.data.candidates[0]) {
-                const generatedText = response.data.candidates[0].content.parts[0].text;
+            if (response.data && response.data.choices && response.data.choices[0]) {
+                const generatedText = response.data.choices[0].message.content;
                 const parsedQuery = this.parseGeminiResponse(generatedText);
                 console.log('Successfully generated query:', parsedQuery);
                 return parsedQuery;
             } else {
-                console.error('Invalid Gemini API response:', response.data);
-                throw new Error('Invalid response from Gemini API');
+                console.error('Invalid OpenRouter API response:', response.data);
+                throw new Error('Invalid response from OpenRouter API');
             }
 
         } catch (error) {
-            console.error('Gemini API Error:', error.response?.data || error.message);
+            console.error('OpenRouter API Error:', error.response?.data || error.message);
             
             // Provide more specific error messages
             if (error.response?.status === 400) {
-                throw new Error('Invalid request to Gemini API - check API key and request format');
-            } else if (error.response?.status === 403) {
-                throw new Error('Gemini API access denied - check API key permissions');
+                throw new Error('Invalid request to OpenRouter API - check API key and request format');
+            } else if (error.response?.status === 401 || error.response?.status === 403) {
+                throw new Error('OpenRouter API access denied - check API key permissions');
             } else if (error.response?.status === 429) {
-                throw new Error('Gemini API rate limit exceeded - try again later');
+                throw new Error('OpenRouter API rate limit exceeded - try again later');
             } else if (error.code === 'ECONNABORTED') {
-                throw new Error('Gemini API request timed out - try again');
+                throw new Error('OpenRouter API request timed out - try again');
             } else {
                 throw new Error(`Failed to generate query: ${error.message}`);
             }
@@ -383,7 +378,7 @@ Query:`;
     async explainQuery(query, naturalLanguage) {
         try {
             if (!this.apiKey) {
-                throw new Error('GEMINI_API_KEY is not configured');
+                throw new Error('OPENROUTER_KEY is not configured');
             }
 
             const prompt = `Explain this MongoDB query in simple terms:
@@ -399,33 +394,28 @@ Provide a clear, concise, short explanation of what this query does, including:
 
 Keep the explanation simple, shorter, on-point, under 100 words compulsory, and user-friendly.`;
 
-            const response = await axios.post(`${this.baseURL}?key=${this.apiKey}`, {
-                contents: [{
-                    parts: [{
-                        text: prompt
-                    }]
-                }],
-                generationConfig: {
-                    temperature: 0.3,
-                    topK: 40,
-                    topP: 0.95,
-                    maxOutputTokens: 512,
-                }
+            const response = await axios.post(this.baseURL, {
+                model: "google/gemini-2.5-flash",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.3,
+                top_p: 0.95,
+                max_tokens: 512,
             }, {
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiKey}`
                 },
                 timeout: 15000
             });
 
-            if (response.data && response.data.candidates && response.data.candidates[0]) {
-                return response.data.candidates[0].content.parts[0].text.trim();
+            if (response.data && response.data.choices && response.data.choices[0]) {
+                return response.data.choices[0].message.content.trim();
             } else {
-                throw new Error('Invalid response from Gemini API');
+                throw new Error('Invalid response from OpenRouter API');
             }
 
         } catch (error) {
-            console.error('Gemini API Error (explanation):', error.response?.data || error.message);
+            console.error('OpenRouter API Error (explanation):', error.response?.data || error.message);
             return 'Unable to generate explanation at this time.';
         }
     }
