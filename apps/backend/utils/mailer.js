@@ -138,7 +138,7 @@ const createBaseTemplate = (content, title) => {
                 ${content}
             </div>
             <div class="footer">
-                <p>© 2025 MongoSnap. All rights reserved.</p>
+                <p>© 2026 MongoSnap. All rights reserved.</p>
                 <p>Need help? Contact <a href="mailto:support@mongosnap.live" style="color:#3CBC6B;text-decoration:none;">support@mongosnap.live</a></p>
             </div>
         </div>

@@ -6,7 +6,7 @@ import { UserContext } from '../contexts/UserContext';
 import SessionManager from './SessionManager';
 
 function Settings({ isOpen, onClose, isStandalone = false }) {
-    const { user } = useUser();
+    const { user, fetchWithAuth, refreshUser } = useUser();
     const [activeTab, setActiveTab] = useState('security');
     const [changePasswordLoading, setChangePasswordLoading] = useState(false);
     const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
@@ -36,7 +36,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
     const [loginNotificationsSuccess, setLoginNotificationsSuccess] = useState('');
 
     // Subscription States
-    const { fetchWithAuth, refreshUser } = useContext(UserContext);
+    
     const subscription = useSubscription();
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [isProcessingCancel, setIsProcessingCancel] = useState(false);
@@ -47,8 +47,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
 
     const fetch2FAStatus = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/twofactor/status', {
+            const res = await fetchWithAuth('/api/twofactor/status', {
                 headers: { 
                     'Authorization': `Bearer ${token}`
                 }
@@ -87,8 +86,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
 
     const fetchBackupCodesStatus = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/twofactor/backup-codes-status', {
+            const res = await fetchWithAuth('/api/twofactor/backup-codes-status', {
                 headers: { 
                     'Authorization': `Bearer ${token}`
                 }
@@ -109,8 +107,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         setTwoFactorSuccess('');
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/twofactor/regenerate-backup-codes', {
+            const res = await fetchWithAuth('/api/twofactor/regenerate-backup-codes', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -144,8 +141,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         setChangePasswordSuccess('');
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/auth/request-password-change', {
+            const res = await fetchWithAuth('/api/auth/request-password-change', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -173,8 +169,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         setTwoFactorSuccess('');
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/twofactor/enable-email-two-factor', {
+            const res = await fetchWithAuth('/api/twofactor/enable-email-two-factor', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -204,8 +199,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         setTwoFactorSuccess('');
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/twofactor/disable-email-two-factor', {
+            const res = await fetchWithAuth('/api/twofactor/disable-email-two-factor', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -235,8 +229,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         setTwoFactorSuccess('');
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/twofactor/enable-totp-verification', {
+            const res = await fetchWithAuth('/api/twofactor/enable-totp-verification', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -271,8 +264,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         setTotpVerificationError('');
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/twofactor/verify-totp-verification', {
+            const res = await fetchWithAuth('/api/twofactor/verify-totp-verification', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -312,8 +304,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         setTwoFactorSuccess('');
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/twofactor/disable-totp-verification', {
+            const res = await fetchWithAuth('/api/twofactor/disable-totp-verification', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -341,8 +332,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         // If setup was initiated, cancel it on the backend
         if (totpQrCode) {
             try {
-                const token = localStorage.getItem('token');
-                await fetch('/api/twofactor/cancel-totp-setup', {
+                await fetchWithAuth('/api/twofactor/cancel-totp-setup', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -368,8 +358,7 @@ function Settings({ isOpen, onClose, isStandalone = false }) {
         setLoginNotificationsSuccess('');
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/auth/update-login-notifications', {
+            const res = await fetchWithAuth('/api/auth/update-login-notifications', {
                 method: 'PUT',
                 headers: { 
                     'Content-Type': 'application/json',

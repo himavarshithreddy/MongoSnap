@@ -205,9 +205,6 @@ const PublicLayout = ({ children }) => {
                                     </a>
                                 </p>
                                 <p className="text-gray-400">
-                                    18-14-128/1A, Maruthi Nagar, Street Number 3, Siddipet, Telangana, 502103, India
-                                </p>
-                                <p className="text-gray-400">
                                     <a href="tel:7815849505" className="hover:text-brand-quaternary transition-colors duration-200 cursor-pointer">7815849505</a>
                                 </p>
                             </div>
@@ -218,7 +215,7 @@ const PublicLayout = ({ children }) => {
                     <div className="border-t border-brand-tertiary/50 mt-8 pt-8">
                         <div className="flex flex-col md:flex-row justify-between items-center">
                             <p className="text-gray-400 text-sm">
-                                © 2025 MongoSnap. All rights reserved.
+                                © 2026 MongoSnap. All rights reserved.
                             </p>
                             <div className="flex space-x-6 mt-4 md:mt-0">
                                 <Link
