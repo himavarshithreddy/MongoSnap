@@ -1,4 +1,3 @@
-```bash
 #!/bin/bash
 
 set -e
@@ -35,4 +34,3 @@ echo "♻️ Reloading Nginx..."
 sudo systemctl reload nginx
 
 echo "✅ Deployment complete!"
-```
