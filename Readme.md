@@ -66,6 +66,113 @@ MongoSnap is a web application for generating, running, and managing MongoDB que
 | Hosting    | AWS                               |
 | Security   | JWT, CSRF, 2FA, HTTPS, Rate Limit |
 
+### Architecture Diagram
+
+```mermaid
+flowchart TD
+
+subgraph group_repo["Monorepo"]
+  node_root["MongoSnap<br/>workspace"]
+  node_workspace["Workspace<br/>pnpm"]
+  node_deploy["Deploy<br/>ci/cd<br/>[deploy.yml]"]
+end
+
+subgraph group_frontend["Frontend"]
+  node_frontend_app["Client app<br/>react/vite"]
+  node_public_shell["Public shell<br/>layout<br/>[PublicLayout.jsx]"]
+  node_auth_state["Auth state<br/>context/guard<br/>[UserContext.jsx]"]
+  node_playground_ui["Playground<br/>query ui<br/>[QueryInterface.jsx]"]
+  node_admin_support["Admin support<br/>support ui"]
+  node_billing_ui["Billing UI<br/>premium ui<br/>[Payment.jsx]"]
+  node_policy_pages["Policy pages<br/>content"]
+end
+
+subgraph group_backend["Backend"]
+  node_backend_app["API app<br/>express/api<br/>[index.js]"]
+  node_auth_routes["Auth routes<br/>[auth.js]"]
+  node_domain_routes["Domain routes<br/>[connection.js]"]
+  node_payment_routes["Payments<br/>billing<br/>[payment.js]"]
+  node_security_mw["Security<br/>middleware<br/>[middleware.js]"]
+  node_query_service["Query service<br/>query orchestration<br/>[queryExecutor.js]"]
+  node_db_manager["DB manager<br/>connection layer<br/>[databaseManager.js]"]
+  node_ai_service["AI helper<br/>genai<br/>[geminiApi.js]"]
+  node_payment_core["Payment core<br/>payments<br/>[PaymentHelper.js]"]
+  node_mail_service["Mail service<br/>notifications<br/>[mailer.js]"]
+  node_models[("Data models<br/>mongoose models<br/>[User.js]")]
+end
+
+subgraph group_external["Integrations"]
+  node_mongo_atlas[("MongoDB Atlas<br/>datastore")]
+  node_gemini(("Gemini<br/>external ai"))
+  node_cashfree(("Cashfree<br/>payment gateway"))
+  node_smtp(("SMTP/Brevo<br/>email service"))
+  node_github_actions(("GitHub Actions<br/>ci service"))
+end
+
+node_root -->|"defines"| node_workspace
+node_root -->|"automates"| node_deploy
+node_root -->|"contains"| node_frontend_app
+node_root -->|"contains"| node_backend_app
+node_deploy -->|"runs on"| node_github_actions
+node_frontend_app -->|"renders"| node_public_shell
+node_frontend_app -->|"tracks session"| node_auth_state
+node_frontend_app -->|"drives"| node_playground_ui
+node_frontend_app -->|"exposes"| node_admin_support
+node_frontend_app -->|"handles"| node_billing_ui
+node_frontend_app -->|"shows"| node_policy_pages
+node_frontend_app -->|"calls api"| node_backend_app
+node_backend_app -->|"routes"| node_auth_routes
+node_backend_app -->|"routes"| node_domain_routes
+node_backend_app -->|"routes"| node_payment_routes
+node_backend_app -->|"guards"| node_security_mw
+node_backend_app -->|"orchestrates"| node_query_service
+node_backend_app -->|"connects"| node_db_manager
+node_backend_app -->|"uses"| node_ai_service
+node_backend_app -->|"uses"| node_payment_core
+node_backend_app -->|"uses"| node_mail_service
+node_backend_app -->|"persists via"| node_models
+node_query_service -->|"depends on"| node_db_manager
+node_query_service -->|"consults"| node_ai_service
+node_payment_core -->|"integrates"| node_cashfree
+node_mail_service -->|"delivers via"| node_smtp
+node_models -->|"stores in"| node_mongo_atlas
+node_db_manager -->|"connects to"| node_mongo_atlas
+node_ai_service -->|"calls"| node_gemini
+
+click node_workspace "https://github.com/himavarshithreddy/mongosnap/blob/main/pnpm-workspace.yaml"
+click node_deploy "https://github.com/himavarshithreddy/mongosnap/blob/main/.github/workflows/deploy.yml"
+click node_frontend_app "https://github.com/himavarshithreddy/mongosnap/tree/main/apps/frontend"
+click node_public_shell "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/frontend/src/components/PublicLayout.jsx"
+click node_auth_state "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/frontend/src/contexts/UserContext.jsx"
+click node_playground_ui "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/frontend/src/components/QueryInterface.jsx"
+click node_admin_support "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/frontend/src/components/AdminBugReports.jsx"
+click node_billing_ui "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/frontend/src/components/Payment.jsx"
+click node_policy_pages "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/frontend/src/data/privacyPolicyContent.js"
+click node_backend_app "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/index.js"
+click node_auth_routes "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/routes/auth.js"
+click node_domain_routes "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/routes/connection.js"
+click node_payment_routes "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/routes/payment.js"
+click node_security_mw "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/routes/middleware.js"
+click node_query_service "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/utils/queryExecutor.js"
+click node_db_manager "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/utils/databaseManager.js"
+click node_ai_service "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/utils/geminiApi.js"
+click node_payment_core "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/utils/PaymentHelper.js"
+click node_mail_service "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/utils/mailer.js"
+click node_models "https://github.com/himavarshithreddy/mongosnap/blob/main/apps/backend/models/User.js"
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_root,node_workspace,node_deploy toneBlue
+class node_frontend_app,node_public_shell,node_auth_state,node_playground_ui,node_admin_support,node_billing_ui,node_policy_pages toneAmber
+class node_backend_app,node_auth_routes,node_domain_routes,node_payment_routes,node_security_mw,node_query_service,node_db_manager,node_ai_service,node_payment_core,node_mail_service,node_models toneMint
+class node_mongo_atlas,node_gemini,node_cashfree,node_smtp,node_github_actions toneRose
+```
+
 ### AI Query Generation
 - Users can enter requests in plain English (e.g., "Show all orders from last month").
 - The frontend sends this prompt to the backend, which uses an AI model to generate a MongoDB query.
