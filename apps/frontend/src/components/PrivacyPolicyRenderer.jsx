@@ -21,7 +21,7 @@ const PrivacyPolicyRenderer = ({ content }) => {
                         <li key={index}>
                             <strong className="text-white">{item.term}</strong> {item.hasLink ? (
                                 <>
-                                    refers to MongoSnap, accessible from <a href="https://mongosnap.live" rel="external nofollow noopener" target="_blank" className="text-brand-quaternary hover:text-white transition-colors">mongosnap.live</a>
+                                    refers to MongoSnap, accessible from <a href="https://mongosnap.xyz" rel="external nofollow noopener" target="_blank" className="text-brand-quaternary hover:text-white transition-colors">mongosnap.xyz</a>
                                 </>
                             ) : (
                                 item.definition

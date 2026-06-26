@@ -11,17 +11,17 @@ const TermsOfServiceRenderer = ({ content }) => {
     };
 
     const renderEmailLink = (text) => {
-        const emailRegex = /(support@mongosnap\.live)/g;
+        const emailRegex = /(support@mongosnap\.xyz)/g;
         if (emailRegex.test(text)) {
             const parts = text.split(emailRegex);
             return parts.map((part, index) =>
-                part === 'support@mongosnap.live' ? (
+                part === 'support@mongosnap.xyz' ? (
                     <a
                         key={index}
-                        href="mailto:support@mongosnap.live"
+                        href="mailto:support@mongosnap.xyz"
                         className="text-brand-quaternary hover:text-white transition-colors"
                     >
-                        support@mongosnap.live
+                        support@mongosnap.xyz
                     </a>
                 ) : (
                     part
@@ -48,7 +48,7 @@ const TermsOfServiceRenderer = ({ content }) => {
                 <h2 className="text-2xl font-bold text-white mt-8 mb-4">{section.title}</h2>
                 {section.content && (
                     <div className="text-gray-300 mb-6">
-                        {section.content.includes('support@mongosnap.live') ? (
+                        {section.content.includes('support@mongosnap.xyz') ? (
                             renderEmailLink(section.content)
                         ) : (
                             renderContent(section.content)
@@ -81,7 +81,7 @@ const TermsOfServiceRenderer = ({ content }) => {
             
             {content.introduction.content.map((paragraph, index) => (
                 <p key={index} className="text-gray-300 mb-4">
-                    {paragraph.includes('support@mongosnap.live') ? (
+                    {paragraph.includes('support@mongosnap.xyz') ? (
                         renderEmailLink(paragraph)
                     ) : (
                         paragraph

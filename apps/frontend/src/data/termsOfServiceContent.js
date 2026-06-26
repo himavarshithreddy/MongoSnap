@@ -4,17 +4,17 @@ export const termsOfServiceContent = {
         title: "TERMS AND CONDITIONS",
         description: "Welcome to MongoSnap (\"Company\", \"we\", \"our\", \"us\")!",
         content: [
-            "These Terms of Service (\"Terms\", \"Terms of Service\") govern your use of our website located at mongosnap.live (together or individually \"Service\") operated by MongoSnap, as operated by Gundam Himavarshith Reddy.",
+            "These Terms of Service (\"Terms\", \"Terms of Service\") govern your use of our website located at mongosnap.xyz (together or individually \"Service\") operated by MongoSnap, as operated by Gundam Himavarshith Reddy.",
             "Our Privacy Policy also governs your use of our Service and explains how we collect, safeguard and disclose information that results from your use of our web pages.",
             "Your agreement with us includes these Terms and our Privacy Policy (\"Agreements\"). You acknowledge that you have read and understood Agreements, and agree to be bound of them.",
-            "If you do not agree with (or cannot comply with) Agreements, then you may not use the Service, but please let us know by emailing at support@mongosnap.live so we can try to find a solution. These Terms apply to all visitors, users and others who wish to access or use Service."
+            "If you do not agree with (or cannot comply with) Agreements, then you may not use the Service, but please let us know by emailing at support@mongosnap.xyz so we can try to find a solution. These Terms apply to all visitors, users and others who wish to access or use Service."
         ]
     },
     sections: [
         {
             id: "communications",
             title: "2. Communications",
-            content: "By using our Service, you agree to subscribe to newsletters, marketing or promotional materials and other information we may send. However, you may opt out of receiving any, or all, of these communications from us by following the unsubscribe link or by emailing at support@mongosnap.live."
+            content: "By using our Service, you agree to subscribe to newsletters, marketing or promotional materials and other information we may send. However, you may opt out of receiving any, or all, of these communications from us by following the unsubscribe link or by emailing at support@mongosnap.xyz."
         },
         {
             id: "contests-promotions",
@@ -86,7 +86,7 @@ export const termsOfServiceContent = {
             title: "10. Copyright Policy",
             content: [
                 "We respect the intellectual property rights of others. It is our policy to respond to any claim that Content posted on Service infringes on the copyright or other intellectual property rights (\"Infringement\") of any person or entity.",
-                "If you are a copyright owner, or authorized on behalf of one, and you believe that the copyrighted work has been copied in a way that constitutes copyright infringement, please submit your claim via email to support@mongosnap.live, with the subject line: \"Copyright Infringement\" and include in your claim a detailed description of the alleged Infringement as detailed below, under \"DMCA Notice and Procedure for Copyright Infringement Claims\"",
+                "If you are a copyright owner, or authorized on behalf of one, and you believe that the copyrighted work has been copied in a way that constitutes copyright infringement, please submit your claim via email to support@mongosnap.xyz, with the subject line: \"Copyright Infringement\" and include in your claim a detailed description of the alleged Infringement as detailed below, under \"DMCA Notice and Procedure for Copyright Infringement Claims\"",
                 "You may be held accountable for damages (including costs and attorneys' fees) for misrepresentation or bad-faith claims on the infringement of any Content found on and/or through Service on your copyright."
             ]
         },
@@ -102,12 +102,12 @@ export const termsOfServiceContent = {
                 "0.5. a statement by you that you have a good faith belief that the disputed use is not authorized by the copyright owner, its agent, or the law;",
                 "0.6. a statement by you, made under penalty of perjury, that the above information in your notice is accurate and that you are the copyright owner or authorized to act on the copyright owner's behalf."
             ],
-            additionalInfo: "You can contact our Copyright Agent via email at support@mongosnap.live."
+            additionalInfo: "You can contact our Copyright Agent via email at support@mongosnap.xyz."
         },
         {
             id: "error-reporting",
             title: "12. Error Reporting and Feedback",
-            content: "You may provide us either directly at support@mongosnap.live or via third party sites and tools with information and feedback concerning errors, suggestions for improvements, ideas, problems, complaints, and other matters related to our Service (\"Feedback\"). You acknowledge and agree that: (i) you shall not retain, acquire or assert any intellectual property right or other right, title or interest in or to the Feedback; (ii) Company may have development ideas similar to the Feedback; (iii) Feedback does not contain confidential information or proprietary information from you or any third party; and (iv) Company is not under any obligation of confidentiality with respect to the Feedback. In the event the transfer of the ownership to the Feedback is not possible due to applicable mandatory laws, you grant Company and its affiliates an exclusive, transferable, irrevocable, free-of-charge, sub-licensable, unlimited and perpetual right to use (including copy, modify, create derivative works, publish, distribute and commercialize) Feedback in any manner and for any purpose."
+            content: "You may provide us either directly at support@mongosnap.xyz or via third party sites and tools with information and feedback concerning errors, suggestions for improvements, ideas, problems, complaints, and other matters related to our Service (\"Feedback\"). You acknowledge and agree that: (i) you shall not retain, acquire or assert any intellectual property right or other right, title or interest in or to the Feedback; (ii) Company may have development ideas similar to the Feedback; (iii) Feedback does not contain confidential information or proprietary information from you or any third party; and (iv) Company is not under any obligation of confidentiality with respect to the Feedback. In the event the transfer of the ownership to the Feedback is not possible due to applicable mandatory laws, you grant Company and its affiliates an exclusive, transferable, irrevocable, free-of-charge, sub-licensable, unlimited and perpetual right to use (including copy, modify, create derivative works, publish, distribute and commercialize) Feedback in any manner and for any purpose."
         },
         {
             id: "links-to-other-websites",
@@ -175,7 +175,7 @@ export const termsOfServiceContent = {
         {
             id: "contact-us",
             title: "22. Contact Us",
-            content: "Please send your feedback, comments, requests for technical support by email: support@mongosnap.live."
+            content: "Please send your feedback, comments, requests for technical support by email: support@mongosnap.xyz."
         }
     ]
 }; 

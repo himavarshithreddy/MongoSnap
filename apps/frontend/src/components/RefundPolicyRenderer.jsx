@@ -11,17 +11,17 @@ const RefundPolicyRenderer = ({ content }) => {
     };
 
     const renderEmailLink = (text) => {
-        const emailRegex = /(support@mongosnap\.live)/g;
-        if (text.includes('support@mongosnap.live')) {
+        const emailRegex = /(support@mongosnap\.xyz)/g;
+        if (text.includes('support@mongosnap.xyz')) {
             const parts = text.split(emailRegex);
             return parts.map((part, index) =>
-                part === 'support@mongosnap.live' ? (
+                part === 'support@mongosnap.xyz' ? (
                     <a
                         key={index}
-                        href="mailto:support@mongosnap.live"
+                        href="mailto:support@mongosnap.xyz"
                         className="text-brand-quaternary hover:text-white transition-colors"
                     >
-                        support@mongosnap.live
+                        support@mongosnap.xyz
                     </a>
                 ) : (
                     part

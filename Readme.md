@@ -1,7 +1,7 @@
 # MongoSnap
 
 <p align="center">
-  <img src="https://mongosnap.live/MongoSnap.svg" alt="MongoSnap Logo" width="120" />
+  <img src="https://mongosnap.xyz/MongoSnap.svg" alt="MongoSnap Logo" width="120" />
 </p>
 
 <p align="center">
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://mongosnap.live">Live Site</a> •
+  <a href="https://mongosnap.xyz">Live Site</a> •
   <a href="#user-guide">User Guide</a> •
   <a href="#technical-overview">Technical Overview</a>
 </p>
@@ -40,7 +40,7 @@ MongoSnap is a web application for generating, running, and managing MongoDB que
 
 ### Getting Started
 
-1. Go to [mongosnap.live](https://mongosnap.live)
+1. Go to [mongosnap.xyz](https://mongosnap.xyz)
 2. Sign up for an account.
 3. Connect your MongoDB database.
 4. Use natural language or the visual builder to generate and run queries.
@@ -48,7 +48,7 @@ MongoSnap is a web application for generating, running, and managing MongoDB que
 
 ### Payments & Support
 - Payments are processed via Cashfree. SnapX is activated after payment.
-- For support, email [support@mongosnap.live](mailto:support@mongosnap.live) or use the in-app forms.
+- For support, email [support@mongosnap.xyz](mailto:support@mongosnap.xyz) or use the in-app forms.
 
 ---
 

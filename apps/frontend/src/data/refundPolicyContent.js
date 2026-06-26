@@ -22,7 +22,7 @@ export const refundPolicyContent = {
         {
             id: "refund-process",
             title: "3. Process for Requesting a Refund",
-            content: "To request a refund, please contact our customer support team at support@mongosnap.live. Include your account information, subscription details, and a brief explanation of why you are requesting a refund.",
+            content: "To request a refund, please contact our customer support team at support@mongosnap.xyz. Include your account information, subscription details, and a brief explanation of why you are requesting a refund.",
             hasEmailLink: true
         },
         {
@@ -38,7 +38,7 @@ export const refundPolicyContent = {
         {
             id: "contact-us",
             title: "6. Contact Us",
-            content: "If you have any questions about our refund policy, please contact us at support@mongosnap.live.",
+            content: "If you have any questions about our refund policy, please contact us at support@mongosnap.xyz.",
             hasEmailLink: true
         },
         {

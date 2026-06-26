@@ -87,7 +87,7 @@ const createBaseTemplate = (content, title) => {
                 <font color="#9ca3af" size="2" face="Arial, Helvetica, sans-serif">&copy; 2026 MongoSnap. All rights reserved.</font>
               </p>
               <p style="margin: 0; padding: 0; color: #9ca3af; font-size: 13px; font-family: Arial, Helvetica, sans-serif;">
-                <font color="#9ca3af" size="2" face="Arial, Helvetica, sans-serif">Need help? Contact <a href="mailto:support@mongosnap.live" style="color: #3CBC6B; text-decoration: none;"><font color="#3CBC6B">support@mongosnap.live</font></a></font>
+                <font color="#9ca3af" size="2" face="Arial, Helvetica, sans-serif">Need help? Contact <a href="mailto:support@mongosnap.xyz" style="color: #3CBC6B; text-decoration: none;"><font color="#3CBC6B">support@mongosnap.xyz</font></a></font>
               </p>
             </td>
           </tr>
@@ -235,7 +235,7 @@ const createList = (items, color = '#d1d5db') => {
 
 // Email verification template
 const createVerificationTemplate = (token) => {
-  const verificationLink = `https://mongosnap.live/api/verify-email/${token}`;
+  const verificationLink = `https://mongosnap.xyz/api/verify-email/${token}`;
   const content = `
     ${createH2('Welcome to MongoSnap!')}
     ${createP('Please verify your email address to complete your registration.')}
@@ -272,7 +272,7 @@ const createTwoFactorEnabledTemplate = () => {
   const content = `
     ${createH2('Two-Factor Authentication Enabled')}
     ${createP('Your account is now protected with an additional layer of security.')}
-    ${createButton('https://mongosnap.live', 'Go to MongoSnap')}
+    ${createButton('https://mongosnap.xyz', 'Go to MongoSnap')}
   `;
   return createBaseTemplate(content, '2FA Enabled');
 };
@@ -282,7 +282,7 @@ const createTwoFactorDisabledTemplate = () => {
   const content = `
     ${createH2('Two-Factor Authentication Disabled', '#ef4444')}
     ${createP('Your account security has been reduced. We recommend re-enabling 2FA.')}
-    ${createButton('https://mongosnap.live/settings', 'Re-enable 2FA')}
+    ${createButton('https://mongosnap.xyz/settings', 'Re-enable 2FA')}
   `;
   return createBaseTemplate(content, '2FA Disabled');
 };
@@ -305,7 +305,7 @@ const createLoginNotificationTemplate = (loginDetails) => {
     ${createP('We noticed a new login to your MongoSnap account. Here are the details:')}
     ${createInfoBox(infoRows)}
     ${createP('If this was you, no action is required.')}
-    ${createButton('https://mongosnap.live/settings', 'Review Security Settings')}
+    ${createButton('https://mongosnap.xyz/settings', 'Review Security Settings')}
     ${createWarningBox("If this wasn't you, please secure your account immediately by changing your password and enabling two-factor authentication.")}
   `;
   return createBaseTemplate(content, 'New Login Alert');
@@ -362,7 +362,7 @@ const createPaymentConfirmationTemplate = (paymentDetails) => {
     ${createH2('Payment Confirmation')}
     ${createP('Thank you for your payment! Your subscription has been successfully activated.')}
     ${createInfoBox(paymentRows)}
-    ${createButton('https://mongosnap.live/connect', 'Go to Dashboard')}
+    ${createButton('https://mongosnap.xyz/connect', 'Go to Dashboard')}
     ${createInfoBox(createH3("What's Next?") + createP('You now have access to all premium features including:') + featuresList)}
   `;
   return createBaseTemplate(content, 'Payment Confirmation');
@@ -402,7 +402,7 @@ const createPlanUpgradeTemplate = (upgradeDetails) => {
     ${createH2('Plan Upgrade Successful!')}
     ${createP('Congratulations! Your MongoSnap plan has been successfully upgraded.')}
     ${createInfoBox(upgradeRows)}
-    ${createButton('https://mongosnap.live/connect', 'Start Using Premium Features')}
+    ${createButton('https://mongosnap.xyz/connect', 'Start Using Premium Features')}
     ${createInfoBox(createH3('New Features Available:') + createList(features))}
     ${createP("Thank you for choosing MongoSnap! We're excited to see what you'll build with these powerful features.")}
   `;
@@ -435,10 +435,10 @@ const createSubscriptionCancellationTemplate = (cancellationDetails) => {
     ${createH2('Subscription Cancelled')}
     ${createP(`Your ${planName} subscription has been cancelled as requested.`)}
     ${createInfoBox(cancellationRows)}
-    ${createButton('https://mongosnap.live/pricing', 'Reactivate Subscription')}
+    ${createButton('https://mongosnap.xyz/pricing', 'Reactivate Subscription')}
     ${createWarningBox(createH3('Features No Longer Available:', '#fbbf24') + createList(featuresLost, '#fbbf24'))}
     ${createP('You can reactivate your subscription at any time to regain access to premium features.')}
-    ${createInfoBox(createInfoRow('Need help?', `Contact our support team at <a href="mailto:support@mongosnap.live" style="color: #3CBC6B; text-decoration: none;"><font color="#3CBC6B">support@mongosnap.live</font></a>`))}
+    ${createInfoBox(createInfoRow('Need help?', `Contact our support team at <a href="mailto:support@mongosnap.xyz" style="color: #3CBC6B; text-decoration: none;"><font color="#3CBC6B">support@mongosnap.xyz</font></a>`))}
   `;
   return createBaseTemplate(content, 'Subscription Cancelled');
 };
@@ -451,7 +451,7 @@ const createSubscriptionCancellationTemplate = (cancellationDetails) => {
 const sendVerificationEmail = async (email, token) => {
   const html = createVerificationTemplate(token);
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
     to: email,
     subject: "Verify your MongoSnap account",
     html: html
@@ -461,7 +461,7 @@ const sendVerificationEmail = async (email, token) => {
 const sendResetPasswordEmail = async (email, link) => {
   const html = createPasswordResetTemplate(link);
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
     to: email,
     subject: "Reset your MongoSnap password",
     html: html
@@ -471,7 +471,7 @@ const sendResetPasswordEmail = async (email, link) => {
 const sendTwoFactorEmailOTP = async (email, token) => {
   const html = createTwoFactorOTPTemplate(token);
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
     to: email,
     subject: "MongoSnap - 2FA Code",
     html: html
@@ -481,7 +481,7 @@ const sendTwoFactorEmailOTP = async (email, token) => {
 const sendTwoFactorConfirmationEmail = async (email) => {
   const html = createTwoFactorEnabledTemplate();
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
     to: email,
     subject: "2FA Enabled - MongoSnap",
     html: html
@@ -491,7 +491,7 @@ const sendTwoFactorConfirmationEmail = async (email) => {
 const sendTwoFactorDisableConfirmationEmail = async (email) => {
   const html = createTwoFactorDisabledTemplate();
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
     to: email,
     subject: "2FA Disabled - MongoSnap",
     html: html
@@ -501,7 +501,7 @@ const sendTwoFactorDisableConfirmationEmail = async (email) => {
 const sendLoginNotificationEmail = async (email, loginDetails) => {
   const html = createLoginNotificationTemplate(loginDetails);
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
     to: email,
     subject: "New Login to Your MongoSnap Account",
     html: html
@@ -511,7 +511,7 @@ const sendLoginNotificationEmail = async (email, loginDetails) => {
 const sendPaymentConfirmationEmail = async (email, paymentDetails) => {
   const html = createPaymentConfirmationTemplate(paymentDetails);
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
     to: email,
     subject: "Payment Confirmation - MongoSnap",
     html: html
@@ -521,7 +521,7 @@ const sendPaymentConfirmationEmail = async (email, paymentDetails) => {
 const sendPlanUpgradeEmail = async (email, upgradeDetails) => {
   const html = createPlanUpgradeTemplate(upgradeDetails);
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
     to: email,
     subject: "Plan Upgrade Successful - MongoSnap",
     html: html
@@ -531,7 +531,7 @@ const sendPlanUpgradeEmail = async (email, upgradeDetails) => {
 const sendSubscriptionCancellationEmail = async (email, cancellationDetails) => {
   const html = createSubscriptionCancellationTemplate(cancellationDetails);
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.live>`,
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
     to: email,
     subject: "Subscription Cancelled - MongoSnap",
     html: html

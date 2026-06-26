@@ -175,7 +175,7 @@ const PublicLayout = ({ children }) => {
                             <ul className="space-y-2">
                                 <li>
                                     <a
-                                        href="mailto:support@mongosnap.live"
+                                        href="mailto:support@mongosnap.xyz"
                                         className="text-gray-400 hover:text-brand-quaternary text-sm transition-colors duration-200 cursor-pointer"
                                     >
                                         Help Center
@@ -198,10 +198,10 @@ const PublicLayout = ({ children }) => {
                             <div className="space-y-2 text-sm">
                                 <p className="text-gray-400">
                                     <a
-                                        href="mailto:support@mongosnap.live"
+                                        href="mailto:support@mongosnap.xyz"
                                         className="hover:text-brand-quaternary transition-colors duration-200 cursor-pointer"
                                     >
-                                        support@mongosnap.live
+                                        support@mongosnap.xyz
                                     </a>
                                 </p>
                                 <p className="text-gray-400">

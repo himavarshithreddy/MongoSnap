@@ -40,9 +40,9 @@ const Contact = () => {
         {
             icon: Mail,
             title: "Email Support",
-            content: "support@mongosnap.live",
+            content: "support@mongosnap.xyz",
             description: "Get help with technical questions and account issues",
-            action: "mailto:support@mongosnap.live"
+            action: "mailto:support@mongosnap.xyz"
         },
         {
             icon: Phone,
@@ -149,7 +149,7 @@ const Contact = () => {
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <a
-                                href="mailto:support@mongosnap.live"
+                                href="mailto:support@mongosnap.xyz"
                                 className="px-8 py-4 bg-brand-quaternary text-white rounded-lg hover:bg-brand-quaternary/90 transition-all duration-200 font-semibold text-lg flex items-center justify-center gap-3 group cursor-pointer"
                             >
                                 Quick Email
@@ -345,8 +345,8 @@ const Contact = () => {
                             <p className="text-gray-300 text-sm text-center">
                                 <strong>Response Time:</strong> We typically respond within 24 hours during business days. 
                                 For urgent technical issues, please email us directly at{' '}
-                                <a href="mailto:support@mongosnap.live" className="text-brand-quaternary hover:text-white transition-colors">
-                                    support@mongosnap.live
+                                <a href="mailto:support@mongosnap.xyz" className="text-brand-quaternary hover:text-white transition-colors">
+                                    support@mongosnap.xyz
                                 </a>
                             </p>
                         </div>

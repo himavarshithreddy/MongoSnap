@@ -55,7 +55,7 @@ router.get('/:token', async (req, res) => {
               <div class="logo">MongoSnap</div>
               <h1>Verification Failed</h1>
               <p>The verification link is invalid or has expired.</p>
-              <a href="https://mongosnap.live/login" class="btn">Go to Login</a>
+              <a href="https://mongosnap.xyz/login" class="btn">Go to Login</a>
           </div>
       </body>
       </html>
@@ -131,7 +131,7 @@ router.get('/:token', async (req, res) => {
             <div class="success">✓</div>
             <h1>Email Verified!</h1>
             <p>Your email has been successfully verified. You can now log in to your account.</p>
-            <a href="https://mongosnap.live/login" class="btn">Continue to Login</a>
+            <a href="https://mongosnap.xyz/login" class="btn">Continue to Login</a>
         </div>
     </body>
     </html>
