@@ -13,218 +13,277 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Simple base template
+// ──────────────────────────────────────────────────────────────────────────────
+// TABLE-BASED EMAIL TEMPLATES — FULLY INLINE + HTML ATTRIBUTE FALLBACKS
+//
+// Why this approach:
+// 1. <style> blocks are stripped by Gmail, Yahoo, and many mobile clients
+// 2. <div>-based layouts break in Outlook (uses Word's rendering engine)
+// 3. CSS shorthand (margin: 10px 0) is misinterpreted by some clients
+// 4. HTML attributes (bgcolor, width, align, cellpadding, cellspacing, border)
+//    work even when ALL CSS is stripped — they are the ultimate fallback
+// 5. print-color-adjust / -webkit-print-color-adjust forces browsers to
+//    preserve background colors when printing
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Base template wrapper — table-based layout with full HTML attribute fallbacks.
+ * Every visual property is set via BOTH an HTML attribute AND an inline style.
+ */
 const createBaseTemplate = (content, title) => {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>${title}</title>
-        <style>
-            body {
-                font-family: 'Inter', Arial, sans-serif;
-                background: #101813;
-                color: #e5e7eb;
-                margin: 0;
-                padding: 0;
-                min-width: 100vw;
-            }
-            .container {
-                background: #203127;
-                max-width: 480px;
-                margin: 40px auto;
-                border-radius: 18px;
-                box-shadow: 0 4px 32px 0 #00000033;
-                padding: 32px 24px 24px 24px;
-                border: 1px solid #235337;
-            }
-            .header {
-                text-align: center;
-                margin-bottom: 24px;
-                border-bottom: 2px solid #3CBC6B;
-                padding-bottom: 16px;
-            }
-            .title {
-                color: #3CBC6B;
-                font-size: 26px;
-                font-weight: 800;
-                margin: 0;
-                letter-spacing: 1px;
-            }
-            .main-content {
-                margin-top: 24px;
-                margin-bottom: 24px;
-            }
-            .button {
-                display: inline-block;
-                background: linear-gradient(90deg, #3CBC6B 0%, #35c56a 100%);
-                color: #ffffff !important;
-                text-decoration: none;
-                padding: 14px 32px;
-                border-radius: 10px;
-                font-weight: 700;
-                font-size: 16px;
-                margin: 24px 0 12px 0;
-                transition: background 0.2s, transform 0.2s;
-                box-shadow: 0 2px 8px 0 #3cbc6b22;
-            }
-            .button:hover {
-                background: linear-gradient(90deg, #35c56a 0%, #3CBC6B 100%);
-                transform: scale(1.03);
-            }
-            .code {
-                background: #235337;
-                border: 2px solid #3CBC6B;
-                border-radius: 8px;
-                padding: 18px;
-                text-align: center;
-                font-size: 28px;
-                font-weight: bold;
-                color: #3CBC6B;
-                margin: 24px 0;
-                letter-spacing: 2px;
-            }
-            .footer {
-                text-align: center;
-                color: #9ca3af;
-                font-size: 13px;
-                margin-top: 32px;
-                border-top: 1px solid #235337;
-                padding-top: 18px;
-            }
-            .warning {
-                background: #1f2937;
-                border: 1px solid #374151;
-                border-radius: 8px;
-                padding: 12px;
-                margin: 20px 0;
-                color: #fbbf24;
-                font-size: 15px;
-            }
-            .info-box {
-                background: #17211b;
-                border: 1px solid #374151;
-                border-radius: 8px;
-                padding: 15px;
-                margin: 20px 0;
-                color: #d1d5db;
-            }
-            .info-box p {
-                margin: 8px 0;
-            }
-            .info-box strong {
-                color: #3CBC6B;
-            }
-            h2 {
-                color: #fff;
-                font-weight: 700;
-                margin-bottom: 16px;
-                font-size: 22px;
-            }
-            p {
-                color: #d1d5db;
-                margin-bottom: 15px;
-                font-size: 16px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1 class="title">MongoSnap</h1>
-            </div>
-            <div class="main-content">
-                ${content}
-            </div>
-            <div class="footer">
-                <p>© 2026 MongoSnap. All rights reserved.</p>
-                <p>Need help? Contact <a href="mailto:support@mongosnap.live" style="color:#3CBC6B;text-decoration:none;">support@mongosnap.live</a></p>
-            </div>
-        </div>
-    </body>
-    </html>
-  `;
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no">
+  <title>${title}</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <style type="text/css">
+    body, table, td, a { font-family: Arial, sans-serif !important; }
+    table { border-collapse: collapse !important; }
+  </style>
+  <![endif]-->
+</head>
+<body bgcolor="#101813" style="margin: 0; padding: 0; width: 100%; background-color: #101813; font-family: Arial, Helvetica, sans-serif; color: #e5e7eb; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+
+  <!-- Outer wrapper table — fills viewport, sets background -->
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#101813" style="background-color: #101813; margin: 0; padding: 0; width: 100%; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+    <tr>
+      <td align="center" valign="top" style="padding-top: 40px; padding-bottom: 40px;">
+
+        <!-- Inner container table — the card -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="480" bgcolor="#203127" style="background-color: #203127; max-width: 480px; width: 100%; border-radius: 18px; border: 1px solid #235337; box-shadow: 0 4px 32px 0 rgba(0,0,0,0.2); -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+
+          <!-- Header row -->
+          <tr>
+            <td align="center" style="padding-top: 32px; padding-right: 24px; padding-bottom: 16px; padding-left: 24px; border-bottom: 2px solid #3CBC6B;">
+              <h1 style="margin: 0; padding: 0; color: #3CBC6B; font-size: 26px; font-weight: 800; letter-spacing: 1px; font-family: Arial, Helvetica, sans-serif;">
+                <font color="#3CBC6B" face="Arial, Helvetica, sans-serif">MongoSnap</font>
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Main content row -->
+          <tr>
+            <td style="padding-top: 24px; padding-right: 24px; padding-bottom: 24px; padding-left: 24px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #d1d5db;">
+              ${content}
+            </td>
+          </tr>
+
+          <!-- Footer row -->
+          <tr>
+            <td align="center" style="padding-top: 18px; padding-right: 24px; padding-bottom: 24px; padding-left: 24px; border-top: 1px solid #235337;">
+              <p style="margin: 0; margin-bottom: 8px; padding: 0; color: #9ca3af; font-size: 13px; font-family: Arial, Helvetica, sans-serif;">
+                <font color="#9ca3af" size="2" face="Arial, Helvetica, sans-serif">&copy; 2026 MongoSnap. All rights reserved.</font>
+              </p>
+              <p style="margin: 0; padding: 0; color: #9ca3af; font-size: 13px; font-family: Arial, Helvetica, sans-serif;">
+                <font color="#9ca3af" size="2" face="Arial, Helvetica, sans-serif">Need help? Contact <a href="mailto:support@mongosnap.live" style="color: #3CBC6B; text-decoration: none;"><font color="#3CBC6B">support@mongosnap.live</font></a></font>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Inner container -->
+
+      </td>
+    </tr>
+  </table>
+  <!-- /Outer wrapper -->
+
+</body>
+</html>`;
 };
+
+/**
+ * Helper: creates a styled CTA button using a table-based approach.
+ * The table-cell-as-button technique ensures padding works in Outlook
+ * and the bgcolor attribute provides a fallback when CSS is stripped.
+ */
+const createButton = (href, label) => {
+  return `
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 24px; margin-bottom: 12px;">
+      <tr>
+        <td align="center">
+          <!--[if mso]>
+          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${href}" style="height:48px;v-text-anchor:middle;width:220px;" arcsize="21%" strokeweight="0" fillcolor="#3CBC6B">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">
+              ${label}
+            </center>
+          </v:roundrect>
+          <![endif]-->
+          <!--[if !mso]><!-->
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+            <tr>
+              <td align="center" bgcolor="#3CBC6B" style="background-color: #3CBC6B; border-radius: 10px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+                <a href="${href}" target="_blank" style="display: inline-block; padding-top: 14px; padding-right: 32px; padding-bottom: 14px; padding-left: 32px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 10px; background-color: #3CBC6B; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+                  <font color="#ffffff" face="Arial, Helvetica, sans-serif"><b>${label}</b></font>
+                </a>
+              </td>
+            </tr>
+          </table>
+          <!--<![endif]-->
+        </td>
+      </tr>
+    </table>`;
+};
+
+/**
+ * Helper: creates an info-box using a nested table with bgcolor fallback.
+ */
+const createInfoBox = (innerHtml) => {
+  return `
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#17211b" style="background-color: #17211b; border: 1px solid #374151; border-radius: 8px; margin-top: 20px; margin-bottom: 20px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+      <tr>
+        <td style="padding: 15px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #d1d5db;">
+          ${innerHtml}
+        </td>
+      </tr>
+    </table>`;
+};
+
+/**
+ * Helper: creates a warning box using a nested table with bgcolor fallback.
+ */
+const createWarningBox = (innerHtml) => {
+  return `
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#1f2937" style="background-color: #1f2937; border: 1px solid #374151; border-radius: 8px; margin-top: 20px; margin-bottom: 20px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+      <tr>
+        <td style="padding: 12px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; color: #fbbf24;">
+          <font color="#fbbf24" face="Arial, Helvetica, sans-serif">${innerHtml}</font>
+        </td>
+      </tr>
+    </table>`;
+};
+
+/**
+ * Helper: creates a code/OTP display box using a table with bgcolor fallback.
+ */
+const createCodeBox = (code) => {
+  return `
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#235337" style="background-color: #235337; border: 2px solid #3CBC6B; border-radius: 8px; margin-top: 24px; margin-bottom: 24px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+      <tr>
+        <td align="center" style="padding: 18px; font-family: Arial, Helvetica, sans-serif; font-size: 28px; font-weight: bold; color: #3CBC6B; letter-spacing: 2px;">
+          <font color="#3CBC6B" size="6" face="Arial, Helvetica, sans-serif"><b>${code}</b></font>
+        </td>
+      </tr>
+    </table>`;
+};
+
+/**
+ * Helper: creates a styled info row (label: value) inside an info-box.
+ */
+const createInfoRow = (label, value) => {
+  return `<p style="margin-top: 8px; margin-bottom: 8px; margin-left: 0; margin-right: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #d1d5db;">
+    <font color="#d1d5db" face="Arial, Helvetica, sans-serif"><strong style="color: #3CBC6B;"><font color="#3CBC6B">${label}:</font></strong> ${value}</font>
+  </p>`;
+};
+
+/**
+ * Helper: creates a heading (h2).
+ */
+const createH2 = (text, color = '#ffffff') => {
+  return `<h2 style="margin-top: 0; margin-bottom: 16px; padding: 0; color: ${color}; font-weight: 700; font-size: 22px; font-family: Arial, Helvetica, sans-serif;">
+    <font color="${color}" face="Arial, Helvetica, sans-serif">${text}</font>
+  </h2>`;
+};
+
+/**
+ * Helper: creates a paragraph.
+ */
+const createP = (text) => {
+  return `<p style="margin-top: 0; margin-bottom: 15px; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 16px; color: #d1d5db; line-height: 1.5;">
+    <font color="#d1d5db" face="Arial, Helvetica, sans-serif">${text}</font>
+  </p>`;
+};
+
+/**
+ * Helper: creates a sub-heading (h3) for inside info-boxes.
+ */
+const createH3 = (text, color = '#3CBC6B') => {
+  return `<h3 style="margin-top: 0; margin-bottom: 10px; padding: 0; color: ${color}; font-weight: 700; font-size: 18px; font-family: Arial, Helvetica, sans-serif;">
+    <font color="${color}" face="Arial, Helvetica, sans-serif">${text}</font>
+  </h3>`;
+};
+
+/**
+ * Helper: creates a styled list from an array of items.
+ */
+const createList = (items, color = '#d1d5db') => {
+  const lis = items.map(item =>
+    `<li style="margin-bottom: 4px; color: ${color}; font-size: 16px; font-family: Arial, Helvetica, sans-serif;"><font color="${color}" face="Arial, Helvetica, sans-serif">${item}</font></li>`
+  ).join('\n        ');
+  return `<ul style="margin-top: 10px; margin-bottom: 10px; padding-left: 20px; color: ${color};">
+        ${lis}
+      </ul>`;
+};
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// EMAIL TEMPLATES
+// ──────────────────────────────────────────────────────────────────────────────
 
 // Email verification template
 const createVerificationTemplate = (token) => {
   const verificationLink = `https://mongosnap.live/api/verify-email/${token}`;
   const content = `
-    <h2>Welcome to MongoSnap!</h2>
-    <p>Please verify your email address to complete your registration.</p>
-    
-    <div style="text-align: center;">
-      <a href="${verificationLink}" class="button">Verify Email</a>
-    </div>
-    
-    <div class="warning">
-      This link expires in 24 hours.
-    </div>
+    ${createH2('Welcome to MongoSnap!')}
+    ${createP('Please verify your email address to complete your registration.')}
+    ${createButton(verificationLink, 'Verify Email')}
+    ${createWarningBox('This link expires in 24 hours.')}
   `;
-  
   return createBaseTemplate(content, 'Verify Your Account');
 };
 
 // Password reset template
 const createPasswordResetTemplate = (link) => {
   const content = `
-    <h2>Reset Your Password</h2>
-    <p>Click the button below to create a new password.</p>
-    
-    <div style="text-align: center;">
-      <a href="${link}" class="button">Reset Password</a>
-    </div>
-    
-    <div class="warning">
-      This link expires in 1 hour. If you didn't request this, please ignore this email.
-    </div>
+    ${createH2('Reset Your Password')}
+    ${createP('Click the button below to create a new password.')}
+    ${createButton(link, 'Reset Password')}
+    ${createWarningBox("This link expires in 1 hour. If you didn't request this, please ignore this email.")}
   `;
-  
   return createBaseTemplate(content, 'Reset Password');
 };
 
 // 2FA OTP template
 const createTwoFactorOTPTemplate = (token) => {
   const content = `
-    <h2>Two-Factor Authentication</h2>
-    <p>Enter this code to complete your login:</p>
-    
-    <div class="code">${token.toUpperCase()}</div>
-    
-    <div class="warning">
-      This code expires in 10 minutes. Never share this code with anyone.
-    </div>
+    ${createH2('Two-Factor Authentication')}
+    ${createP('Enter this code to complete your login:')}
+    ${createCodeBox(token.toUpperCase())}
+    ${createWarningBox('This code expires in 10 minutes. Never share this code with anyone.')}
   `;
-  
   return createBaseTemplate(content, '2FA Code');
 };
 
 // 2FA enabled template
 const createTwoFactorEnabledTemplate = () => {
   const content = `
-    <h2>Two-Factor Authentication Enabled</h2>
-    <p>Your account is now protected with an additional layer of security.</p>
-    
-    <div style="text-align: center;">
-      <a href="https://mongosnap.live" class="button">Go to MongoSnap</a>
-    </div>
+    ${createH2('Two-Factor Authentication Enabled')}
+    ${createP('Your account is now protected with an additional layer of security.')}
+    ${createButton('https://mongosnap.live', 'Go to MongoSnap')}
   `;
-  
   return createBaseTemplate(content, '2FA Enabled');
 };
 
 // 2FA disabled template
 const createTwoFactorDisabledTemplate = () => {
   const content = `
-    <h2 style="color: #ef4444;">Two-Factor Authentication Disabled</h2>
-    <p>Your account security has been reduced. We recommend re-enabling 2FA.</p>
-    
-    <div style="text-align: center;">
-      <a href="https://mongosnap.live/settings" class="button">Re-enable 2FA</a>
-    </div>
+    ${createH2('Two-Factor Authentication Disabled', '#ef4444')}
+    ${createP('Your account security has been reduced. We recommend re-enabling 2FA.')}
+    ${createButton('https://mongosnap.live/settings', 'Re-enable 2FA')}
   `;
-  
   return createBaseTemplate(content, '2FA Disabled');
 };
 
@@ -233,30 +292,22 @@ const createLoginNotificationTemplate = (loginDetails) => {
   const { timestamp, ipAddress, userAgent, location, email, loginMethod } = loginDetails;
   const formattedTime = new Date(timestamp).toLocaleString();
 
+  let infoRows = '';
+  infoRows += createInfoRow('Email', email || 'Not provided');
+  infoRows += createInfoRow('Login Method', loginMethod || 'Email/Password');
+  infoRows += createInfoRow('Time', formattedTime);
+  if (ipAddress) infoRows += createInfoRow('IP Address', ipAddress);
+  if (location) infoRows += createInfoRow('Location', location);
+  if (userAgent) infoRows += createInfoRow('Device', userAgent);
+
   const content = `
-    <h2>New Login to Your Account</h2>
-    <p>We noticed a new login to your MongoSnap account. Here are the details:</p>
-    
-    <div class="info-box">
-      <p><strong>Email:</strong> ${email || 'Not provided'}</p>
-      <p><strong>Login Method:</strong> ${loginMethod || 'Email/Password'}</p>
-      <p><strong>Time:</strong> ${formattedTime}</p>
-      ${ipAddress ? `<p><strong>IP Address:</strong> ${ipAddress}</p>` : ''}
-      ${location ? `<p><strong>Location:</strong> ${location}</p>` : ''}
-      ${userAgent ? `<p><strong>Device:</strong> ${userAgent}</p>` : ''}
-    </div>
-    
-    <p>If this was you, no action is required.</p>
-    
-    <div style="text-align: center;">
-      <a href="https://mongosnap.live/settings" class="button">Review Security Settings</a>
-    </div>
-    
-    <div class="warning">
-      If this wasn't you, please secure your account immediately by changing your password and enabling two-factor authentication.
-    </div>
+    ${createH2('New Login to Your Account')}
+    ${createP('We noticed a new login to your MongoSnap account. Here are the details:')}
+    ${createInfoBox(infoRows)}
+    ${createP('If this was you, no action is required.')}
+    ${createButton('https://mongosnap.live/settings', 'Review Security Settings')}
+    ${createWarningBox("If this wasn't you, please secure your account immediately by changing your password and enabling two-factor authentication.")}
   `;
-  
   return createBaseTemplate(content, 'New Login Alert');
 };
 
@@ -273,7 +324,7 @@ const createPaymentConfirmationTemplate = (paymentDetails) => {
     cardLast4
   } = paymentDetails;
 
-  const formattedAmount = `₹${amount}`;
+  const formattedAmount = `&#8377;${amount}`;
   const formattedPaymentDate = new Date(paymentDate).toLocaleDateString('en-IN', {
     year: 'numeric',
     month: 'long',
@@ -287,40 +338,33 @@ const createPaymentConfirmationTemplate = (paymentDetails) => {
     day: 'numeric'
   });
 
+  let paymentRows = '';
+  paymentRows += createInfoRow('Transaction ID', transactionId);
+  paymentRows += createInfoRow('Amount Paid', formattedAmount);
+  paymentRows += createInfoRow('Plan', subscriptionPlan.toUpperCase());
+  paymentRows += createInfoRow('Payment Date', formattedPaymentDate);
+  paymentRows += createInfoRow('Subscription Expires', formattedExpiryDate);
+  if (paymentMethod) paymentRows += createInfoRow('Payment Method', paymentMethod);
+  if (cardLast4) paymentRows += createInfoRow('Card', `**** **** **** ${cardLast4}`);
+
+  const featuresList = createList([
+    'Unlimited query history',
+    'Save &amp; organize queries',
+    'Unlimited database connections',
+    'Unlimited executions',
+    'Enhanced AI generation',
+    'Export database schemas',
+    'Upload your own databases',
+    'Priority support'
+  ]);
+
   const content = `
-    <h2>Payment Confirmation</h2>
-    <p>Thank you for your payment! Your subscription has been successfully activated.</p>
-    
-    <div class="info-box">
-      <p><strong>Transaction ID:</strong> ${transactionId}</p>
-      <p><strong>Amount Paid:</strong> ${formattedAmount}</p>
-      <p><strong>Plan:</strong> ${subscriptionPlan.toUpperCase()}</p>
-      <p><strong>Payment Date:</strong> ${formattedPaymentDate}</p>
-      <p><strong>Subscription Expires:</strong> ${formattedExpiryDate}</p>
-      ${paymentMethod ? `<p><strong>Payment Method:</strong> ${paymentMethod}</p>` : ''}
-      ${cardLast4 ? `<p><strong>Card:</strong> **** **** **** ${cardLast4}</p>` : ''}
-    </div>
-    
-    <div style="text-align: center;">
-      <a href="https://mongosnap.live/connect" class="button">Go to Dashboard</a>
-    </div>
-    
-    <div class="info-box">
-      <h3 style="color: #3CBC6B; margin-top: 0;">What's Next?</h3>
-      <p>You now have access to all premium features including:</p>
-      <ul style="margin: 10px 0; padding-left: 20px;">
-        <li>Unlimited query history</li>
-        <li>Save & organize queries</li>
-        <li>Unlimited database connections</li>
-        <li>Unlimited executions</li>
-        <li>Enhanced AI generation</li>
-        <li>Export database schemas</li>
-        <li>Upload your own databases</li>
-        <li>Priority support</li>
-      </ul>
-    </div>
+    ${createH2('Payment Confirmation')}
+    ${createP('Thank you for your payment! Your subscription has been successfully activated.')}
+    ${createInfoBox(paymentRows)}
+    ${createButton('https://mongosnap.live/connect', 'Go to Dashboard')}
+    ${createInfoBox(createH3("What's Next?") + createP('You now have access to all premium features including:') + featuresList)}
   `;
-  
   return createBaseTemplate(content, 'Payment Confirmation');
 };
 
@@ -348,31 +392,20 @@ const createPlanUpgradeTemplate = (upgradeDetails) => {
     day: 'numeric'
   });
 
+  let upgradeRows = '';
+  upgradeRows += createInfoRow('Previous Plan', oldPlan);
+  upgradeRows += createInfoRow('New Plan', newPlan);
+  upgradeRows += createInfoRow('Upgrade Date', formattedUpgradeDate);
+  upgradeRows += createInfoRow('Subscription Expires', formattedExpiryDate);
+
   const content = `
-    <h2>Plan Upgrade Successful!</h2>
-    <p>Congratulations! Your MongoSnap plan has been successfully upgraded.</p>
-    
-    <div class="info-box">
-      <p><strong>Previous Plan:</strong> ${oldPlan}</p>
-      <p><strong>New Plan:</strong> ${newPlan}</p>
-      <p><strong>Upgrade Date:</strong> ${formattedUpgradeDate}</p>
-      <p><strong>Subscription Expires:</strong> ${formattedExpiryDate}</p>
-    </div>
-    
-    <div style="text-align: center;">
-      <a href="https://mongosnap.live/connect" class="button">Start Using Premium Features</a>
-    </div>
-    
-    <div class="info-box">
-      <h3 style="color: #3CBC6B; margin-top: 0;">New Features Available:</h3>
-      <ul style="margin: 10px 0; padding-left: 20px;">
-        ${features.map(feature => `<li>${feature}</li>`).join('')}
-      </ul>
-    </div>
-    
-    <p>Thank you for choosing MongoSnap! We're excited to see what you'll build with these powerful features.</p>
+    ${createH2('Plan Upgrade Successful!')}
+    ${createP('Congratulations! Your MongoSnap plan has been successfully upgraded.')}
+    ${createInfoBox(upgradeRows)}
+    ${createButton('https://mongosnap.live/connect', 'Start Using Premium Features')}
+    ${createInfoBox(createH3('New Features Available:') + createList(features))}
+    ${createP("Thank you for choosing MongoSnap! We're excited to see what you'll build with these powerful features.")}
   `;
-  
   return createBaseTemplate(content, 'Plan Upgrade Successful');
 };
 
@@ -393,38 +426,28 @@ const createSubscriptionCancellationTemplate = (cancellationDetails) => {
     minute: '2-digit'
   });
 
+  let cancellationRows = '';
+  cancellationRows += createInfoRow('Plan', planName);
+  cancellationRows += createInfoRow('Cancellation Date', formattedCancellationDate);
+  cancellationRows += createInfoRow('Status', 'Cancelled');
+
   const content = `
-    <h2>Subscription Cancelled</h2>
-    <p>Your ${planName} subscription has been cancelled as requested.</p>
-    
-    <div class="info-box">
-      <p><strong>Plan:</strong> ${planName}</p>
-      <p><strong>Cancellation Date:</strong> ${formattedCancellationDate}</p>
-      <p><strong>Status:</strong> Cancelled</p>
-    </div>
-    
-    <div style="text-align: center;">
-      <a href="https://mongosnap.live/pricing" class="button">Reactivate Subscription</a>
-    </div>
-    
-    <div class="warning">
-      <h3 style="color: #fbbf24; margin-top: 0;">Features No Longer Available:</h3>
-      <ul style="margin: 10px 0; padding-left: 20px;">
-        ${featuresLost.map(feature => `<li>${feature}</li>`).join('')}
-      </ul>
-    </div>
-    
-    <p>You can reactivate your subscription at any time to regain access to premium features.</p>
-    
-    <div class="info-box">
-      <p><strong>Need help?</strong> Contact our support team at <a href="mailto:support@mongosnap.live" style="color:#3CBC6B;text-decoration:none;">support@mongosnap.live</a></p>
-    </div>
+    ${createH2('Subscription Cancelled')}
+    ${createP(`Your ${planName} subscription has been cancelled as requested.`)}
+    ${createInfoBox(cancellationRows)}
+    ${createButton('https://mongosnap.live/pricing', 'Reactivate Subscription')}
+    ${createWarningBox(createH3('Features No Longer Available:', '#fbbf24') + createList(featuresLost, '#fbbf24'))}
+    ${createP('You can reactivate your subscription at any time to regain access to premium features.')}
+    ${createInfoBox(createInfoRow('Need help?', `Contact our support team at <a href="mailto:support@mongosnap.live" style="color: #3CBC6B; text-decoration: none;"><font color="#3CBC6B">support@mongosnap.live</font></a>`))}
   `;
-  
   return createBaseTemplate(content, 'Subscription Cancelled');
 };
 
-// Email sending functions
+
+// ──────────────────────────────────────────────────────────────────────────────
+// EMAIL SENDING FUNCTIONS
+// ──────────────────────────────────────────────────────────────────────────────
+
 const sendVerificationEmail = async (email, token) => {
   const html = createVerificationTemplate(token);
   await transporter.sendMail({
