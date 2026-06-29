@@ -27,9 +27,9 @@ app.use(cors({
   credentials: true,
   sameSite: 'lax'
 }));
-// JSON parser; keep raw body for Cashfree webhook route only
+// JSON parser; keep raw body for Cashfree webhook routes only
 app.use((req, res, next) => {
-  if (req.path === '/api/payment/cf/webhook') return next();
+  if (req.path === '/api/payment/cf/webhook' || req.path === '/api/payment/cfform/webhook') return next();
   express.json()(req, res, () => express.urlencoded({ extended: true })(req, res, next));
 });
 app.use(cookieParser());

@@ -48,7 +48,7 @@ async function getOrder(orderId) {
 }
 
 function verifyWebhookSignature(rawBodyBuffer, timestamp, receivedSignature) {
-  const clientSecret = process.env.CASHFREE_CLIENT_SECRET;
+  const clientSecret = process.env.CASHFREE_CLIENT_SECRET || process.env.CASHFREE_SECRET_KEY;
   if (!clientSecret || !timestamp || !receivedSignature) return false;
   try {
     const signedPayload = Buffer.concat([

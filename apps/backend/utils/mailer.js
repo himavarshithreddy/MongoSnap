@@ -538,6 +538,58 @@ const sendSubscriptionCancellationEmail = async (email, cancellationDetails) => 
   });
 };
 
+// Payment Form success template (fixed notification to admin/recipient)
+const createPaymentFormSuccessTemplate = (formDetails) => {
+  const {
+    formId,
+    orderId,
+    amount,
+    currency,
+    customerName,
+    customerEmail,
+    customerPhone,
+    paymentTime
+  } = formDetails;
+
+  const formattedAmount = `${currency} ${amount}`;
+  const formattedPaymentDate = new Date(paymentTime).toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  let infoRows = '';
+  infoRows += createInfoRow('Form ID', formId);
+  infoRows += createInfoRow('Order ID', orderId);
+  infoRows += createInfoRow('Amount Paid', formattedAmount);
+  infoRows += createInfoRow('Customer Name', customerName);
+  infoRows += createInfoRow('Customer Email', customerEmail);
+  infoRows += createInfoRow('Customer Phone', customerPhone);
+  infoRows += createInfoRow('Payment Date', formattedPaymentDate);
+  infoRows += createInfoRow('Status', 'PAID (Success)');
+
+  const content = `
+    ${createH2('Payment Form Success 🎉')}
+    ${createP('A new payment has been successfully received via Cashfree Payment Forms!')}
+    ${createInfoBox(infoRows)}
+    ${createButton('https://merchant.cashfree.com', 'View in Cashfree Dashboard')}
+    ${createP('This automated notification confirms the successful transaction.')}
+  `;
+  return createBaseTemplate(content, 'Payment Form Success');
+};
+
+const sendPaymentFormSuccessEmail = async (formDetails) => {
+  const html = createPaymentFormSuccessTemplate(formDetails);
+  await transporter.sendMail({
+    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
+    to: 'himavarshithreddy@gmail.com',
+    subject: `Payment Received: ${formDetails.currency} ${formDetails.amount} on ${formDetails.formId}`,
+    html: html
+  });
+};
+
 module.exports = { 
   sendVerificationEmail, 
   sendResetPasswordEmail, 
@@ -547,5 +599,6 @@ module.exports = {
   sendLoginNotificationEmail,
   sendPaymentConfirmationEmail,
   sendPlanUpgradeEmail,
-  sendSubscriptionCancellationEmail
+  sendSubscriptionCancellationEmail,
+  sendPaymentFormSuccessEmail
 };

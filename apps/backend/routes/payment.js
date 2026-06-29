@@ -9,7 +9,7 @@ const UserUsage = require('../models/UserUsage');
 const { generateTransactionId, formatAmount } = require('../utils/PaymentHelper');
 // Cashfree utilities (new)
 const { createOrder: cfCreateOrder, getOrder: cfGetOrder, verifyWebhookSignature } = require('../utils/cashfree');
-const { sendPaymentConfirmationEmail, sendPlanUpgradeEmail } = require('../utils/mailer');
+const { sendPaymentConfirmationEmail, sendPlanUpgradeEmail, sendPaymentFormSuccessEmail } = require('../utils/mailer');
 
 // Rate limiters for payment operations
 const paymentLimiter = rateLimit({
@@ -408,6 +408,47 @@ router.post('/cf/webhook', webhookLimiter, express.raw({ type: '*/*' }), async (
 
     } catch (error) {
         console.error('Error processing Cashfree webhook:', error);
+        res.status(500).send('Webhook processing error');
+    }
+});
+
+/**
+ * POST /api/payment/cfform/webhook
+ * Handle Cashfree Payment Forms webhook notifications
+ */
+router.post('/cfform/webhook', webhookLimiter, express.raw({ type: '*/*' }), async (req, res) => {
+    try {
+        console.log('Cashfree Payment Form webhook received');
+        const signature = req.header('x-webhook-signature');
+        const timestamp = req.header('x-webhook-timestamp');
+        const raw = req.body; // Buffer
+        const verified = verifyWebhookSignature(raw, timestamp, signature);
+        if (!verified) {
+            console.error('Invalid Cashfree Payment Form webhook signature');
+            return res.status(400).send('Invalid signature');
+        }
+        const payload = JSON.parse(raw.toString());
+        
+        const orderStatus = payload?.data?.order?.order_status;
+        if (orderStatus === 'PAID') {
+            console.log('Cashfree Payment Form success received, triggering email to himavarshithreddy@gmail.com');
+            const formDetails = {
+                formId: payload?.data?.form?.form_id || 'N/A',
+                orderId: payload?.data?.order?.order_id || 'N/A',
+                amount: payload?.data?.order?.order_amount || 0,
+                currency: payload?.data?.form?.form_currency || 'INR',
+                customerName: payload?.data?.order?.customer_details?.customer_name || 'N/A',
+                customerEmail: payload?.data?.order?.customer_details?.customer_email || 'N/A',
+                customerPhone: payload?.data?.order?.customer_details?.customer_phone || 'N/A',
+                paymentTime: payload?.event_time || new Date()
+            };
+            await sendPaymentFormSuccessEmail(formDetails);
+            console.log('Payment Form success email sent successfully');
+        }
+
+        res.status(200).send('Webhook processed successfully');
+    } catch (error) {
+        console.error('Error processing Cashfree Payment Form webhook:', error);
         res.status(500).send('Webhook processing error');
     }
 });
