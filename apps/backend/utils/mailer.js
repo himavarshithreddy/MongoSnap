@@ -583,9 +583,9 @@ const createPaymentFormSuccessTemplate = (formDetails) => {
 const sendPaymentFormSuccessEmail = async (formDetails) => {
   const html = createPaymentFormSuccessTemplate(formDetails);
   await transporter.sendMail({
-    from: `"MongoSnap" <noreply@mongosnap.xyz>`,
+    from: `"Canva Pro Payment" <noreply@mongosnap.xyz>`,
     to: 'himavarshithreddy@gmail.com',
-    subject: `Payment Received: ${formDetails.currency} ${formDetails.amount} on ${formDetails.formId}`,
+    subject: `Payment Received: ${formDetails.currency} ${formDetails.amount} for Canva Pro`,
     html: html
   });
 };

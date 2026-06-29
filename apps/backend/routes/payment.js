@@ -433,10 +433,10 @@ router.post('/cfform/webhook', webhookLimiter, express.raw({ type: '*/*' }), asy
         if (orderStatus === 'PAID') {
             console.log('Cashfree Payment Form success received, triggering email to himavarshithreddy@gmail.com');
             const formDetails = {
-                formId: payload?.data?.form?.form_id || 'N/A',
+                formId: payload?.data?.form?.form_id || payload?.data?.form?.cf_form_id || payload?.data?.order?.form_id || payload?.data?.order?.cf_form_id || payload?.data?.form_id || payload?.data?.cf_form_id || payload?.form_id || payload?.cf_form_id || 'N/A',
                 orderId: payload?.data?.order?.order_id || 'N/A',
                 amount: payload?.data?.order?.order_amount || 0,
-                currency: payload?.data?.form?.form_currency || 'INR',
+                currency: payload?.data?.form?.form_currency || payload?.data?.order?.order_currency || 'INR',
                 customerName: payload?.data?.order?.customer_details?.customer_name || 'N/A',
                 customerEmail: payload?.data?.order?.customer_details?.customer_email || 'N/A',
                 customerPhone: payload?.data?.order?.customer_details?.customer_phone || 'N/A',
